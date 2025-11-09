@@ -1,11 +1,16 @@
 mod camera;
 mod constants;
+mod controls;
 mod game_world;
+mod gizmos_plugin;
 mod player;
+mod shared;
 mod states;
 
 use crate::camera::CameraPlugin;
+use crate::controls::ControlsPlugin;
 use crate::game_world::GameWorldPlugin;
+use crate::gizmos_plugin::GizmosPlugin;
 use crate::player::PlayerPlugin;
 use crate::states::AppStatePlugin;
 use avian2d::PhysicsPlugins;
@@ -26,6 +31,13 @@ fn main() {
       PhysicsPlugins::default().with_length_unit(5.0),
     ))
     .insert_resource(Gravity::ZERO)
-    .add_plugins((CameraPlugin, AppStatePlugin, GameWorldPlugin, PlayerPlugin))
+    .add_plugins((
+      CameraPlugin,
+      AppStatePlugin,
+      GizmosPlugin,
+      GameWorldPlugin,
+      PlayerPlugin,
+      ControlsPlugin,
+    ))
     .run();
 }

@@ -15,3 +15,6 @@ pub(crate) const ROTATION_SPEED: f32 = 120.0;
 pub(crate) const BASE_BODY_COLOUR: Srgba = Srgba::new(0.0, 0.419607, 0.4239524, 1.0);
 pub(crate) const BODY_WIDTH: f32 = 3.0;
 pub(crate) const POSITION_SAMPLE_DISTANCE: f32 = 5.0; // Record position every 5 pixels
+pub(crate) const MAX_CONTINUOUS_SNAKE_LENGTH: usize = 100;
+pub(crate) const SNAKE_GAP_LENGTH: usize = 15;
+pub(crate) const SNAKE_HEAD_SIZE: f32 = 5.0;
