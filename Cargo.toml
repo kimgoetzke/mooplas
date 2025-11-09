@@ -1,0 +1,10 @@
+[package]
+name = "ekansoom"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+bevy = { version = "0.17.2", features = ["wayland"] }
+bevy-inspector-egui = { version = "0.35.0" }
+rand = "0.8.5"
+rand_chacha = "0.3.1"

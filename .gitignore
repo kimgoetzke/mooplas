@@ -1,0 +1,5 @@
+/target
+.direnv
+.idea
+/nohup.out
+/www/public/assets/
