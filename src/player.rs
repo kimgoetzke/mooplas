@@ -13,9 +13,9 @@ impl Plugin for PlayerPlugin {
     app.add_systems(Startup, spawn_player_system).add_systems(
       Update,
       ((
-        update_snake_tail_system,
-        update_snake_tail_collider_system,
-        update_snake_tail_mesh_system,
+        update_snake_tail_segments_system,
+        update_active_segment_collider_system,
+        update_active_segment_mesh_system,
       )
         .chain(),),
     );
@@ -46,30 +46,38 @@ impl Controller {
 }
 
 #[derive(Component)]
-struct SnakeTail {
+struct SnakeSegment {
   positions: Vec<Vec2>,
-  distance_since_last_sample: f32,
+  mesh_entity: Option<Entity>,
   collider_entity: Option<Entity>,
 }
 
-impl SnakeTail {
-  fn len(&self) -> usize {
-    self.positions.len()
-  }
-}
-
-impl Default for SnakeTail {
+impl Default for SnakeSegment {
   fn default() -> Self {
     Self {
-      positions: Vec::with_capacity(10000),
-      distance_since_last_sample: 0.0,
+      positions: Vec::with_capacity(MAX_CONTINUOUS_SNAKE_LENGTH),
+      mesh_entity: None,
       collider_entity: None,
     }
   }
 }
 
 #[derive(Component)]
-struct SnakeBodyCollider;
+struct SnakeTail {
+  segments: Vec<SnakeSegment>,
+  distance_since_last_sample: f32,
+  gap_samples_remaining: usize,
+}
+
+impl Default for SnakeTail {
+  fn default() -> Self {
+    Self {
+      segments: vec![SnakeSegment::default()],
+      distance_since_last_sample: 0.0,
+      gap_samples_remaining: 0,
+    }
+  }
+}
 
 #[derive(PhysicsLayer, Default)]
 enum GameLayer {
@@ -79,6 +87,7 @@ enum GameLayer {
   Tail,
 }
 
+// TODO: Spawn all player related entities under a parent entity for better organisation
 /// Spawns the player.
 fn spawn_player_system(
   mut commands: Commands,
@@ -103,13 +112,12 @@ fn spawn_player_system(
   commands.spawn((
     Name::new("Snake Tail"),
     SnakeTail::default(),
-    Mesh2d(meshes.add(Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default()))),
-    MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
     Transform::from_xyz(starting_position.x, starting_position.y, 0.),
     RigidBody::Static,
     CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
     PIXEL_PERFECT_LAYER,
   ));
+  // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
   commands.spawn((
     Name::new("Snake Tail End"),
     Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
@@ -122,85 +130,179 @@ fn spawn_player_system(
   ));
 }
 
-fn update_snake_tail_system(
+/// Samples the player's position and updates the [`SnakeTail`] segments accordingly. Creates mesh and collider
+/// entities as needed.
+fn update_snake_tail_segments_system(
   mut commands: Commands,
   mut snake_tail_query: Query<&mut SnakeTail, Without<Player>>,
   player_query: Query<&Transform, With<Player>>,
+  mut meshes: ResMut<Assets<Mesh>>,
+  mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let transform = player_query.single().expect("There should be a single player");
   for mut snake_tail in &mut snake_tail_query {
-    if snake_tail.len() >= MAX_CONTINUOUS_SNAKE_LENGTH + SNAKE_GAP_LENGTH {
-      // TODO: Create new body
-    }
+    let gap_samples_remaining = snake_tail.gap_samples_remaining;
+    let active_segment_index = snake_tail.segments.len() - 1;
+    let active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
+    let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 5.).truncate();
 
-    if snake_tail.len() >= MAX_CONTINUOUS_SNAKE_LENGTH {
+    // Add the first point and, if required, the mesh if the active segment has no positions yet and there are no gap
+    // samples remaining
+    if active_segment_positions_empty && gap_samples_remaining == 0 {
+      snake_tail.distance_since_last_sample = 0.0;
+      let active_segment = &mut snake_tail.segments[active_segment_index];
+      active_segment.positions.push(current_position);
+      create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment);
       continue;
     }
 
-    let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 5.).truncate();
-    if snake_tail.positions.is_empty() {
-      snake_tail.positions.push(current_position);
-      return;
+    // Update distance since last sample based distance between last point and current position
+    update_distance_since_last_sample(&mut snake_tail, active_segment_index, current_position);
+
+    // Handle logic for when sample distance is reached
+    handle_sample_distance_reached(
+      &mut commands,
+      &mut meshes,
+      &mut materials,
+      &mut snake_tail,
+      active_segment_index,
+      current_position,
+    );
+  }
+}
+
+/// Creates a mesh entity for the active segment if none exists.
+fn create_segment_mesh_if_none_exist(
+  commands: &mut Commands,
+  meshes: &mut ResMut<Assets<Mesh>>,
+  materials: &mut ResMut<Assets<ColorMaterial>>,
+  active_seg: &mut SnakeSegment,
+) {
+  if active_seg.mesh_entity.is_none() {
+    let mesh_entity = commands
+      .spawn((
+        Name::new("Snake Tail Segment Mesh"),
+        Mesh2d(meshes.add(Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default()))),
+        MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
+        Transform::default(),
+        PIXEL_PERFECT_LAYER,
+      ))
+      .id();
+    active_seg.mesh_entity = Some(mesh_entity);
+  }
+}
+
+/// Updates the distance since the last sample for the active segment based on the distance from the last recorded
+/// position to the current position.
+fn update_distance_since_last_sample(
+  snake_tail: &mut Mut<SnakeTail>,
+  active_segment_index: usize,
+  current_position: Vec2,
+) {
+  let last_position = snake_tail.segments[active_segment_index]
+    .positions
+    .last()
+    .copied()
+    .unwrap_or(current_position);
+  let distance = current_position.distance(last_position);
+  snake_tail.distance_since_last_sample += distance;
+}
+
+/// Handles the logic for when the distance since the last sample exceeds the defined threshold.
+fn handle_sample_distance_reached(
+  mut commands: &mut Commands,
+  mut meshes: &mut ResMut<Assets<Mesh>>,
+  mut materials: &mut ResMut<Assets<ColorMaterial>>,
+  snake_tail: &mut Mut<SnakeTail>,
+  active_segment_index: usize,
+  current_position: Vec2,
+) {
+  if snake_tail.distance_since_last_sample < POSITION_SAMPLE_DISTANCE {
+    return;
+  }
+
+  // Reset distance since last sample
+  snake_tail.distance_since_last_sample = 0.0;
+
+  // Handle gap samples by decrementing counter and starting new segment if gap is over
+  if snake_tail.gap_samples_remaining > 0 {
+    snake_tail.gap_samples_remaining -= 1;
+    if snake_tail.gap_samples_remaining == 0 {
+      // Start a fresh segment after the gap
+      snake_tail.segments.push(SnakeSegment::default());
     }
+    return;
+  }
 
-    let last_position = *snake_tail
-      .positions
-      .last()
-      .expect("There should be at least one position");
-    let distance = current_position.distance(last_position);
-    snake_tail.distance_since_last_sample += distance;
+  // Add current position to active segment and create mesh if needed
+  let active_segment = &mut snake_tail.segments[active_segment_index];
+  active_segment.positions.push(current_position);
+  create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment);
 
-    if snake_tail.distance_since_last_sample >= POSITION_SAMPLE_DISTANCE {
-      snake_tail.positions.push(current_position);
-      snake_tail.distance_since_last_sample = 0.0;
+  // Create collider entity in the active segment once we have two points if none exists
+  if active_segment.collider_entity.is_none() && active_segment.positions.len() >= 2 {
+    let collider = commands
+      .spawn((
+        Name::new("Snake Body Collider"),
+        RigidBody::Static,
+        Collider::polyline(active_segment.positions.clone(), None),
+        Transform::default(),
+        CollisionLayers::new([GameLayer::Tail], [GameLayer::Head]),
+      ))
+      .id();
+    active_segment.collider_entity = Some(collider);
+  }
 
-      if snake_tail.collider_entity.is_none() && snake_tail.positions.len() >= 2 {
-        debug!(
-          "Creating snake body collider with {} positions",
-          snake_tail.positions.len()
-        );
-        let collider = commands
-          .spawn((
-            Name::new("Snake Body Collider"),
-            SnakeBodyCollider,
-            RigidBody::Static,
-            Collider::polyline(snake_tail.positions.clone(), None),
-            Transform::default(),
-            CollisionLayers::new([GameLayer::Tail], [GameLayer::Head]),
-          ))
-          .id();
-        snake_tail.collider_entity = Some(collider);
+  // If this segment reached max continuous length, start gap samples
+  if active_segment.positions.len() >= MAX_CONTINUOUS_SNAKE_LENGTH {
+    snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH;
+  }
+}
+
+// Replaces the [`Collider`] of the active (last) [`SnakeSegment`] every time the [`SnakeTail`] changes.
+fn update_active_segment_collider_system(
+  mut commands: Commands,
+  snake_tail_query: Query<&SnakeTail, Changed<SnakeTail>>,
+) {
+  for snake_tail in &snake_tail_query {
+    if snake_tail.segments.is_empty() {
+      continue;
+    }
+    if let Some(active_segment) = snake_tail.segments.last() {
+      if active_segment.positions.len() < 2 {
+        continue;
+      }
+      if let Some(collider_entity) = active_segment.collider_entity {
+        let vertices: Vec<Vector> = active_segment.positions.iter().map(|p| Vector::new(p.x, p.y)).collect();
+        commands
+          .entity(collider_entity)
+          .insert(Collider::polyline(vertices, None));
       }
     }
   }
 }
 
-fn update_snake_tail_collider_system(mut commands: Commands, player_query: Query<&SnakeTail, Changed<SnakeTail>>) {
-  for snake_tail in &player_query {
-    if snake_tail.positions.len() < 2 {
-      continue;
-    }
-
-    if let Some(collider_entity) = snake_tail.collider_entity {
-      let vertices: Vec<Vector> = snake_tail.positions.iter().map(|p| Vector::new(p.x, p.y)).collect();
-      commands
-        .entity(collider_entity)
-        .insert(Collider::polyline(vertices, None));
-    }
-  }
-}
-
-fn update_snake_tail_mesh_system(
-  player_query: Query<(&mut Mesh2d, &SnakeTail), (Without<Player>, Changed<SnakeTail>)>,
+/// Updates the mesh of the active (last) [`SnakeSegment`] every time the [`SnakeTail`] changes.
+fn update_active_segment_mesh_system(
+  snake_tail_query: Query<&SnakeTail, (Without<Player>, Changed<SnakeTail>)>,
+  mut mesh_query: Query<&mut Mesh2d>,
   mut meshes: ResMut<Assets<Mesh>>,
 ) {
-  for (mesh, snake_tail) in &player_query {
-    if snake_tail.positions.len() < 2 {
+  for snake_tail in &snake_tail_query {
+    if snake_tail.segments.is_empty() {
       continue;
     }
-
-    if let Some(mesh) = meshes.get_mut(&mesh.0) {
-      *mesh = create_snake_tail_mesh(&snake_tail.positions);
+    if let Some(active_segment) = snake_tail.segments.last() {
+      if active_segment.positions.len() < 2 {
+        continue;
+      }
+      if let Some(mesh_entity) = active_segment.mesh_entity {
+        if let Ok(mesh2d) = mesh_query.get_mut(mesh_entity) {
+          if let Some(m) = meshes.get_mut(&mesh2d.0) {
+            *m = create_snake_tail_mesh(&active_segment.positions);
+          }
+        }
+      }
     }
   }
 }
