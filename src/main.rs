@@ -12,6 +12,7 @@ use crate::controls::ControlsPlugin;
 use crate::game_world::GameWorldPlugin;
 use crate::gizmos_plugin::GizmosPlugin;
 use crate::player::PlayerPlugin;
+use crate::shared::{SharedMessagesPlugin, SharedResourcesPlugin};
 use crate::states::AppStatePlugin;
 use avian2d::PhysicsPlugins;
 use avian2d::prelude::Gravity;
@@ -36,6 +37,8 @@ fn main() {
       AppStatePlugin,
       GizmosPlugin,
       GameWorldPlugin,
+      SharedResourcesPlugin,
+      SharedMessagesPlugin,
       PlayerPlugin,
       ControlsPlugin,
     ))

@@ -149,7 +149,6 @@ fn update_snake_tail_system(
       .expect("There should be at least one position");
     let distance = current_position.distance(last_position);
     snake_tail.distance_since_last_sample += distance;
-    // debug!("Snake tail length: {}, distance: {}", snake_tail.len(), distance);
 
     if snake_tail.distance_since_last_sample >= POSITION_SAMPLE_DISTANCE {
       snake_tail.positions.push(current_position);
@@ -170,7 +169,6 @@ fn update_snake_tail_system(
             CollisionLayers::new([GameLayer::Tail], [GameLayer::Head]),
           ))
           .id();
-
         snake_tail.collider_entity = Some(collider);
       }
     }

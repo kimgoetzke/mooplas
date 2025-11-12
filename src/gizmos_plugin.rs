@@ -1,11 +1,11 @@
 use crate::constants::SNAKE_HEAD_SIZE;
-use crate::shared::Player;
+use crate::shared::{Player, Settings};
 use avian2d::math::Vector;
 use bevy::app::{App, Plugin, Update};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::math::Isometry2d;
-use bevy::prelude::{Gizmos, Query, Transform, With};
+use bevy::prelude::{Gizmos, Query, Res, Transform, With};
 
 /// A plugin that renders gizmos for debugging purposes.
 pub struct GizmosPlugin;
@@ -16,7 +16,10 @@ impl Plugin for GizmosPlugin {
   }
 }
 
-fn render_gizmos_system(mut gizmos: Gizmos, player_query: Query<&Transform, With<Player>>) {
+fn render_gizmos_system(mut gizmos: Gizmos, settings: Res<Settings>, player_query: Query<&Transform, With<Player>>) {
+  if !settings.general.display_player_gizmos {
+    return;
+  }
   for transform in player_query.iter() {
     gizmos.circle_2d(
       Isometry2d::from_translation(Vector::new(transform.translation.x, transform.translation.y)),

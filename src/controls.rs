@@ -1,11 +1,11 @@
 use crate::constants::{MOVEMENT_SPEED, RESOLUTION_HEIGHT, RESOLUTION_WIDTH, ROTATION_SPEED, WRAPAROUND_MARGIN};
-use crate::shared::{Player, WrapAroundEntity};
+use crate::shared::{DebugStateMessage, GeneralSettings, Player, Settings, WrapAroundEntity};
 use crate::states::AppState;
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
 use bevy::input::ButtonInput;
-use bevy::log::{debug, debug_once};
+use bevy::log::*;
 use bevy::math::Vec3;
 use bevy::prelude::{
   IntoScheduleConfigs, KeyCode, Message, MessageReader, MessageWriter, NextState, Query, Res, ResMut, Time, Transform,
@@ -18,9 +18,12 @@ impl Plugin for ControlsPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<InputAction>()
-      .add_systems(Update, (keyboard_input_system, wraparound_system))
+      .add_systems(Update, (settings_controls_system, wraparound_system))
       .add_systems(Update, start_game_system.run_if(in_state(AppState::Loading)))
-      .add_systems(Update, movement_system.run_if(in_state(AppState::Running)));
+      .add_systems(
+        Update,
+        (player_input_system, player_action_system).run_if(in_state(AppState::Running)),
+      );
   }
 }
 
@@ -50,10 +53,7 @@ fn start_game_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut next_app_sta
 }
 
 /// Sends [`InputAction`] events based on keyboard input.
-fn keyboard_input_system(
-  mut input_action_writer: MessageWriter<InputAction>,
-  keyboard_input: Res<ButtonInput<KeyCode>>,
-) {
+fn player_input_system(mut input_action_writer: MessageWriter<InputAction>, keyboard_input: Res<ButtonInput<KeyCode>>) {
   let left = keyboard_input.any_pressed([KeyCode::KeyA, KeyCode::ArrowLeft]);
   let right = keyboard_input.any_pressed([KeyCode::KeyD, KeyCode::ArrowRight]);
   let horizontal = right as i8 - left as i8;
@@ -67,7 +67,7 @@ fn keyboard_input_system(
 }
 
 /// Responds to [`InputAction`] events and moves character controllers accordingly.
-fn movement_system(
+fn player_action_system(
   time: Res<Time>,
   mut input_action_messages: MessageReader<InputAction>,
   mut controllers: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity), With<Player>>,
@@ -111,5 +111,24 @@ fn wraparound_system(mut entities: Query<&mut Transform, With<WrapAroundEntity>>
     } else if transform.translation.y < (-extents.y - WRAPAROUND_MARGIN) {
       transform.translation.y = extents.y + WRAPAROUND_MARGIN;
     }
+  }
+}
+
+fn settings_controls_system(
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  mut settings: ResMut<Settings>,
+  mut general_settings: ResMut<GeneralSettings>,
+  mut debug_state_message: MessageWriter<DebugStateMessage>,
+) {
+  if keyboard_input.just_pressed(KeyCode::F9) {
+    settings.general.display_player_gizmos = !settings.general.display_player_gizmos;
+    general_settings.display_player_gizmos = settings.general.display_player_gizmos;
+    info!(
+      "[F9] Set display player gizmos to [{}]",
+      settings.general.display_player_gizmos
+    );
+    debug_state_message.write(DebugStateMessage {
+      display_player_gizmos: settings.general.display_player_gizmos,
+    });
   }
 }
