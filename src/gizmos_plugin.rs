@@ -1,5 +1,5 @@
 use crate::constants::SNAKE_HEAD_SIZE;
-use crate::player::SnakeBody;
+use crate::shared::Player;
 use avian2d::math::Vector;
 use bevy::app::{App, Plugin, Update};
 use bevy::color::Color;
@@ -16,11 +16,11 @@ impl Plugin for GizmosPlugin {
   }
 }
 
-fn render_gizmos_system(mut gizmos: Gizmos, player_query: Query<&Transform, With<SnakeBody>>) {
+fn render_gizmos_system(mut gizmos: Gizmos, player_query: Query<&Transform, With<Player>>) {
   for transform in player_query.iter() {
     gizmos.circle_2d(
       Isometry2d::from_translation(Vector::new(transform.translation.x, transform.translation.y)),
-      SNAKE_HEAD_SIZE / 2.,
+      SNAKE_HEAD_SIZE,
       Color::from(tailwind::AMBER_400),
     );
 

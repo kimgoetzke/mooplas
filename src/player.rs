@@ -10,17 +10,23 @@ pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
   fn build(&self, app: &mut App) {
-    app
-      .add_systems(Startup, spawn_player_system)
-      .add_systems(Update, ((update_snake_body_system, refresh_snake_mesh_system).chain(),));
+    app.add_systems(Startup, spawn_player_system).add_systems(
+      Update,
+      ((
+        update_snake_tail_system,
+        update_snake_tail_collider_system,
+        update_snake_tail_mesh_system,
+      )
+        .chain(),),
+    );
   }
 }
 
 /// A bundle that contains the components needed for a basic kinematic character controller.
 #[derive(Bundle)]
 struct Controller {
-  body: RigidBody,
   collider: Collider,
+  body: RigidBody,
   ground_caster: ShapeCaster,
   locked_axes: LockedAxes,
 }
@@ -31,8 +37,8 @@ impl Controller {
     caster_shape.set_scale(Vector::ONE * 0.99, 10);
 
     Self {
-      body: RigidBody::Dynamic,
       collider,
+      body: RigidBody::Dynamic,
       ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, 0.0, Dir2::NEG_Y).with_max_distance(10.0),
       locked_axes: LockedAxes::ROTATION_LOCKED,
     }
@@ -40,34 +46,30 @@ impl Controller {
 }
 
 #[derive(Component)]
-pub(crate) struct SnakeBody {
+struct SnakeTail {
   positions: Vec<Vec2>,
   distance_since_last_sample: f32,
-  segment_entities: Vec<Entity>,
+  collider_entity: Option<Entity>,
 }
 
-impl SnakeBody {
+impl SnakeTail {
   fn len(&self) -> usize {
     self.positions.len()
   }
 }
 
-#[derive(Component)]
-struct SnakeBodySegment;
-
-impl Default for SnakeBody {
+impl Default for SnakeTail {
   fn default() -> Self {
     Self {
       positions: Vec::with_capacity(10000),
       distance_since_last_sample: 0.0,
-      segment_entities: Vec::with_capacity(10000),
+      collider_entity: None,
     }
   }
 }
 
-/// A marker component for the snake body mesh.
 #[derive(Component)]
-struct SnakeTail;
+struct SnakeBodyCollider;
 
 #[derive(PhysicsLayer, Default)]
 enum GameLayer {
@@ -84,101 +86,128 @@ fn spawn_player_system(
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+  let starting_position = Vec2::ZERO;
   let snake_head_handle = asset_server.load("player.png");
   commands.spawn((
     Name::new("Snake Head"),
     Player,
     WrapAroundEntity,
     Sprite::from_image(snake_head_handle),
-    SnakeBody::default(),
     Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
-    Transform::default(),
+    Transform::from_xyz(starting_position.x, starting_position.y, 0.),
     Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
     Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-    ColliderDensity::default(),
     CollisionLayers::new(GameLayer::Head, [GameLayer::Default, GameLayer::Tail]),
     PIXEL_PERFECT_LAYER,
   ));
   commands.spawn((
-    Player,
     Name::new("Snake Tail"),
-    SnakeTail,
+    SnakeTail::default(),
     Mesh2d(meshes.add(Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default()))),
     MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
-    Transform::default(),
+    Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+    RigidBody::Static,
     CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
+    PIXEL_PERFECT_LAYER,
+  ));
+  commands.spawn((
+    Name::new("Snake Tail End"),
+    Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
+    MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
+    Transform::from_xyz(starting_position.x, starting_position.y - (BODY_WIDTH * 2.), 1.),
+    CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
+    Collider::circle(SNAKE_HEAD_SIZE / 2.),
+    RigidBody::Static,
     PIXEL_PERFECT_LAYER,
   ));
 }
 
-fn update_snake_body_system(
+fn update_snake_tail_system(
   mut commands: Commands,
-  mut player_query: Query<(&Transform, &mut SnakeBody), With<Player>>,
-  mut meshes: ResMut<Assets<Mesh>>,
-  mut materials: ResMut<Assets<ColorMaterial>>,
+  mut snake_tail_query: Query<&mut SnakeTail, Without<Player>>,
+  player_query: Query<&Transform, With<Player>>,
 ) {
-  for (transform, mut body) in &mut player_query {
-    if body.len() > MAX_CONTINUOUS_SNAKE_LENGTH + SNAKE_GAP_LENGTH {
+  let transform = player_query.single().expect("There should be a single player");
+  for mut snake_tail in &mut snake_tail_query {
+    if snake_tail.len() >= MAX_CONTINUOUS_SNAKE_LENGTH + SNAKE_GAP_LENGTH {
       // TODO: Create new body
     }
 
-    if body.len() > MAX_CONTINUOUS_SNAKE_LENGTH {
+    if snake_tail.len() >= MAX_CONTINUOUS_SNAKE_LENGTH {
       continue;
     }
 
-    let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 10.).truncate();
-
-    if body.positions.is_empty() {
-      body.positions.push(current_position);
+    let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 5.).truncate();
+    if snake_tail.positions.is_empty() {
+      snake_tail.positions.push(current_position);
       return;
     }
 
-    let last_position = *body.positions.last().unwrap();
+    let last_position = *snake_tail
+      .positions
+      .last()
+      .expect("There should be at least one position");
     let distance = current_position.distance(last_position);
-    body.distance_since_last_sample += distance;
+    snake_tail.distance_since_last_sample += distance;
+    // debug!("Snake tail length: {}, distance: {}", snake_tail.len(), distance);
 
-    if body.distance_since_last_sample >= POSITION_SAMPLE_DISTANCE {
-      body.positions.push(current_position);
-      body.distance_since_last_sample = 0.0;
+    if snake_tail.distance_since_last_sample >= POSITION_SAMPLE_DISTANCE {
+      snake_tail.positions.push(current_position);
+      snake_tail.distance_since_last_sample = 0.0;
 
-      let segment = commands
-        .spawn((
-          Name::new("Snake Body Segment"),
-          SnakeBodySegment,
-          Transform::from_translation(current_position.extend(0.0)),
-          RigidBody::Static,
-          Collider::circle(BODY_WIDTH / 2.),
-          CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
-          Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
-          MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
-          PIXEL_PERFECT_LAYER,
-        ))
-        .id();
+      if snake_tail.collider_entity.is_none() && snake_tail.positions.len() >= 2 {
+        debug!(
+          "Creating snake body collider with {} positions",
+          snake_tail.positions.len()
+        );
+        let collider = commands
+          .spawn((
+            Name::new("Snake Body Collider"),
+            SnakeBodyCollider,
+            RigidBody::Static,
+            Collider::polyline(snake_tail.positions.clone(), None),
+            Transform::default(),
+            CollisionLayers::new([GameLayer::Tail], [GameLayer::Head]),
+          ))
+          .id();
 
-      body.segment_entities.push(segment);
-    }
-  }
-}
-
-fn refresh_snake_mesh_system(
-  player_query: Query<&SnakeBody, (With<Player>, Changed<SnakeBody>)>,
-  mut mesh_query: Query<&mut Mesh2d, With<SnakeTail>>,
-  mut meshes: ResMut<Assets<Mesh>>,
-) {
-  for body in &player_query {
-    if body.positions.len() < 2 {
-      continue;
-    }
-
-    for mesh_handle in &mut mesh_query {
-      if let Some(mesh) = meshes.get_mut(&mesh_handle.0) {
-        *mesh = create_snake_body_mesh(&body.positions);
+        snake_tail.collider_entity = Some(collider);
       }
     }
   }
 }
 
-fn create_snake_body_mesh(positions: &[Vec2]) -> Mesh {
+fn update_snake_tail_collider_system(mut commands: Commands, player_query: Query<&SnakeTail, Changed<SnakeTail>>) {
+  for snake_tail in &player_query {
+    if snake_tail.positions.len() < 2 {
+      continue;
+    }
+
+    if let Some(collider_entity) = snake_tail.collider_entity {
+      let vertices: Vec<Vector> = snake_tail.positions.iter().map(|p| Vector::new(p.x, p.y)).collect();
+      commands
+        .entity(collider_entity)
+        .insert(Collider::polyline(vertices, None));
+    }
+  }
+}
+
+fn update_snake_tail_mesh_system(
+  player_query: Query<(&mut Mesh2d, &SnakeTail), (Without<Player>, Changed<SnakeTail>)>,
+  mut meshes: ResMut<Assets<Mesh>>,
+) {
+  for (mesh, snake_tail) in &player_query {
+    if snake_tail.positions.len() < 2 {
+      continue;
+    }
+
+    if let Some(mesh) = meshes.get_mut(&mesh.0) {
+      *mesh = create_snake_tail_mesh(&snake_tail.positions);
+    }
+  }
+}
+
+fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
   if positions.len() < 2 {
     return Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default());
   }
