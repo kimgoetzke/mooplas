@@ -89,7 +89,6 @@ enum GameLayer {
 }
 
 // TODO: Spawn all player related entities under a parent entity for better organisation
-// TODO: Handle wraparound for tail segments by immediately stopping segment growth when wraparound occurs
 /// Spawns the player.
 fn spawn_player_system(
   mut commands: Commands,
@@ -140,7 +139,6 @@ fn update_snake_tail_segments_system(
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let transform = player_query.single().expect("There should be a single player");
-  let can_continue_growing = determine_if_segment_can_continue_growing(transform);
   for mut snake_tail in &mut snake_tail_query {
     let gap_samples_remaining = snake_tail.gap_samples_remaining;
     let active_segment_index = snake_tail.segments.len() - 1;
@@ -169,19 +167,6 @@ fn update_snake_tail_segments_system(
       active_segment_index,
       current_position,
     );
-  }
-}
-
-fn determine_if_segment_can_continue_growing(transform: &Transform) -> bool {
-  let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
-  if transform.translation.x > (extents.x + WRAPAROUND_MARGIN)
-    || transform.translation.x < (-extents.x - WRAPAROUND_MARGIN)
-    || transform.translation.y > (extents.y + WRAPAROUND_MARGIN)
-    || transform.translation.y < (-extents.y - WRAPAROUND_MARGIN)
-  {
-    false
-  } else {
-    true
   }
 }
 
@@ -364,18 +349,36 @@ fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
 }
 
 /// Wraps the relevant entities around the screen edges, making them reappear on the opposite side.
-fn wraparound_system(mut entities: Query<&mut Transform, With<WrapAroundEntity>>) {
+fn wraparound_system(
+  mut entities: Query<(Entity, &mut Transform, Option<&Player>), With<WrapAroundEntity>>,
+  mut snake_tail_query: Query<&mut SnakeTail, Without<Player>>,
+) {
   let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
-  for mut transform in entities.iter_mut() {
+  for (_entity, mut transform, player) in entities.iter_mut() {
+    let mut was_wrapped = false;
+
+    // Move entity to opposite side if it goes out of bounds and set flag
     if transform.translation.x > (extents.x + WRAPAROUND_MARGIN) {
       transform.translation.x = -extents.x - WRAPAROUND_MARGIN;
+      was_wrapped = true;
     } else if transform.translation.x < (-extents.x - WRAPAROUND_MARGIN) {
       transform.translation.x = extents.x + WRAPAROUND_MARGIN;
+      was_wrapped = true;
     }
     if transform.translation.y > (extents.y + WRAPAROUND_MARGIN) {
       transform.translation.y = -extents.y - WRAPAROUND_MARGIN;
+      was_wrapped = true;
     } else if transform.translation.y < (-extents.y - WRAPAROUND_MARGIN) {
       transform.translation.y = extents.y + WRAPAROUND_MARGIN;
+      was_wrapped = true;
+    }
+
+    // If flagged, and this entity is a player, stop tail growth and start a gap
+    if was_wrapped && player.is_some() {
+      for mut snake_tail in &mut snake_tail_query {
+        snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH / 2;
+        snake_tail.distance_since_last_sample = 0.0;
+      }
     }
   }
 }
