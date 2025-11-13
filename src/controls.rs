@@ -1,5 +1,5 @@
-use crate::constants::{MOVEMENT_SPEED, RESOLUTION_HEIGHT, RESOLUTION_WIDTH, ROTATION_SPEED, WRAPAROUND_MARGIN};
-use crate::shared::{DebugStateMessage, GeneralSettings, Player, Settings, WrapAroundEntity};
+use crate::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
+use crate::shared::{DebugStateMessage, GeneralSettings, Player, Settings};
 use crate::states::AppState;
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -18,7 +18,7 @@ impl Plugin for ControlsPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<InputAction>()
-      .add_systems(Update, (settings_controls_system, wraparound_system))
+      .add_systems(Update, settings_controls_system)
       .add_systems(Update, start_game_system.run_if(in_state(AppState::Loading)))
       .add_systems(
         Update,
@@ -93,23 +93,6 @@ fn player_action_system(
     }
     if !has_movement_input {
       angular_velocity.0 = 0.;
-    }
-  }
-}
-
-/// Wraps the relevant entities around the screen edges, making them reappear on the opposite side.
-fn wraparound_system(mut entities: Query<&mut Transform, With<WrapAroundEntity>>) {
-  let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
-  for mut transform in entities.iter_mut() {
-    if transform.translation.x > (extents.x + WRAPAROUND_MARGIN) {
-      transform.translation.x = -extents.x - WRAPAROUND_MARGIN;
-    } else if transform.translation.x < (-extents.x - WRAPAROUND_MARGIN) {
-      transform.translation.x = extents.x + WRAPAROUND_MARGIN;
-    }
-    if transform.translation.y > (extents.y + WRAPAROUND_MARGIN) {
-      transform.translation.y = -extents.y - WRAPAROUND_MARGIN;
-    } else if transform.translation.y < (-extents.y - WRAPAROUND_MARGIN) {
-      transform.translation.y = extents.y + WRAPAROUND_MARGIN;
     }
   }
 }

@@ -13,6 +13,7 @@ impl Plugin for PlayerPlugin {
     app.add_systems(Startup, spawn_player_system).add_systems(
       Update,
       ((
+        wraparound_system,
         update_snake_tail_segments_system,
         update_active_segment_collider_system,
         update_active_segment_mesh_system,
@@ -88,6 +89,7 @@ enum GameLayer {
 }
 
 // TODO: Spawn all player related entities under a parent entity for better organisation
+// TODO: Handle wraparound for tail segments by immediately stopping segment growth when wraparound occurs
 /// Spawns the player.
 fn spawn_player_system(
   mut commands: Commands,
@@ -113,8 +115,6 @@ fn spawn_player_system(
     Name::new("Snake Tail"),
     SnakeTail::default(),
     Transform::from_xyz(starting_position.x, starting_position.y, 0.),
-    RigidBody::Static,
-    CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
     PIXEL_PERFECT_LAYER,
   ));
   // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
@@ -135,20 +135,21 @@ fn spawn_player_system(
 fn update_snake_tail_segments_system(
   mut commands: Commands,
   mut snake_tail_query: Query<&mut SnakeTail, Without<Player>>,
-  player_query: Query<&Transform, With<Player>>,
+  player_query: Query<&mut Transform, With<Player>>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let transform = player_query.single().expect("There should be a single player");
+  let can_continue_growing = determine_if_segment_can_continue_growing(transform);
   for mut snake_tail in &mut snake_tail_query {
     let gap_samples_remaining = snake_tail.gap_samples_remaining;
     let active_segment_index = snake_tail.segments.len() - 1;
-    let active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
+    let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
     let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 5.).truncate();
 
     // Add the first point and, if required, the mesh if the active segment has no positions yet and there are no gap
     // samples remaining
-    if active_segment_positions_empty && gap_samples_remaining == 0 {
+    if is_active_segment_positions_empty && gap_samples_remaining == 0 {
       snake_tail.distance_since_last_sample = 0.0;
       let active_segment = &mut snake_tail.segments[active_segment_index];
       active_segment.positions.push(current_position);
@@ -171,14 +172,27 @@ fn update_snake_tail_segments_system(
   }
 }
 
+fn determine_if_segment_can_continue_growing(transform: &Transform) -> bool {
+  let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
+  if transform.translation.x > (extents.x + WRAPAROUND_MARGIN)
+    || transform.translation.x < (-extents.x - WRAPAROUND_MARGIN)
+    || transform.translation.y > (extents.y + WRAPAROUND_MARGIN)
+    || transform.translation.y < (-extents.y - WRAPAROUND_MARGIN)
+  {
+    false
+  } else {
+    true
+  }
+}
+
 /// Creates a mesh entity for the active segment if none exists.
 fn create_segment_mesh_if_none_exist(
   commands: &mut Commands,
   meshes: &mut ResMut<Assets<Mesh>>,
   materials: &mut ResMut<Assets<ColorMaterial>>,
-  active_seg: &mut SnakeSegment,
+  active_segment: &mut SnakeSegment,
 ) {
-  if active_seg.mesh_entity.is_none() {
+  if active_segment.mesh_entity.is_none() {
     let mesh_entity = commands
       .spawn((
         Name::new("Snake Tail Segment Mesh"),
@@ -188,7 +202,7 @@ fn create_segment_mesh_if_none_exist(
         PIXEL_PERFECT_LAYER,
       ))
       .id();
-    active_seg.mesh_entity = Some(mesh_entity);
+    active_segment.mesh_entity = Some(mesh_entity);
   }
 }
 
@@ -243,7 +257,7 @@ fn handle_sample_distance_reached(
   if active_segment.collider_entity.is_none() && active_segment.positions.len() >= 2 {
     let collider = commands
       .spawn((
-        Name::new("Snake Body Collider"),
+        Name::new("Snake Tail Segment Collider"),
         RigidBody::Static,
         Collider::polyline(active_segment.positions.clone(), None),
         Transform::default(),
@@ -347,4 +361,21 @@ fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
   Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     .with_inserted_indices(Indices::U32(indices))
+}
+
+/// Wraps the relevant entities around the screen edges, making them reappear on the opposite side.
+fn wraparound_system(mut entities: Query<&mut Transform, With<WrapAroundEntity>>) {
+  let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
+  for mut transform in entities.iter_mut() {
+    if transform.translation.x > (extents.x + WRAPAROUND_MARGIN) {
+      transform.translation.x = -extents.x - WRAPAROUND_MARGIN;
+    } else if transform.translation.x < (-extents.x - WRAPAROUND_MARGIN) {
+      transform.translation.x = extents.x + WRAPAROUND_MARGIN;
+    }
+    if transform.translation.y > (extents.y + WRAPAROUND_MARGIN) {
+      transform.translation.y = -extents.y - WRAPAROUND_MARGIN;
+    } else if transform.translation.y < (-extents.y - WRAPAROUND_MARGIN) {
+      transform.translation.y = extents.y + WRAPAROUND_MARGIN;
+    }
+  }
 }
