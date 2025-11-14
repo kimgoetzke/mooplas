@@ -81,7 +81,7 @@ impl Default for SnakeTail {
 }
 
 #[derive(PhysicsLayer, Default)]
-enum GameLayer {
+enum CollisionLayer {
   #[default]
   Default,
   Head,
@@ -114,7 +114,7 @@ fn spawn_player_system(
         Transform::from_xyz(starting_position.x, starting_position.y, 0.),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-        CollisionLayers::new(GameLayer::Head, [GameLayer::Default, GameLayer::Tail]),
+        CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Default, CollisionLayer::Tail]),
         PIXEL_PERFECT_LAYER,
       ));
       parent.spawn((
@@ -129,7 +129,7 @@ fn spawn_player_system(
         Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
         MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
         Transform::from_xyz(starting_position.x, starting_position.y - (BODY_WIDTH * 2.), 1.),
-        CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
+        CollisionLayers::new(CollisionLayer::Tail, [CollisionLayer::Head]),
         Collider::circle(SNAKE_HEAD_SIZE / 2.),
         RigidBody::Static,
         PIXEL_PERFECT_LAYER,
@@ -264,7 +264,7 @@ fn handle_sample_distance_reached(
         RigidBody::Static,
         Collider::polyline(active_segment.positions.clone(), None),
         Transform::default(),
-        CollisionLayers::new([GameLayer::Tail], [GameLayer::Head]),
+        CollisionLayers::new([CollisionLayer::Tail], [CollisionLayer::Head]),
       ))
       .id();
     commands.entity(snake_tail_entity).add_child(collider);
