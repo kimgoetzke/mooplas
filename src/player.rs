@@ -88,7 +88,8 @@ enum GameLayer {
   Tail,
 }
 
-// TODO: Spawn all player related entities under a parent entity for better organisation
+// TODO: Spawn player at random position instead of always at center
+// TODO: Allow multiple players (for local multiplayer)
 /// Spawns the player.
 fn spawn_player_system(
   mut commands: Commands,
@@ -98,48 +99,55 @@ fn spawn_player_system(
 ) {
   let starting_position = Vec2::ZERO;
   let snake_head_handle = asset_server.load("player.png");
-  commands.spawn((
-    Name::new("Snake Head"),
-    Player,
-    WrapAroundEntity,
-    Sprite::from_image(snake_head_handle),
-    Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
-    Transform::from_xyz(starting_position.x, starting_position.y, 0.),
-    Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
-    Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-    CollisionLayers::new(GameLayer::Head, [GameLayer::Default, GameLayer::Tail]),
-    PIXEL_PERFECT_LAYER,
-  ));
-  commands.spawn((
-    Name::new("Snake Tail"),
-    SnakeTail::default(),
-    Transform::from_xyz(starting_position.x, starting_position.y, 0.),
-    PIXEL_PERFECT_LAYER,
-  ));
-  // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
-  commands.spawn((
-    Name::new("Snake Tail End"),
-    Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
-    MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
-    Transform::from_xyz(starting_position.x, starting_position.y - (BODY_WIDTH * 2.), 1.),
-    CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
-    Collider::circle(SNAKE_HEAD_SIZE / 2.),
-    RigidBody::Static,
-    PIXEL_PERFECT_LAYER,
-  ));
+  commands
+    .spawn((
+      Name::new("Snake"),
+      Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+    ))
+    .with_children(|parent| {
+      parent.spawn((
+        Name::new("Snake Head"),
+        Player,
+        WrapAroundEntity,
+        Sprite::from_image(snake_head_handle),
+        Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
+        Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+        Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
+        Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
+        CollisionLayers::new(GameLayer::Head, [GameLayer::Default, GameLayer::Tail]),
+        PIXEL_PERFECT_LAYER,
+      ));
+      parent.spawn((
+        Name::new("Snake Tail"),
+        SnakeTail::default(),
+        Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+        PIXEL_PERFECT_LAYER,
+      ));
+      // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
+      parent.spawn((
+        Name::new("Snake Tail End"),
+        Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
+        MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
+        Transform::from_xyz(starting_position.x, starting_position.y - (BODY_WIDTH * 2.), 1.),
+        CollisionLayers::new(GameLayer::Tail, [GameLayer::Head]),
+        Collider::circle(SNAKE_HEAD_SIZE / 2.),
+        RigidBody::Static,
+        PIXEL_PERFECT_LAYER,
+      ));
+    });
 }
 
 /// Samples the player's position and updates the [`SnakeTail`] segments accordingly. Creates mesh and collider
 /// entities as needed.
 fn update_snake_tail_segments_system(
   mut commands: Commands,
-  mut snake_tail_query: Query<&mut SnakeTail, Without<Player>>,
+  mut snake_tail_query: Query<(Entity, &mut SnakeTail), Without<Player>>,
   player_query: Query<&mut Transform, With<Player>>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let transform = player_query.single().expect("There should be a single player");
-  for mut snake_tail in &mut snake_tail_query {
+  for (entity, mut snake_tail) in &mut snake_tail_query {
     let gap_samples_remaining = snake_tail.gap_samples_remaining;
     let active_segment_index = snake_tail.segments.len() - 1;
     let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
@@ -151,7 +159,7 @@ fn update_snake_tail_segments_system(
       snake_tail.distance_since_last_sample = 0.0;
       let active_segment = &mut snake_tail.segments[active_segment_index];
       active_segment.positions.push(current_position);
-      create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment);
+      create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment, entity);
       continue;
     }
 
@@ -164,6 +172,7 @@ fn update_snake_tail_segments_system(
       &mut meshes,
       &mut materials,
       &mut snake_tail,
+      entity,
       active_segment_index,
       current_position,
     );
@@ -176,6 +185,7 @@ fn create_segment_mesh_if_none_exist(
   meshes: &mut ResMut<Assets<Mesh>>,
   materials: &mut ResMut<Assets<ColorMaterial>>,
   active_segment: &mut SnakeSegment,
+  snake_tail_entity: Entity,
 ) {
   if active_segment.mesh_entity.is_none() {
     let mesh_entity = commands
@@ -187,6 +197,7 @@ fn create_segment_mesh_if_none_exist(
         PIXEL_PERFECT_LAYER,
       ))
       .id();
+    commands.entity(snake_tail_entity).add_child(mesh_entity);
     active_segment.mesh_entity = Some(mesh_entity);
   }
 }
@@ -213,6 +224,7 @@ fn handle_sample_distance_reached(
   mut meshes: &mut ResMut<Assets<Mesh>>,
   mut materials: &mut ResMut<Assets<ColorMaterial>>,
   snake_tail: &mut Mut<SnakeTail>,
+  snake_tail_entity: Entity,
   active_segment_index: usize,
   current_position: Vec2,
 ) {
@@ -236,7 +248,13 @@ fn handle_sample_distance_reached(
   // Add current position to active segment and create mesh if needed
   let active_segment = &mut snake_tail.segments[active_segment_index];
   active_segment.positions.push(current_position);
-  create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment);
+  create_segment_mesh_if_none_exist(
+    &mut commands,
+    &mut meshes,
+    &mut materials,
+    active_segment,
+    snake_tail_entity,
+  );
 
   // Create collider entity in the active segment once we have two points if none exists
   if active_segment.collider_entity.is_none() && active_segment.positions.len() >= 2 {
@@ -249,6 +267,7 @@ fn handle_sample_distance_reached(
         CollisionLayers::new([GameLayer::Tail], [GameLayer::Head]),
       ))
       .id();
+    commands.entity(snake_tail_entity).add_child(collider);
     active_segment.collider_entity = Some(collider);
   }
 
