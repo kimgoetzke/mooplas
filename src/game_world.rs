@@ -50,7 +50,7 @@ fn create_world_system(
               Name::new("Text"),
               Text2d::new(description),
               TextFont {
-                font_size: 18.,
+                font_size: 16.,
                 font: asset_server.load(DEFAULT_FONT),
                 font_smoothing: FontSmoothing::None,
                 ..default()

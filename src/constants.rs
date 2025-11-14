@@ -1,7 +1,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::color::Srgba;
 
-pub(crate) const DEFAULT_FONT: &str = "fonts/bulkypix.ttf";
+pub(crate) const DEFAULT_FONT: &str = "fonts/Tiny5.ttf";
 pub(crate) const TILES_X: f32 = 5.; // Must result in a whole number when dividing by WORLD_SIZE
 pub(crate) const TILES_Y: f32 = 5.; // Must result in a whole number when dividing by WORLD_SIZE
 pub(crate) const GRID_MARGIN: f32 = 2.;
