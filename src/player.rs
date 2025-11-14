@@ -56,7 +56,7 @@ struct SnakeSegment {
 impl Default for SnakeSegment {
   fn default() -> Self {
     Self {
-      positions: Vec::with_capacity(MAX_CONTINUOUS_SNAKE_LENGTH),
+      positions: Vec::with_capacity(SNAKE_LENGTH_MAX_CONTINUOUS),
       mesh_entity: None,
       collider_entity: None,
     }
@@ -126,9 +126,9 @@ fn spawn_player_system(
       // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
       parent.spawn((
         Name::new("Snake Tail End"),
-        Mesh2d(meshes.add(Circle::new(BODY_WIDTH))),
-        MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
-        Transform::from_xyz(starting_position.x, starting_position.y - (BODY_WIDTH * 2.), 1.),
+        Mesh2d(meshes.add(Circle::new(SNAKE_BODY_WIDTH))),
+        MeshMaterial2d(materials.add(Color::from(SNAKE_BASE_COLOUR))),
+        Transform::from_xyz(starting_position.x, starting_position.y - (SNAKE_BODY_WIDTH * 2.), 1.),
         CollisionLayers::new(CollisionLayer::Tail, [CollisionLayer::Head]),
         Collider::circle(SNAKE_HEAD_SIZE / 2.),
         RigidBody::Static,
@@ -192,7 +192,7 @@ fn create_segment_mesh_if_none_exist(
       .spawn((
         Name::new("Snake Tail Segment Mesh"),
         Mesh2d(meshes.add(Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default()))),
-        MeshMaterial2d(materials.add(Color::from(BASE_BODY_COLOUR))),
+        MeshMaterial2d(materials.add(Color::from(SNAKE_BASE_COLOUR))),
         Transform::default(),
         PIXEL_PERFECT_LAYER,
       ))
@@ -228,7 +228,7 @@ fn handle_sample_distance_reached(
   active_segment_index: usize,
   current_position: Vec2,
 ) {
-  if snake_tail.distance_since_last_sample < POSITION_SAMPLE_DISTANCE {
+  if snake_tail.distance_since_last_sample < SNAKE_TAIL_POSITION_SAMPLE_DISTANCE {
     return;
   }
 
@@ -272,7 +272,7 @@ fn handle_sample_distance_reached(
   }
 
   // If this segment reached max continuous length, start gap samples
-  if active_segment.positions.len() >= MAX_CONTINUOUS_SNAKE_LENGTH {
+  if active_segment.positions.len() >= SNAKE_LENGTH_MAX_CONTINUOUS {
     snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH;
   }
 }
@@ -345,13 +345,13 @@ fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
 
     let normal = Vec2::new(-tangent.y, tangent.x);
     vertices.push([
-      position.x + normal.x * BODY_WIDTH,
-      position.y + normal.y * BODY_WIDTH,
+      position.x + normal.x * SNAKE_BODY_WIDTH,
+      position.y + normal.y * SNAKE_BODY_WIDTH,
       0.0,
     ]);
     vertices.push([
-      position.x - normal.x * BODY_WIDTH,
-      position.y - normal.y * BODY_WIDTH,
+      position.x - normal.x * SNAKE_BODY_WIDTH,
+      position.y - normal.y * SNAKE_BODY_WIDTH,
       0.0,
     ]);
   }

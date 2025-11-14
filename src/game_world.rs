@@ -19,8 +19,8 @@ fn create_world_system(
   mut materials: ResMut<Assets<ColorMaterial>>,
   asset_server: Res<AssetServer>,
 ) {
-  let tile_size_x = (RESOLUTION_WIDTH as f32 - GRID_MARGIN) / TILES_X;
-  let tile_size_y = (RESOLUTION_HEIGHT as f32 - GRID_MARGIN) / TILES_Y;
+  let tile_size_x = (RESOLUTION_WIDTH as f32 - GRID_MARGIN) / GRID_TILES_X;
+  let tile_size_y = (RESOLUTION_HEIGHT as f32 - GRID_MARGIN) / GRID_TILES_Y;
   let adjusted_tile_size_x = tile_size_x - GRID_MARGIN;
   let adjusted_tile_size_y = tile_size_y - GRID_MARGIN;
   let half_world_x = RESOLUTION_WIDTH as f32 / 2.;
@@ -28,12 +28,12 @@ fn create_world_system(
   let half_margin = GRID_MARGIN / 2.;
   let parent = commands.spawn((Name::new("Game World"), Transform::default())).id();
 
-  for i in 0..TILES_X as i32 {
-    for j in (0..TILES_Y as i32).rev() {
+  for i in 0..GRID_TILES_X as i32 {
+    for j in (0..GRID_TILES_Y as i32).rev() {
       let x = (i as f32 * tile_size_x) - half_world_x + (tile_size_x / 2.);
       let y = (j as f32 * tile_size_y) - half_world_y + (tile_size_y / 2.);
       let letter = (b'A' + i as u8) as char;
-      let description = format!("{}{}", letter, TILES_Y as i32 - j);
+      let description = format!("{}{}", letter, GRID_TILES_Y as i32 - j);
       let tile_color = determine_tile_colour(i, j);
 
       commands.entity(parent).with_children(|parent| {
