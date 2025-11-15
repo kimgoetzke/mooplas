@@ -1,5 +1,5 @@
 use crate::constants::*;
-use crate::shared::{Player, WrapAroundEntity};
+use crate::shared::{Player, SnakeHead, SpawnPoints, WrapAroundEntity};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
@@ -88,30 +88,31 @@ enum CollisionLayer {
   Tail,
 }
 
-// TODO: Spawn player at random position instead of always at center
 // TODO: Allow multiple players (for local multiplayer)
 /// Spawns the player.
 fn spawn_player_system(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
+  spawn_points: Res<SpawnPoints>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-  let starting_position = Vec2::ZERO;
+  let (x, y) = spawn_points.points.first().expect("There is no spawn point");
   let snake_head_handle = asset_server.load("player.png");
   commands
     .spawn((
       Name::new("Snake"),
-      Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+      Player,
+      Transform::from_xyz(*x, *y, 0.),
+      WrapAroundEntity,
     ))
     .with_children(|parent| {
       parent.spawn((
         Name::new("Snake Head"),
-        Player,
-        WrapAroundEntity,
+        SnakeHead,
         Sprite::from_image(snake_head_handle),
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
-        Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+        Transform::default(),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Default, CollisionLayer::Tail]),
@@ -120,7 +121,7 @@ fn spawn_player_system(
       parent.spawn((
         Name::new("Snake Tail"),
         SnakeTail::default(),
-        Transform::from_xyz(starting_position.x, starting_position.y, 0.),
+        Transform::default(),
         PIXEL_PERFECT_LAYER,
       ));
       // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
@@ -128,7 +129,7 @@ fn spawn_player_system(
         Name::new("Snake Tail End"),
         Mesh2d(meshes.add(Circle::new(SNAKE_BODY_WIDTH))),
         MeshMaterial2d(materials.add(Color::from(SNAKE_BASE_COLOUR))),
-        Transform::from_xyz(starting_position.x, starting_position.y - (SNAKE_BODY_WIDTH * 2.), 1.),
+        Transform::from_xyz(0., 0. - (SNAKE_BODY_WIDTH * 2.), 1.),
         CollisionLayers::new(CollisionLayer::Tail, [CollisionLayer::Head]),
         Collider::circle(SNAKE_HEAD_SIZE / 2.),
         RigidBody::Static,
@@ -141,12 +142,12 @@ fn spawn_player_system(
 /// entities as needed.
 fn update_snake_tail_segments_system(
   mut commands: Commands,
-  mut snake_tail_query: Query<(Entity, &mut SnakeTail), Without<Player>>,
-  player_query: Query<&mut Transform, With<Player>>,
+  mut snake_tail_query: Query<(Entity, &mut SnakeTail), Without<SnakeHead>>,
+  snake_head_query: Query<&mut Transform, With<SnakeHead>>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-  let transform = player_query.single().expect("There should be a single player");
+  let transform = snake_head_query.single().expect("There should be a single player");
   for (entity, mut snake_tail) in &mut snake_tail_query {
     let gap_samples_remaining = snake_tail.gap_samples_remaining;
     let active_segment_index = snake_tail.segments.len() - 1;
@@ -302,7 +303,7 @@ fn update_active_segment_collider_system(
 
 /// Updates the mesh of the active (last) [`SnakeSegment`] every time the [`SnakeTail`] changes.
 fn update_active_segment_mesh_system(
-  snake_tail_query: Query<&SnakeTail, (Without<Player>, Changed<SnakeTail>)>,
+  snake_tail_query: Query<&SnakeTail, (Without<SnakeHead>, Changed<SnakeTail>)>,
   mut mesh_query: Query<&mut Mesh2d>,
   mut meshes: ResMut<Assets<Mesh>>,
 ) {
@@ -367,13 +368,14 @@ fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
     .with_inserted_indices(Indices::U32(indices))
 }
 
+// TODO: Currently broken; refactor also to work with multiple players
 /// Wraps the relevant entities around the screen edges, making them reappear on the opposite side.
 fn wraparound_system(
-  mut entities: Query<(Entity, &mut Transform, Option<&Player>), With<WrapAroundEntity>>,
-  mut snake_tail_query: Query<&mut SnakeTail, Without<Player>>,
+  mut player_query: Query<(Entity, &mut Transform, Option<&Player>), With<WrapAroundEntity>>,
+  mut snake_tail_query: Query<&mut SnakeTail, Without<SnakeHead>>,
 ) {
   let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
-  for (_entity, mut transform, player) in entities.iter_mut() {
+  for (_entity, mut transform, player) in player_query.iter_mut() {
     let mut was_wrapped = false;
 
     // Move entity to opposite side if it goes out of bounds and set flag

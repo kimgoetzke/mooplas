@@ -1,6 +1,6 @@
+use crate::app_states::AppState;
 use crate::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
-use crate::shared::{DebugStateMessage, GeneralSettings, Player, Settings};
-use crate::states::AppState;
+use crate::shared::{DebugStateMessage, GeneralSettings, Settings, SnakeHead};
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
@@ -8,8 +8,8 @@ use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
 use bevy::prelude::{
-  IntoScheduleConfigs, KeyCode, Message, MessageReader, MessageWriter, NextState, Query, Res, ResMut, Time, Transform,
-  With, in_state,
+  IntoScheduleConfigs, KeyCode, Message, MessageReader, MessageWriter, MonitorSelection, NextState, Query, Res, ResMut,
+  Time, Transform, Window, With, in_state,
 };
 
 pub struct ControlsPlugin;
@@ -70,7 +70,7 @@ fn player_input_system(mut input_action_writer: MessageWriter<InputAction>, keyb
 fn player_action_system(
   time: Res<Time>,
   mut input_action_messages: MessageReader<InputAction>,
-  mut controllers: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity), With<Player>>,
+  mut controllers: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity), With<SnakeHead>>,
 ) {
   let delta_time = time.delta_secs_f64().adjust_precision();
   for (transform, mut linear_velocity, mut angular_velocity) in &mut controllers {
@@ -102,6 +102,7 @@ fn settings_controls_system(
   mut settings: ResMut<Settings>,
   mut general_settings: ResMut<GeneralSettings>,
   mut debug_state_message: MessageWriter<DebugStateMessage>,
+  mut windows: Query<&mut Window>,
 ) {
   if keyboard_input.just_pressed(KeyCode::F9) {
     settings.general.display_player_gizmos = !settings.general.display_player_gizmos;
@@ -113,5 +114,13 @@ fn settings_controls_system(
     debug_state_message.write(DebugStateMessage {
       display_player_gizmos: settings.general.display_player_gizmos,
     });
+  }
+  if keyboard_input.just_pressed(KeyCode::F11) {
+    let mut window = windows.single_mut().expect("Failed to get primary window");
+    window.mode = match window.mode {
+      bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+      _ => bevy::window::WindowMode::Windowed,
+    };
+    info!("[F11] Set window mode to [{:?}]", window.mode);
   }
 }
