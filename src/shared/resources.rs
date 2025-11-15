@@ -11,10 +11,10 @@ impl Plugin for SharedResourcesPlugin {
     app
       .init_resource::<Settings>()
       .register_type::<Settings>()
-      .insert_resource(Settings::default())
       .init_resource::<GeneralSettings>()
       .register_type::<GeneralSettings>()
-      .insert_resource(GeneralSettings::default());
+      .register_type::<SpawnPoints>()
+      .init_resource::<SpawnPoints>();
   }
 }
 
@@ -41,7 +41,12 @@ pub struct GeneralSettings {
 impl Default for GeneralSettings {
   fn default() -> Self {
     Self {
-      display_player_gizmos: false,
+      display_player_gizmos: true,
     }
   }
+}
+
+#[derive(Resource, Reflect, Clone, Default)]
+pub struct SpawnPoints {
+  pub points: Vec<(f32, f32)>,
 }

@@ -19,7 +19,7 @@ impl Plugin for ControlsPlugin {
     app
       .add_message::<InputAction>()
       .add_systems(Update, settings_controls_system)
-      .add_systems(Update, start_game_system.run_if(in_state(AppState::Loading)))
+      .add_systems(Update, start_game_system.run_if(in_state(AppState::Waiting)))
       .add_systems(
         Update,
         (player_input_system, player_action_system).run_if(in_state(AppState::Running)),
