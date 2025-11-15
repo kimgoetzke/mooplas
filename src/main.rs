@@ -13,6 +13,7 @@ use crate::camera::CameraPlugin;
 use crate::controls::ControlsPlugin;
 use crate::game_world::GameWorldPlugin;
 use crate::gizmos_plugin::GizmosPlugin;
+use crate::initialisation::InitialisationPlugin;
 use crate::player::PlayerPlugin;
 use crate::shared::{SharedMessagesPlugin, SharedResourcesPlugin};
 use avian2d::PhysicsPlugins;
