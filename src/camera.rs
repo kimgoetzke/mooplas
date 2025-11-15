@@ -33,7 +33,7 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
     ..default()
   };
 
-  // This Image serves as a canvas representing the low-resolution game screen
+  // This image serves as a canvas representing the low-resolution game screen
   let mut canvas = Image {
     texture_descriptor: TextureDescriptor {
       label: None,
@@ -48,7 +48,6 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
     ..default()
   };
 
-  // Fill image.data with zeroes
   canvas.resize(canvas_size);
   let image_handle = images.add(canvas);
   commands.spawn((
