@@ -3,6 +3,7 @@ use crate::shared::{Player, SnakeHead, SpawnPoints, WrapAroundEntity};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
+use bevy::ecs::relationship::Relationship;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 
@@ -64,7 +65,7 @@ impl Default for SnakeSegment {
 }
 
 #[derive(Component)]
-struct SnakeTail {
+pub struct SnakeTail {
   segments: Vec<SnakeSegment>,
   distance_since_last_sample: f32,
   gap_samples_remaining: usize,
@@ -100,16 +101,12 @@ fn spawn_player_system(
   let (x, y) = spawn_points.points.first().expect("There is no spawn point");
   let snake_head_handle = asset_server.load("player.png");
   commands
-    .spawn((
-      Name::new("Snake"),
-      Player,
-      Transform::from_xyz(*x, *y, 0.),
-      WrapAroundEntity,
-    ))
+    .spawn((Name::new("Snake"), Player, Transform::from_xyz(*x, *y, 0.)))
     .with_children(|parent| {
       parent.spawn((
         Name::new("Snake Head"),
         SnakeHead,
+        WrapAroundEntity,
         Sprite::from_image(snake_head_handle),
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
         Transform::default(),
@@ -368,37 +365,43 @@ fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
     .with_inserted_indices(Indices::U32(indices))
 }
 
-// TODO: Currently broken; refactor also to work with multiple players
 /// Wraps the relevant entities around the screen edges, making them reappear on the opposite side.
 fn wraparound_system(
-  mut player_query: Query<(Entity, &mut Transform, Option<&Player>), With<WrapAroundEntity>>,
-  mut snake_tail_query: Query<&mut SnakeTail, Without<SnakeHead>>,
+  mut snake_head_query: Query<(&mut Transform, &GlobalTransform, &ChildOf), (With<SnakeHead>, With<WrapAroundEntity>)>,
+  mut snake_tail_query: Query<&mut SnakeTail>,
+  children_query: Query<&Children>,
 ) {
   let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
-  for (_entity, mut transform, player) in player_query.iter_mut() {
+  for (mut transform, global_transform, parent) in snake_head_query.iter_mut() {
+    let global_translation = global_transform.translation();
     let mut was_wrapped = false;
 
-    // Move entity to opposite side if it goes out of bounds and set flag
-    if transform.translation.x > (extents.x + WRAPAROUND_MARGIN) {
-      transform.translation.x = -extents.x - WRAPAROUND_MARGIN;
+    // Move snake head to opposite side if it goes out of bounds and set flag
+    if global_translation.x > (extents.x + WRAPAROUND_MARGIN) {
+      transform.translation.x -= RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
       was_wrapped = true;
-    } else if transform.translation.x < (-extents.x - WRAPAROUND_MARGIN) {
-      transform.translation.x = extents.x + WRAPAROUND_MARGIN;
+    } else if global_translation.x < (-extents.x - WRAPAROUND_MARGIN) {
+      transform.translation.x += RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
       was_wrapped = true;
     }
-    if transform.translation.y > (extents.y + WRAPAROUND_MARGIN) {
-      transform.translation.y = -extents.y - WRAPAROUND_MARGIN;
+    if global_translation.y > (extents.y + WRAPAROUND_MARGIN) {
+      transform.translation.y -= RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
       was_wrapped = true;
-    } else if transform.translation.y < (-extents.y - WRAPAROUND_MARGIN) {
-      transform.translation.y = extents.y + WRAPAROUND_MARGIN;
+    } else if global_translation.y < (-extents.y - WRAPAROUND_MARGIN) {
+      transform.translation.y += RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
       was_wrapped = true;
     }
 
-    // If flagged, and this entity is a player, stop tail growth and start a gap
-    if was_wrapped && player.is_some() {
-      for mut snake_tail in &mut snake_tail_query {
-        snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH / 2;
-        snake_tail.distance_since_last_sample = 0.0;
+    // If snake head was moved, find the corresponding snake tail and stop it from growing
+    if was_wrapped {
+      let parent_entity = parent.get();
+      if let Ok(children) = children_query.get(parent_entity) {
+        for child in children.iter() {
+          if let Ok(mut snake_tail) = snake_tail_query.get_mut(child) {
+            snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH / 2;
+            snake_tail.distance_since_last_sample = 0.0;
+          }
+        }
       }
     }
   }
