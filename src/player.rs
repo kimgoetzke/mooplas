@@ -51,8 +51,12 @@ impl Controller {
   }
 }
 
+/// A continuous drawn segment of the snake tail.
 #[derive(Component)]
 struct SnakeSegment {
+  /// Sampled world positions along this segment.
+  /// - Index 0 is the *oldest* position (furthest behind the head),
+  /// - The last index is the *newest* position (closest to the head).
   positions: Vec<Vec2>,
   mesh_entity: Option<Entity>,
   collider_entity: Option<Entity>,
@@ -68,6 +72,7 @@ impl Default for SnakeSegment {
   }
 }
 
+/// The snake tail component that manages all [`SnakeSegment`]s and sampling.
 #[derive(Component)]
 pub struct SnakeTail {
   segments: Vec<SnakeSegment>,
@@ -85,6 +90,7 @@ impl Default for SnakeTail {
   }
 }
 
+/// The collision layers used for snake head and tail.
 #[derive(PhysicsLayer, Default)]
 enum CollisionLayer {
   #[default]
@@ -99,8 +105,6 @@ fn spawn_player_system(
   asset_server: Res<AssetServer>,
   mut spawn_points: ResMut<SpawnPoints>,
   players: Res<RegisteredPlayers>,
-  mut meshes: ResMut<Assets<Mesh>>,
-  mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let snake_head_handle = asset_server.load("player.png");
   for player in players.players.iter() {
@@ -125,24 +129,13 @@ fn spawn_player_system(
         Transform::default(),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-        CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Default, CollisionLayer::Tail]),
+        CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Tail]),
         PIXEL_PERFECT_LAYER,
       ));
       parent.spawn((
         Name::new("Snake Tail"),
         SnakeTail::default(),
         Transform::default(),
-        PIXEL_PERFECT_LAYER,
-      ));
-      // Spawning round tail for visual reasons; consider replacing with more fancy tail mesh later
-      parent.spawn((
-        Name::new("Snake Tail End"),
-        Mesh2d(meshes.add(Circle::new(SNAKE_BODY_WIDTH))),
-        MeshMaterial2d(materials.add(Color::from(SNAKE_BASE_COLOUR))),
-        Transform::from_xyz(0., 0. - (SNAKE_BODY_WIDTH * 2.), 1.),
-        CollisionLayers::new(CollisionLayer::Tail, [CollisionLayer::Head]),
-        Collider::circle(SNAKE_HEAD_SIZE / 2.),
-        RigidBody::Static,
         PIXEL_PERFECT_LAYER,
       ));
     });
@@ -275,19 +268,29 @@ fn handle_sample_distance_reached(
     snake_tail_entity,
   );
 
-  // Create collider entity in the active segment once we have two points if none exists
-  if active_segment.collider_entity.is_none() && active_segment.positions.len() >= 2 {
-    let collider = commands
-      .spawn((
-        Name::new("Snake Tail Segment Collider"),
-        RigidBody::Static,
-        Collider::polyline(active_segment.positions.clone(), None),
-        Transform::default(),
-        CollisionLayers::new([CollisionLayer::Tail], [CollisionLayer::Head]),
-      ))
-      .id();
-    commands.entity(snake_tail_entity).add_child(collider);
-    active_segment.collider_entity = Some(collider);
+  // Create collider entity in the active segment once we have enough points, if none exists
+  if active_segment.collider_entity.is_none() && active_segment.positions.len() > TAIL_COLLIDER_SKIP_RECENT + 2 {
+    let collider_end = active_segment.positions.len() - TAIL_COLLIDER_SKIP_RECENT;
+    let polyline: Vec<Vector> = active_segment.positions[0..collider_end]
+      .iter()
+      .map(|p| Vector::new(p.x, p.y))
+      .collect();
+
+    if polyline.len() >= 2 {
+      // Spawn collider as a child of the snake tail entity (adjust flags/friction as needed)
+      let collider_entity = commands
+        .spawn((
+          Name::new("Snake Tail Segment Collider"),
+          RigidBody::Static,
+          Collider::polyline(polyline, None),
+          Transform::default(),
+          CollisionLayers::new(CollisionLayer::Tail, [CollisionLayer::Head]),
+        ))
+        .id();
+
+      commands.entity(snake_tail_entity).add_child(collider_entity);
+      active_segment.collider_entity = Some(collider_entity);
+    }
   }
 
   // If this segment reached max continuous length, start gap samples
@@ -305,15 +308,24 @@ fn update_active_segment_collider_system(
     if snake_tail.segments.is_empty() {
       continue;
     }
+
     if let Some(active_segment) = snake_tail.segments.last() {
       if active_segment.positions.len() < 2 {
         continue;
       }
+
       if let Some(collider_entity) = active_segment.collider_entity {
-        let vertices: Vec<Vector> = active_segment.positions.iter().map(|p| Vector::new(p.x, p.y)).collect();
-        commands
-          .entity(collider_entity)
-          .insert(Collider::polyline(vertices, None));
+        let collider_end = active_segment.positions.len() - TAIL_COLLIDER_SKIP_RECENT;
+        let vertices: Vec<Vector> = active_segment.positions[0..collider_end]
+          .iter()
+          .map(|p| Vector::new(p.x, p.y))
+          .collect();
+
+        if vertices.len() >= 2 {
+          commands
+            .entity(collider_entity)
+            .insert(Collider::polyline(vertices, None));
+        }
       }
     }
   }
