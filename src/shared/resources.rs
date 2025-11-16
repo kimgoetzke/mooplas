@@ -1,4 +1,4 @@
-use crate::prelude::RegisteredPlayer;
+use crate::prelude::{AvailablePlayerInput, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 use bevy_inspector_egui::InspectorOptions;
@@ -16,7 +16,9 @@ impl Plugin for SharedResourcesPlugin {
       .register_type::<GeneralSettings>()
       .register_type::<SpawnPoints>()
       .init_resource::<SpawnPoints>()
-      .init_resource::<RegisteredPlayers>();
+      .init_resource::<AvailablePlayerInputs>()
+      .init_resource::<RegisteredPlayers>()
+      .init_resource::<WinnerInfo>();
   }
 }
 
@@ -54,8 +56,18 @@ pub struct SpawnPoints {
 }
 
 #[derive(Resource, Default)]
+pub struct AvailablePlayerInputs {
+  pub(crate) inputs: Vec<AvailablePlayerInput>,
+}
+
+#[derive(Resource, Default)]
 pub struct RegisteredPlayers {
   pub players: Vec<RegisteredPlayer>,
+}
+
+#[derive(Resource, Default)]
+pub struct WinnerInfo {
+  pub winner: Option<PlayerId>,
 }
 
 #[cfg(test)]
@@ -88,5 +100,8 @@ mod tests {
       .get_resource::<SpawnPoints>()
       .expect("Failed to retrieve SpawnPoints");
     assert!(spawn_points.points.is_empty());
+    assert!(world.contains_resource::<AvailablePlayerInputs>());
+    assert!(world.contains_resource::<RegisteredPlayers>());
+    assert!(world.contains_resource::<WinnerInfo>());
   }
 }

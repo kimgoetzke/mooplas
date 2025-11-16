@@ -8,7 +8,7 @@ use bevy::prelude::{IntoScheduleConfigs, NextState, OnEnter, Res, ResMut, Resour
 use rand::Rng;
 use rand::prelude::ThreadRng;
 
-// A plugin that initialises the game by loading resources and generation data such as spawn points.
+/// A plugin that initialises the game by loading resources and generation data such as spawn points.
 pub struct InitialisationPlugin;
 
 impl Plugin for InitialisationPlugin {
@@ -74,7 +74,8 @@ fn check_initialisation_progress_system(
   }
 }
 
-// TODO: Ensure spawn points are not to close to each other.
+// TODO: Ensure spawn points are not to close to each other
+// TODO: Add random rotation so that players don't all face the same direction
 /// A system that provides random but safe spawn points for players.
 fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,

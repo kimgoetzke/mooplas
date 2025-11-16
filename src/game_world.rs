@@ -3,7 +3,7 @@ use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use bevy::text::FontSmoothing;
 
-/// Plugin that creates the game world. Only has a visual effect.
+/// A plugin that creates the game world. Only has a visual effect.
 pub struct GameWorldPlugin;
 
 impl Plugin for GameWorldPlugin {

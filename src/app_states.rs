@@ -4,6 +4,7 @@ use bevy::prelude::{AppExtStates, MessageReader, State, StateTransitionEvent, St
 use bevy::reflect::Reflect;
 use std::fmt::Display;
 
+/// A plugin that introduces and manages the main application states.
 pub struct AppStatePlugin;
 
 impl Plugin for AppStatePlugin {
@@ -35,10 +36,14 @@ fn name_from<T: ToString>(state: Option<T>) -> String {
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States, Reflect)]
 pub enum AppState {
+  /// The initialisation state which loads shared resources. Only runs once at application start.
   #[default]
   Initialising,
+  /// The state where players can register to join the game.
   Registering,
+  /// The main gameplay state.
   Playing,
+  /// The state after a game has finished.
   GameOver,
 }
 

@@ -1,6 +1,7 @@
 use crate::prelude::PlayerId;
 use bevy::prelude::KeyCode;
 
+/// Represents a player that has registered to play the game. Used during the game loop.
 #[derive(Clone)]
 pub struct RegisteredPlayer {
   pub id: PlayerId,
@@ -26,4 +27,11 @@ impl PlayerInput {
       action,
     }
   }
+}
+
+/// Represents an available player input configuration. Predefined for players to choose from.
+#[derive(Clone)]
+pub struct AvailablePlayerInput {
+  pub id: PlayerId,
+  pub input: PlayerInput,
 }

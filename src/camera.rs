@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDescriptor, TextureDimension, TextureFormat, TextureUsages};
 use bevy::window::WindowResized;
 
+/// A plugin that sets up the cameras for pixel-perfect rendering as well as high-resolution rendering.
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {

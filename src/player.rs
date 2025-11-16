@@ -1,5 +1,6 @@
+use crate::app_states::AppState;
 use crate::prelude::constants::*;
-use crate::prelude::{Player, PlayerId, SnakeHead, SpawnPoints, WrapAroundEntity};
+use crate::prelude::{Player, PlayerId, RegisteredPlayers, SnakeHead, SpawnPoints, WrapAroundEntity};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
@@ -7,20 +8,23 @@ use bevy::ecs::relationship::Relationship;
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 
+/// A plugin that manages player spawning and snake tail updates.
 pub struct PlayerPlugin;
 
 impl Plugin for PlayerPlugin {
   fn build(&self, app: &mut App) {
-    app.add_systems(Startup, spawn_player_system).add_systems(
-      Update,
-      ((
-        wraparound_system,
-        update_snake_tail_segments_system,
-        update_active_segment_collider_system,
-        update_active_segment_mesh_system,
-      )
-        .chain(),),
-    );
+    app
+      .add_systems(OnExit(AppState::Registering), spawn_player_system)
+      .add_systems(
+        Update,
+        ((
+          wraparound_system,
+          update_snake_tail_segments_system,
+          update_active_segment_collider_system,
+          update_active_segment_mesh_system,
+        )
+          .chain(),),
+      );
   }
 }
 
@@ -93,25 +97,28 @@ enum CollisionLayer {
 fn spawn_player_system(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
-  spawn_points: Res<SpawnPoints>,
+  mut spawn_points: ResMut<SpawnPoints>,
+  players: Res<RegisteredPlayers>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
   let snake_head_handle = asset_server.load("player.png");
-  for (index, (x, y)) in spawn_points.points.iter().enumerate().take(2) {
+  for player in players.players.iter() {
+    let (x, y) = spawn_points.points.pop().expect("Can't get spawn point for player");
+    let index = player.id.0;
     let player_entity = commands
       .spawn((
         Name::new(format!("Snake {}", index + 1)),
         Player,
-        PlayerId(index as u8),
-        Transform::from_xyz(*x, *y, 0.),
+        PlayerId(index),
+        Transform::from_xyz(x, y, 0.),
       ))
       .id();
     commands.entity(player_entity).with_children(|parent| {
       parent.spawn((
         Name::new("Snake Head"),
         SnakeHead,
-        PlayerId(index as u8),
+        PlayerId(index),
         WrapAroundEntity,
         Sprite::from_image(snake_head_handle.clone()),
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
