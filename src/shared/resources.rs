@@ -50,3 +50,36 @@ impl Default for GeneralSettings {
 pub struct SpawnPoints {
   pub points: Vec<(f32, f32)>,
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::MinimalPlugins;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, SharedResourcesPlugin));
+    app
+  }
+
+  #[test]
+  fn shared_messages_plugin_does_not_panic_on_empty_app() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins(SharedResourcesPlugin);
+  }
+
+  #[test]
+  fn shared_resources_plugin_registers_plugins() {
+    let app = setup();
+    let world = app.world();
+
+    assert!(world.contains_resource::<Settings>());
+    assert!(world.contains_resource::<GeneralSettings>());
+    assert!(world.contains_resource::<SpawnPoints>());
+    let spawn_points = world
+      .get_resource::<SpawnPoints>()
+      .expect("Failed to retrieve SpawnPoints");
+    assert!(spawn_points.points.is_empty());
+  }
+}

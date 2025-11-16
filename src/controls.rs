@@ -166,3 +166,80 @@ fn settings_controls_system(
     info!("[F11] Set window mode to [{:?}]", window.mode);
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::app_states::AppStatePlugin;
+  use crate::prelude::SharedResourcesPlugin;
+  use crate::shared::SharedMessagesPlugin;
+  use bevy::MinimalPlugins;
+  use bevy::prelude::State;
+  use bevy::state::app::StatesPlugin;
+
+  enum TestKeyboardInput {
+    Press(KeyCode),
+    Release(KeyCode),
+  }
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app
+      .add_plugins((
+        MinimalPlugins,
+        ControlsPlugin,
+        StatesPlugin,
+        AppStatePlugin,
+        SharedMessagesPlugin,
+        SharedResourcesPlugin,
+      ))
+      .init_resource::<ButtonInput<KeyCode>>();
+    app
+  }
+
+  #[test]
+  fn shared_messages_plugin_does_not_panic_on_empty_app() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins(ControlsPlugin);
+  }
+
+  #[test]
+  fn start_game_system_changes_app_state() {
+    let mut app = setup();
+
+    // Verify initial state
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Initialising);
+
+    // Manually advance state to the state in which the function runs
+    change_app_state(&mut app);
+
+    // Verify state has been advanced
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Waiting);
+
+    // Simulate space key press to start the game
+    handle_key_input(&mut app, TestKeyboardInput::Press(KeyCode::Space));
+    handle_key_input(&mut app, TestKeyboardInput::Release(KeyCode::Space));
+
+    // Verify state has changed by the system
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Running);
+  }
+
+  fn change_app_state(app: &mut App) {
+    let mut next_state = app.world_mut().resource_mut::<NextState<AppState>>();
+    next_state.set(AppState::Waiting);
+    app.update();
+  }
+
+  fn handle_key_input(app: &mut App, desired_input: TestKeyboardInput) {
+    let mut keyboard_input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+    match desired_input {
+      TestKeyboardInput::Press(key_code) => keyboard_input.press(key_code),
+      TestKeyboardInput::Release(key_code) => keyboard_input.release(key_code),
+    };
+    app.update();
+  }
+}

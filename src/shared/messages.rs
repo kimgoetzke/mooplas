@@ -16,3 +16,48 @@ impl Plugin for SharedMessagesPlugin {
 pub struct DebugStateMessage {
   pub display_player_gizmos: bool,
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::MinimalPlugins;
+  use bevy::prelude::Messages;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, SharedMessagesPlugin));
+    app
+  }
+
+  #[test]
+  fn shared_messages_plugin_does_not_panic_on_empty_app() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins(SharedMessagesPlugin);
+  }
+
+  #[test]
+  fn shared_messages_plugin_registers_debug_state_message() {
+    let app = setup();
+    assert!(app.world().contains_resource::<Messages<DebugStateMessage>>());
+  }
+
+  #[test]
+  fn debug_state_message_can_be_written_and_read() {
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, SharedMessagesPlugin));
+    let message_id = app
+      .world_mut()
+      .write_message(DebugStateMessage {
+        display_player_gizmos: true,
+      })
+      .unwrap()
+      .id;
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<DebugStateMessage>>()
+      .expect("Failed to get Messages<DebugStateMessage>");
+    let message = messages.get_message(message_id).expect("Failed to get message");
+    assert!(message.0.display_player_gizmos);
+  }
+}
