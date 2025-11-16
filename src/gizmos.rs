@@ -31,26 +31,34 @@ fn render_gizmos_system(
     gizmos.circle_2d(
       Isometry2d::from_translation(Vec2::new(*x, *y)),
       SNAKE_HEAD_SIZE,
-      Color::from(tailwind::CYAN_300),
+      Color::WHITE,
     );
   }
 
   // Players
+  let mut available_colours = vec![
+    Color::from(tailwind::AMBER_400),
+    Color::from(tailwind::RED_400),
+    Color::from(tailwind::GREEN_400),
+    Color::from(tailwind::BLUE_400),
+    Color::from(tailwind::YELLOW_400),
+  ];
   for transform in snake_head_query.iter() {
+    let colour = available_colours.pop().unwrap_or(Color::WHITE);
     let translation = transform.translation();
 
     // Head collider
     gizmos.circle_2d(
       Isometry2d::from_translation(Vector::new(translation.x, translation.y)),
       SNAKE_HEAD_SIZE,
-      Color::from(tailwind::AMBER_400),
+      colour.clone(),
     );
 
     // Head center point
     gizmos.circle_2d(
       Isometry2d::from_translation(Vector::new(translation.x, translation.y)),
       0.5,
-      Color::from(tailwind::AMBER_400),
+      colour,
     );
   }
 }

@@ -34,7 +34,7 @@ struct Controller {
 }
 
 impl Controller {
-  pub fn new(collider: Collider) -> Self {
+  fn new(collider: Collider) -> Self {
     let mut caster_shape = collider.clone();
     caster_shape.set_scale(Vector::ONE * 0.99, 10);
 
@@ -417,6 +417,36 @@ fn wraparound_system(
           }
         }
       }
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::mesh::Indices;
+
+  #[test]
+  fn create_snake_tail_mesh_with_one_point() {
+    let positions = vec![Vec2::new(1.0, 2.0)];
+    let mesh = create_snake_tail_mesh(&positions);
+
+    // Expect no indices for a single point due to guard clause
+    assert!(mesh.indices().is_none());
+  }
+
+  #[test]
+  fn create_snake_tail_mesh_with_two_points() {
+    let positions = vec![Vec2::new(0.0, 0.0), Vec2::new(1.0, 0.0)];
+    let mesh = create_snake_tail_mesh(&positions);
+
+    if let Some(indices) = mesh.indices() {
+      match indices {
+        Indices::U32(vec) => assert_eq!(vec.len(), 6),
+        Indices::U16(_) => panic!("Expected u32 indices"),
+      }
+    } else {
+      panic!("Expected indices to be present for two points");
     }
   }
 }

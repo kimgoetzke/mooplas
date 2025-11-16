@@ -34,6 +34,7 @@ enum InputAction {
   Action(PlayerId),
 }
 
+/// Defines the key bindings for a given player.
 struct PlayerInput {
   id: PlayerId,
   left: KeyCode,
