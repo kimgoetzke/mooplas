@@ -80,7 +80,7 @@ fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut spawn_points: ResMut<SpawnPoints>,
 ) {
-  let mut rng = rand::thread_rng();
+  let mut rng = rand::rng();
   for i in 0..5 {
     let (x, y) = random_start_position(&mut rng);
     spawn_points.points.push((x, y));
@@ -102,8 +102,8 @@ fn random_start_position(rng: &mut ThreadRng) -> (f32, f32) {
     return (0., 0.);
   }
 
-  let x = rng.gen_range(min_x..=max_x).trunc();
-  let y = rng.gen_range(min_y..=max_y).trunc();
+  let x = rng.random_range(min_x..=max_x).trunc();
+  let y = rng.random_range(min_y..=max_y).trunc();
 
   (x, y)
 }
