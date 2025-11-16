@@ -138,8 +138,8 @@ fn despawn_lobby_ui_system(mut commands: Commands, roots: Query<Entity, With<Lob
 fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, asset_server: Res<AssetServer>) {
   let font = asset_server.load(DEFAULT_FONT);
   let message = match winner.winner {
-    Some(id) => format!("Player {} wins!\nPress [Space] to continue", id.0),
-    None => "No winner this round.\nPress [Space] to continue".to_string(),
+    Some(id) => format!("Player {} wins!\nPress [Space] to continue...", id.0),
+    None => "No winner this round.\nPress [Space] to continue...".to_string(),
   };
 
   commands

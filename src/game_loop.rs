@@ -1,7 +1,9 @@
 use crate::app_states::AppState;
 use crate::player::SnakeTail;
 use crate::prelude::{PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo};
+use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
+use bevy::ecs::entity::Entity;
 use bevy::prelude::*;
 
 /// A plugin that manages the main game loop.
@@ -24,13 +26,60 @@ fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner:
   winner.winner = None;
 }
 
+// TODO: Implement this properly once tail colliders no longer overlap with head colliders
 fn check_snake_collisions_system(
-  mut registered: ResMut<RegisteredPlayers>,
-  heads: Query<(&PlayerId, &Transform), With<SnakeHead>>,
-  tails: Query<(&PlayerId, &Transform), With<SnakeTail>>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  collisions: Collisions,
+  snake_head_query: Query<&PlayerId, With<SnakeHead>>,
+  snake_tail_query: Query<(), With<SnakeTail>>,
+  player_id_query: Query<&PlayerId>,
+  parent_query: Query<&ChildOf>,
 ) {
-  // TODO: Replace with actual collision detection
-  let _ = (&mut *registered, &heads, &tails);
+  let resolve_player_id = |start: Entity| -> Option<PlayerId> {
+    let mut current = start;
+    loop {
+      if let Ok(pid) = player_id_query.get(current) {
+        return Some(*pid);
+      }
+      match parent_query.get(current) {
+        Ok(parent) => current = parent.0,
+        Err(_) => return None,
+      }
+    }
+  };
+
+  for contact_pair in collisions.iter() {
+    let a = contact_pair.collider1;
+    let b = contact_pair.collider2;
+
+    let mut process_pair = |this_entity: Entity, other_entity: Entity| {
+      if let Some(this_player_id) = resolve_player_id(this_entity) {
+        if let Ok(_) = snake_head_query.get(this_entity) {
+          if let Some(player) = registered_players.players.iter_mut().find(|p| p.id == this_player_id) {
+            if let Some(other_player_id) = resolve_player_id(other_entity) {
+              if other_player_id.0 != this_player_id.0 {
+                debug!("Player [{:?}] collided with player [{:?}]", player.id, other_player_id);
+                player.alive = false;
+                return;
+              }
+              debug!("Player [{:?}] collided with themselves", player.id);
+            } else {
+              warn!(
+                "Player [{:?}] collided with non-tail entity [{:?}]",
+                player.id, other_entity
+              );
+            }
+          } else {
+            warn!("Cannot find alive player for head entity [{:?}]", this_entity);
+            return;
+          }
+        }
+      }
+    };
+
+    process_pair(a, b);
+    process_pair(b, a);
+  }
 }
 
 fn transition_to_game_over_system(
