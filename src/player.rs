@@ -1,5 +1,5 @@
 use crate::constants::*;
-use crate::shared::{Player, SnakeHead, SpawnPoints, WrapAroundEntity};
+use crate::shared::{Player, PlayerId, SnakeHead, SpawnPoints, WrapAroundEntity};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
@@ -89,8 +89,7 @@ enum CollisionLayer {
   Tail,
 }
 
-// TODO: Allow multiple players (for local multiplayer)
-/// Spawns the player.
+/// Spawns the player(s).
 fn spawn_player_system(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
@@ -98,16 +97,23 @@ fn spawn_player_system(
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
-  let (x, y) = spawn_points.points.first().expect("There is no spawn point");
   let snake_head_handle = asset_server.load("player.png");
-  commands
-    .spawn((Name::new("Snake"), Player, Transform::from_xyz(*x, *y, 0.)))
-    .with_children(|parent| {
+  for (index, (x, y)) in spawn_points.points.iter().enumerate().take(2) {
+    let player_entity = commands
+      .spawn((
+        Name::new(format!("Snake {}", index + 1)),
+        Player,
+        PlayerId(index as u8),
+        Transform::from_xyz(*x, *y, 0.),
+      ))
+      .id();
+    commands.entity(player_entity).with_children(|parent| {
       parent.spawn((
         Name::new("Snake Head"),
         SnakeHead,
+        PlayerId(index as u8),
         WrapAroundEntity,
-        Sprite::from_image(snake_head_handle),
+        Sprite::from_image(snake_head_handle.clone()),
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
         Transform::default(),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
@@ -133,47 +139,58 @@ fn spawn_player_system(
         PIXEL_PERFECT_LAYER,
       ));
     });
+  }
 }
 
-/// Samples the player's position and updates the [`SnakeTail`] segments accordingly. Creates mesh and collider
+/// Samples each player's position and updates their [`SnakeTail`] segments accordingly. Creates mesh and collider
 /// entities as needed.
 fn update_snake_tail_segments_system(
   mut commands: Commands,
   mut snake_tail_query: Query<(Entity, &mut SnakeTail), Without<SnakeHead>>,
-  snake_head_query: Query<&mut Transform, With<SnakeHead>>,
+  snake_head_query: Query<(&Transform, &GlobalTransform, &ChildOf, &PlayerId), With<SnakeHead>>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
+  children_query: Query<&Children>,
 ) {
-  let transform = snake_head_query.single().expect("There should be a single player");
-  for (entity, mut snake_tail) in &mut snake_tail_query {
-    let gap_samples_remaining = snake_tail.gap_samples_remaining;
-    let active_segment_index = snake_tail.segments.len() - 1;
-    let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
+  // For each snake head, find the matching tail child under the same parent (player) and update it
+  for (transform, _global, parent, _player_id) in snake_head_query.iter() {
     let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 5.).truncate();
+    let parent_entity = parent.get();
+    if let Ok(children) = children_query.get(parent_entity) {
+      // Find SnakeTail entity
+      for child in children.iter() {
+        if let Ok((tail_entity, mut snake_tail)) = snake_tail_query.get_mut(child) {
+          // Now perform the same logic as before but using current_position for this head
+          let gap_samples_remaining = snake_tail.gap_samples_remaining;
+          let active_segment_index = snake_tail.segments.len() - 1;
+          let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
 
-    // Add the first point and, if required, the mesh if the active segment has no positions yet and there are no gap
-    // samples remaining
-    if is_active_segment_positions_empty && gap_samples_remaining == 0 {
-      snake_tail.distance_since_last_sample = 0.0;
-      let active_segment = &mut snake_tail.segments[active_segment_index];
-      active_segment.positions.push(current_position);
-      create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment, entity);
-      continue;
+          // Add the first point and, if required, the mesh if the active segment has no positions yet and there are no
+          // gap samples remaining
+          if is_active_segment_positions_empty && gap_samples_remaining == 0 {
+            snake_tail.distance_since_last_sample = 0.0;
+            let active_segment = &mut snake_tail.segments[active_segment_index];
+            active_segment.positions.push(current_position);
+            create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment, tail_entity);
+            continue;
+          }
+
+          // Update distance since last sample based distance between last point and current position
+          update_distance_since_last_sample(&mut snake_tail, active_segment_index, current_position);
+
+          // Handle logic for when sample distance is reached
+          handle_sample_distance_reached(
+            &mut commands,
+            &mut meshes,
+            &mut materials,
+            &mut snake_tail,
+            tail_entity,
+            active_segment_index,
+            current_position,
+          );
+        }
+      }
     }
-
-    // Update distance since last sample based distance between last point and current position
-    update_distance_since_last_sample(&mut snake_tail, active_segment_index, current_position);
-
-    // Handle logic for when sample distance is reached
-    handle_sample_distance_reached(
-      &mut commands,
-      &mut meshes,
-      &mut materials,
-      &mut snake_tail,
-      entity,
-      active_segment_index,
-      current_position,
-    );
   }
 }
 

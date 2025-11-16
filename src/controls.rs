@@ -1,9 +1,10 @@
 use crate::app_states::AppState;
 use crate::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
-use crate::shared::{DebugStateMessage, GeneralSettings, Settings, SnakeHead};
+use crate::shared::{DebugStateMessage, GeneralSettings, PlayerId, Settings, SnakeHead};
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
+use bevy::ecs::message::MessageIterator;
 use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
@@ -30,8 +31,26 @@ impl Plugin for ControlsPlugin {
 /// A [`Message`] written for an input action.
 #[derive(Message)]
 enum InputAction {
-  Move(Scalar),
-  Action,
+  Move(PlayerId, Scalar),
+  Action(PlayerId),
+}
+
+struct PlayerInput {
+  id: PlayerId,
+  left: KeyCode,
+  right: KeyCode,
+  action: KeyCode,
+}
+
+impl PlayerInput {
+  fn new(id: PlayerId, left: KeyCode, right: KeyCode, action: KeyCode) -> Self {
+    Self {
+      id,
+      left,
+      right,
+      action,
+    }
+  }
 }
 
 /// Transitions the game from the loading state to the running state.
@@ -54,15 +73,32 @@ fn start_game_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut next_app_sta
 
 /// Sends [`InputAction`] events based on keyboard input.
 fn player_input_system(mut input_action_writer: MessageWriter<InputAction>, keyboard_input: Res<ButtonInput<KeyCode>>) {
-  let left = keyboard_input.any_pressed([KeyCode::KeyA, KeyCode::ArrowLeft]);
-  let right = keyboard_input.any_pressed([KeyCode::KeyD, KeyCode::ArrowRight]);
-  let horizontal = right as i8 - left as i8;
-  let direction = horizontal as Scalar;
-  if direction != 0.0 {
-    input_action_writer.write(InputAction::Move(direction));
+  let player_0 = PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::Space);
+  let player_1 = PlayerInput::new(
+    PlayerId(1),
+    KeyCode::ArrowLeft,
+    KeyCode::ArrowRight,
+    KeyCode::ShiftRight,
+  );
+  for player_input in [player_0, player_1] {
+    process_inputs(&mut input_action_writer, &keyboard_input, player_input);
   }
-  if keyboard_input.just_pressed(KeyCode::Space) {
-    input_action_writer.write(InputAction::Action);
+}
+
+fn process_inputs(
+  input_action_writer: &mut MessageWriter<InputAction>,
+  keyboard_input: &Res<ButtonInput<KeyCode>>,
+  player_input: PlayerInput,
+) {
+  let left = keyboard_input.any_pressed([player_input.left]);
+  let right = keyboard_input.any_pressed([player_input.right]);
+  let horizontal_p1 = right as i8 - left as i8;
+  let direction = horizontal_p1 as Scalar;
+  if direction != 0.0 {
+    input_action_writer.write(InputAction::Move(player_input.id, direction));
+  }
+  if keyboard_input.just_pressed(player_input.action) {
+    input_action_writer.write(InputAction::Action(player_input.id));
   }
 }
 
@@ -70,27 +106,31 @@ fn player_input_system(mut input_action_writer: MessageWriter<InputAction>, keyb
 fn player_action_system(
   time: Res<Time>,
   mut input_action_messages: MessageReader<InputAction>,
-  mut controllers: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity), With<SnakeHead>>,
+  mut controllers: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity, &PlayerId), With<SnakeHead>>,
 ) {
   let delta_time = time.delta_secs_f64().adjust_precision();
-  for (transform, mut linear_velocity, mut angular_velocity) in &mut controllers {
+  let messages: Vec<&InputAction> = input_action_messages.read().collect();
+
+  for (transform, mut linear_velocity, mut angular_velocity, player_id) in &mut controllers {
     let mut has_movement_input = false;
     let direction = (transform.rotation * Vec3::Y).normalize_or_zero();
     let velocity = direction * MOVEMENT_SPEED;
     linear_velocity.x = velocity.x;
     linear_velocity.y = velocity.y;
 
-    for event in input_action_messages.read() {
-      has_movement_input = true;
+    for event in messages.iter() {
       match event {
-        InputAction::Move(direction) => {
+        InputAction::Move(id, direction) if id == player_id => {
+          has_movement_input = true;
           angular_velocity.0 = -*direction * ROTATION_SPEED * delta_time;
         }
-        InputAction::Action => {
-          debug!("[Not implemented] Action received");
+        InputAction::Action(pid) if pid == player_id => {
+          debug!("[Not implemented] Action received for player {:?}", player_id);
         }
+        _ => {}
       }
     }
+
     if !has_movement_input {
       angular_velocity.0 = 0.;
     }
