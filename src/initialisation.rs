@@ -2,7 +2,7 @@ use crate::app_states::AppState;
 use crate::prelude::SpawnPoints;
 use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use bevy::app::{App, Plugin};
-use bevy::log::debug;
+use bevy::log::*;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::{IntoScheduleConfigs, NextState, OnEnter, Res, ResMut, Resource, Update, in_state};
 use rand::Rng;
@@ -85,7 +85,7 @@ fn generate_valid_spawn_points_system(
   for i in 0..5 {
     let (x, y) = random_start_position(&mut rng);
     spawn_points.points.push((x, y));
-    debug!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
+    trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
   }
   tracker.mark_done(InitialisationStep::GenerateSpawnPoints);
 }

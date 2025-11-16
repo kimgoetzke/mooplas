@@ -17,7 +17,8 @@ impl Plugin for GameLoopPlugin {
         Update,
         (check_snake_collisions_system, transition_to_game_over_system).run_if(in_state(AppState::Playing)),
       )
-      .add_systems(OnExit(AppState::Playing), despawn_players_system);
+      .add_systems(OnEnter(AppState::GameOver), pause_game)
+      .add_systems(OnExit(AppState::GameOver), (unpause_game, despawn_players_system));
   }
 }
 
@@ -26,12 +27,10 @@ fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner:
   winner.winner = None;
 }
 
-// TODO: Implement this properly once tail colliders no longer overlap with head colliders
 fn check_snake_collisions_system(
   mut registered_players: ResMut<RegisteredPlayers>,
   collisions: Collisions,
   snake_head_query: Query<&PlayerId, With<SnakeHead>>,
-  snake_tail_query: Query<(), With<SnakeTail>>,
   player_id_query: Query<&PlayerId>,
   parent_query: Query<&ChildOf>,
 ) {
@@ -59,18 +58,18 @@ fn check_snake_collisions_system(
             if let Some(other_player_id) = resolve_player_id(other_entity) {
               if other_player_id.0 != this_player_id.0 {
                 debug!("Player [{:?}] collided with player [{:?}]", player.id, other_player_id);
-                player.alive = false;
-                return;
+              } else {
+                debug!("Player [{:?}] collided with themselves", player.id);
               }
-              debug!("Player [{:?}] collided with themselves", player.id);
+              player.alive = false;
             } else {
-              warn!(
+              error!(
                 "Player [{:?}] collided with non-tail entity [{:?}]",
                 player.id, other_entity
               );
             }
           } else {
-            warn!("Cannot find alive player for head entity [{:?}]", this_entity);
+            error!("Cannot find alive player for head entity [{:?}]", this_entity);
             return;
           }
         }
@@ -99,6 +98,14 @@ fn transition_to_game_over_system(
     }
     _ => {}
   }
+}
+
+fn pause_game(mut time: ResMut<Time<Virtual>>) {
+  time.pause();
+}
+
+fn unpause_game(mut time: ResMut<Time<Virtual>>) {
+  time.unpause();
 }
 
 fn despawn_players_system(

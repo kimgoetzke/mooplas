@@ -129,7 +129,7 @@ fn spawn_player_system(
         Transform::default(),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
-        CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Tail]),
+        CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Tail, CollisionLayer::Head]),
         PIXEL_PERFECT_LAYER,
       ));
       parent.spawn((
