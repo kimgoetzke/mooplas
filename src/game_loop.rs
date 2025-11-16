@@ -78,7 +78,7 @@ fn setup_available_player_inputs_system(mut available: ResMut<AvailablePlayerInp
     },
     AvailablePlayerInput {
       id: PlayerId(2),
-      input: PlayerInput::new(PlayerId(2), KeyCode::KeyB, KeyCode::KeyN, KeyCode::KeyM),
+      input: PlayerInput::new(PlayerId(2), KeyCode::KeyB, KeyCode::KeyH, KeyCode::KeyM),
     },
   ];
 }
@@ -191,16 +191,17 @@ fn check_snake_collisions_system(
 }
 
 fn transition_to_game_over_system(
-  registered: ResMut<RegisteredPlayers>,
+  registered_players: ResMut<RegisteredPlayers>,
   mut winner: ResMut<WinnerInfo>,
   mut next: ResMut<NextState<AppState>>,
 ) {
-  let alive_players: Vec<&RegisteredPlayer> = registered.players.iter().filter(|p| p.alive).collect();
-  match alive_players.len() {
-    0 => {
+  let alive_players: Vec<&RegisteredPlayer> = registered_players.players.iter().filter(|p| p.alive).collect();
+  match (registered_players.players.len(), alive_players.len()) {
+    (_, 0) => {
       winner.winner = None;
+      next.set(AppState::GameOver);
     }
-    1 => {
+    (registered_players, 1) if registered_players > 1 => {
       winner.winner = Some(alive_players[0].id);
       next.set(AppState::GameOver);
     }
@@ -225,7 +226,7 @@ fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, as
   let font = asset_server.load(DEFAULT_FONT);
   let message = match winner.winner {
     Some(id) => format!("Player {} wins!\nPress [Space] to continue", id.0),
-    None => "No winner this round.\nPress Space to continue".to_string(),
+    None => "No winner this round.\nPress [Space] to continue".to_string(),
   };
 
   commands
