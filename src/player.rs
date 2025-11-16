@@ -147,20 +147,17 @@ fn spawn_player_system(
 fn update_snake_tail_segments_system(
   mut commands: Commands,
   mut snake_tail_query: Query<(Entity, &mut SnakeTail), Without<SnakeHead>>,
-  snake_head_query: Query<(&Transform, &GlobalTransform, &ChildOf, &PlayerId), With<SnakeHead>>,
+  snake_head_query: Query<(&Transform, &ChildOf), With<SnakeHead>>,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
   children_query: Query<&Children>,
 ) {
-  // For each snake head, find the matching tail child under the same parent (player) and update it
-  for (transform, _global, parent, _player_id) in snake_head_query.iter() {
+  for (transform, parent) in snake_head_query.iter() {
     let current_position = transform.translation.truncate() - (transform.rotation * Vec3::Y * 5.).truncate();
     let parent_entity = parent.get();
     if let Ok(children) = children_query.get(parent_entity) {
-      // Find SnakeTail entity
       for child in children.iter() {
         if let Ok((tail_entity, mut snake_tail)) = snake_tail_query.get_mut(child) {
-          // Now perform the same logic as before but using current_position for this head
           let gap_samples_remaining = snake_tail.gap_samples_remaining;
           let active_segment_index = snake_tail.segments.len() - 1;
           let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();

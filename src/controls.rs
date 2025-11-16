@@ -4,7 +4,6 @@ use crate::shared::{DebugStateMessage, GeneralSettings, PlayerId, Settings, Snak
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
-use bevy::ecs::message::MessageIterator;
 use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
@@ -71,16 +70,18 @@ fn start_game_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut next_app_sta
   next_app_state.set(AppState::Running);
 }
 
+// TODO: Move player input to resource and declare once on startup
 /// Sends [`InputAction`] events based on keyboard input.
 fn player_input_system(mut input_action_writer: MessageWriter<InputAction>, keyboard_input: Res<ButtonInput<KeyCode>>) {
-  let player_0 = PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::Space);
-  let player_1 = PlayerInput::new(
-    PlayerId(1),
-    KeyCode::ArrowLeft,
-    KeyCode::ArrowRight,
-    KeyCode::ShiftRight,
-  );
-  for player_input in [player_0, player_1] {
+  for player_input in [
+    PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::Space),
+    PlayerInput::new(
+      PlayerId(1),
+      KeyCode::ArrowLeft,
+      KeyCode::ArrowRight,
+      KeyCode::ShiftRight,
+    ),
+  ] {
     process_inputs(&mut input_action_writer, &keyboard_input, player_input);
   }
 }
@@ -125,7 +126,7 @@ fn player_action_system(
           angular_velocity.0 = -*direction * ROTATION_SPEED * delta_time;
         }
         InputAction::Action(pid) if pid == player_id => {
-          debug!("[Not implemented] Action received for player {:?}", player_id);
+          debug!("[Not implemented] Action received for: {:?}", player_id);
         }
         _ => {}
       }
