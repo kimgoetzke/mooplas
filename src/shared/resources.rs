@@ -1,3 +1,4 @@
+use crate::prelude::RegisteredPlayer;
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 use bevy_inspector_egui::InspectorOptions;
@@ -14,7 +15,8 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<GeneralSettings>()
       .register_type::<GeneralSettings>()
       .register_type::<SpawnPoints>()
-      .init_resource::<SpawnPoints>();
+      .init_resource::<SpawnPoints>()
+      .init_resource::<RegisteredPlayers>();
   }
 }
 
@@ -49,6 +51,11 @@ impl Default for GeneralSettings {
 #[derive(Resource, Reflect, Clone, Default)]
 pub struct SpawnPoints {
   pub points: Vec<(f32, f32)>,
+}
+
+#[derive(Resource, Default)]
+pub struct RegisteredPlayers {
+  pub players: Vec<RegisteredPlayer>,
 }
 
 #[cfg(test)]

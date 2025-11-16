@@ -1,6 +1,8 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
-use crate::prelude::{DebugStateMessage, GeneralSettings, PlayerId, Settings, SnakeHead};
+use crate::prelude::{
+  DebugStateMessage, GeneralSettings, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
+};
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
@@ -19,10 +21,19 @@ impl Plugin for ControlsPlugin {
     app
       .add_message::<InputAction>()
       .add_systems(Update, settings_controls_system)
-      .add_systems(Update, start_game_system.run_if(in_state(AppState::Waiting)))
       .add_systems(
         Update,
-        (player_input_system, player_action_system).run_if(in_state(AppState::Running)),
+        start_game_system
+          .run_if(in_state(AppState::Registering))
+          .run_if(has_registered_players),
+      )
+      .add_systems(
+        Update,
+        (player_input_system, player_action_system).run_if(in_state(AppState::Playing)),
+      )
+      .add_systems(
+        Update,
+        game_over_to_lobby_transition_system.run_if(in_state(AppState::GameOver)),
       );
   }
 }
@@ -34,56 +45,42 @@ enum InputAction {
   Action(PlayerId),
 }
 
-/// Defines the key bindings for a given player.
-struct PlayerInput {
-  id: PlayerId,
-  left: KeyCode,
-  right: KeyCode,
-  action: KeyCode,
-}
-
-impl PlayerInput {
-  fn new(id: PlayerId, left: KeyCode, right: KeyCode, action: KeyCode) -> Self {
-    Self {
-      id,
-      left,
-      right,
-      action,
-    }
-  }
-}
-
 /// Transitions the game from the loading state to the running state.
 fn start_game_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut next_app_state: ResMut<NextState<AppState>>) {
   if keyboard_input.any_pressed([
     KeyCode::Space,
     KeyCode::Enter,
     KeyCode::Escape,
-    KeyCode::KeyA,
-    KeyCode::KeyW,
-    KeyCode::KeyS,
-    KeyCode::KeyD,
+    KeyCode::Tab,
+    KeyCode::ShiftLeft,
+    KeyCode::ShiftRight,
   ]) {
     debug_once!("Waiting for keyboard input to start the game...");
   } else {
     return;
   }
-  next_app_state.set(AppState::Running);
+  next_app_state.set(AppState::Playing);
 }
 
-// TODO: Move player input to resource and declare once on startup
-/// Sends [`InputAction`] events based on keyboard input.
-fn player_input_system(mut input_action_writer: MessageWriter<InputAction>, keyboard_input: Res<ButtonInput<KeyCode>>) {
-  for player_input in [
-    PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::Space),
-    PlayerInput::new(
-      PlayerId(1),
-      KeyCode::ArrowLeft,
-      KeyCode::ArrowRight,
-      KeyCode::ShiftRight,
-    ),
-  ] {
-    process_inputs(&mut input_action_writer, &keyboard_input, player_input);
+fn has_registered_players(registered: Option<Res<RegisteredPlayers>>) -> bool {
+  if let Some(registered) = registered {
+    !registered.players.is_empty()
+  } else {
+    false
+  }
+}
+
+// Sends `InputAction` events based on keyboard input, but only for registered players.
+fn player_input_system(
+  mut input_action_writer: MessageWriter<InputAction>,
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  registered: Option<Res<RegisteredPlayers>>,
+) {
+  let Some(registered) = registered else {
+    return;
+  };
+  for player in &registered.players {
+    process_inputs(&mut input_action_writer, &keyboard_input, player.input.clone());
   }
 }
 
@@ -167,6 +164,15 @@ fn settings_controls_system(
   }
 }
 
+fn game_over_to_lobby_transition_system(
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  mut next_state: ResMut<NextState<AppState>>,
+) {
+  if keyboard_input.just_pressed(KeyCode::Space) {
+    next_state.set(AppState::Registering);
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -217,7 +223,7 @@ mod tests {
 
     // Verify state has been advanced
     let state = app.world().resource::<State<AppState>>();
-    assert_eq!(state.get(), &AppState::Waiting);
+    assert_eq!(state.get(), &AppState::Registering);
 
     // Simulate space key press to start the game
     handle_key_input(&mut app, TestKeyboardInput::Press(KeyCode::Space));
@@ -225,12 +231,12 @@ mod tests {
 
     // Verify state has changed by the system
     let state = app.world().resource::<State<AppState>>();
-    assert_eq!(state.get(), &AppState::Running);
+    assert_eq!(state.get(), &AppState::Playing);
   }
 
   fn change_app_state(app: &mut App) {
     let mut next_state = app.world_mut().resource_mut::<NextState<AppState>>();
-    next_state.set(AppState::Waiting);
+    next_state.set(AppState::Registering);
     app.update();
   }
 

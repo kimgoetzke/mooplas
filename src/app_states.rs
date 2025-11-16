@@ -37,8 +37,9 @@ fn name_from<T: ToString>(state: Option<T>) -> String {
 pub enum AppState {
   #[default]
   Initialising,
-  Waiting,
-  Running,
+  Registering,
+  Playing,
+  GameOver,
 }
 
 impl AppState {

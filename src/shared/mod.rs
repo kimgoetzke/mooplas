@@ -1,8 +1,10 @@
+mod components;
 pub mod constants;
 mod messages;
 mod resources;
-mod shared;
+mod structs;
 
+pub use components::*;
 pub use messages::*;
 pub use resources::*;
-pub use shared::*;
+pub use structs::*;

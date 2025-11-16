@@ -70,7 +70,7 @@ fn check_initialisation_progress_system(
 ) {
   if tracker.all_done() {
     debug!("✅  Initialisation completed");
-    next_state.set(AppState::Waiting);
+    next_state.set(AppState::Registering);
   }
 }
 
