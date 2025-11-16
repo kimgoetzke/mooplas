@@ -1,6 +1,6 @@
 use crate::app_states::AppState;
-use crate::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
-use crate::shared::SpawnPoints;
+use crate::prelude::SpawnPoints;
+use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use bevy::app::{App, Plugin};
 use bevy::log::debug;
 use bevy::platform::collections::HashSet;

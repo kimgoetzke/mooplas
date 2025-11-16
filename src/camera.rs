@@ -1,4 +1,4 @@
-use crate::constants::*;
+use crate::prelude::constants::*;
 use bevy::app::{App, Plugin, Startup, Update};
 use bevy::asset::Assets;
 use bevy::camera::RenderTarget;

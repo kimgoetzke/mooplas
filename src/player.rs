@@ -1,5 +1,5 @@
-use crate::constants::*;
-use crate::shared::{Player, PlayerId, SnakeHead, SpawnPoints, WrapAroundEntity};
+use crate::prelude::constants::*;
+use crate::prelude::{Player, PlayerId, SnakeHead, SpawnPoints, WrapAroundEntity};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;

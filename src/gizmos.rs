@@ -1,5 +1,5 @@
-use crate::constants::SNAKE_HEAD_SIZE;
-use crate::shared::{Settings, SnakeHead, SpawnPoints};
+use crate::prelude::constants::SNAKE_HEAD_SIZE;
+use crate::prelude::{Settings, SnakeHead, SpawnPoints};
 use avian2d::math::Vector;
 use bevy::app::{App, Plugin, Update};
 use bevy::color::Color;

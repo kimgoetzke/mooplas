@@ -1,4 +1,4 @@
-use crate::constants::*;
+use crate::prelude::constants::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 use bevy::text::FontSmoothing;

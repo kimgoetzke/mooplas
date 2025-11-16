@@ -1,6 +1,6 @@
 use crate::app_states::AppState;
-use crate::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
-use crate::shared::{DebugStateMessage, GeneralSettings, PlayerId, Settings, SnakeHead};
+use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
+use crate::prelude::{DebugStateMessage, GeneralSettings, PlayerId, Settings, SnakeHead};
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
