@@ -83,6 +83,7 @@ fn check_initialisation_progress_system(
   }
 }
 
+// TODO: Re-initialise spawn points each round
 // TODO: Ensure spawn points are not to close to each other
 // TODO: Add random rotation so that players don't all face the same direction
 /// A system that provides random but safe spawn points for players.

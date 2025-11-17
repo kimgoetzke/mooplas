@@ -45,7 +45,7 @@ pub struct GeneralSettings {
 impl Default for GeneralSettings {
   fn default() -> Self {
     Self {
-      display_player_gizmos: true,
+      display_player_gizmos: false,
     }
   }
 }

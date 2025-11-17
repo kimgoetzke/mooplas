@@ -1,5 +1,4 @@
 use bevy::camera::visibility::RenderLayers;
-use bevy::color::Srgba;
 
 // General and rendering
 // --------------------------------//

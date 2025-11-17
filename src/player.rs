@@ -106,7 +106,11 @@ fn spawn_player_system(
         SnakeHead,
         PlayerId(index),
         WrapAroundEntity,
-        Sprite::from_image(snake_head_handle.clone()),
+        Sprite {
+          image: snake_head_handle.clone(),
+          color: player.colour,
+          ..default()
+        },
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
         Transform::default(),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
