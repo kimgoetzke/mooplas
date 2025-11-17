@@ -9,9 +9,9 @@ use bevy::color::Color;
 use bevy::input::ButtonInput;
 use bevy::log::debug;
 use bevy::prelude::{
-  AlignItems, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, KeyCode,
-  LineBreak, Node, OnEnter, OnExit, Query, Res, ResMut, Text, TextColor, TextFont, TextLayout, Val, With, default,
-  in_state,
+  AlignItems, Children, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs, Justify, JustifyContent,
+  KeyCode, LineBreak, Node, OnEnter, OnExit, Query, Res, ResMut, Text, TextColor, TextFont, TextLayout, Val, With,
+  default, in_state,
 };
 use bevy::text::LineHeight;
 
@@ -43,11 +43,11 @@ struct LobbyUiEntry {
 #[derive(Component)]
 struct VictoryUiRoot;
 
-// TODO: Colour the player name with their chosen colour
 fn setup_lobby_ui_system(
   mut commands: Commands,
   available: Res<AvailablePlayerConfigs>,
   asset_server: Res<AssetServer>,
+  available_configs: Res<AvailablePlayerConfigs>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
 
@@ -66,22 +66,53 @@ fn setup_lobby_ui_system(
     .id();
 
   for available_input in &available.configs {
-    let text = press_to_join_text(available_input);
+    let (player_label, prompt) = press_to_join_text(available_input);
+    let colour = available_configs
+      .configs
+      .iter()
+      .find(|p| p.id == available_input.id)
+      .map(|p| p.colour)
+      .unwrap_or(Color::WHITE);
     let entry = commands
       .spawn((
         LobbyUiEntry {
           player_id: available_input.id,
         },
-        Text::new(text),
-        TextFont {
-          font: font.clone(),
-          font_size: 38.0,
+        Node {
+          width: Val::Percent(100.0),
+          flex_direction: FlexDirection::Row,
+          justify_content: JustifyContent::Center,
+          align_items: AlignItems::Center,
           ..default()
         },
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        TextColor(Color::WHITE),
       ))
+      .with_children(|parent| {
+        // Player
+        parent.spawn((
+          Text::new(player_label),
+          TextFont {
+            font: font.clone(),
+            font_size: 38.0,
+            ..default()
+          },
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          TextColor(colour),
+        ));
+
+        // Prompt
+        parent.spawn((
+          Text::new(prompt),
+          TextFont {
+            font: font.clone(),
+            font_size: 38.0,
+            ..default()
+          },
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          TextColor(Color::WHITE),
+        ));
+      })
       .id();
+
     commands.entity(root).add_child(entry);
   }
 
@@ -103,13 +134,13 @@ fn setup_lobby_ui_system(
   commands.entity(root).add_child(prompt);
 }
 
-// TODO: Colour the player name with their chosen colour
 // TODO: Move to controls plugin and use messages to notify registration changes
 fn registration_input_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut registered_players: ResMut<RegisteredPlayers>,
-  mut query: Query<(&LobbyUiEntry, &mut Text)>,
+  mut entries: Query<(Entity, &LobbyUiEntry, &Children)>,
+  mut texts: Query<&mut Text>,
 ) {
   for available_config in &available_configs.configs {
     if !keyboard_input.just_pressed(available_config.input.action) {
@@ -123,10 +154,21 @@ fn registration_input_system(
       .position(|p| p.id == available_config.id)
     {
       registered_players.players.remove(pos);
-      for (entry, mut text) in &mut query {
+
+      for (_entity, entry, children) in &mut entries {
         if entry.player_id == available_config.id {
           debug!("Player [{}] has unregistered", available_config.id.0);
-          text.0 = press_to_join_text(available_config);
+          let (player_label, prompt) = press_to_join_text(available_config);
+          if let Some(first_child) = children.get(0) {
+            if let Ok(mut t) = texts.get_mut(*first_child) {
+              t.0 = player_label.clone();
+            }
+          }
+          if let Some(second_child) = children.get(1) {
+            if let Ok(mut t) = texts.get_mut(*second_child) {
+              t.0 = prompt.clone();
+            }
+          }
         }
       }
       continue;
@@ -139,19 +181,29 @@ fn registration_input_system(
       colour: available_config.colour,
       alive: true,
     });
-    for (entry, mut text) in &mut query {
+    for (_entity, entry, children) in &mut entries {
       if entry.player_id == available_config.id {
         debug!("Player [{}] has registered", available_config.id.0);
-        text.0 = format!("Player {}: Registered!", available_config.id.0);
+        // Set first child to "Player N" and second child to ": Registered!"
+        if let Some(first_child) = children.get(0) {
+          if let Ok(mut t) = texts.get_mut(*first_child) {
+            t.0 = format!("Player {}", available_config.id.0);
+          }
+        }
+        if let Some(second_child) = children.get(1) {
+          if let Ok(mut t) = texts.get_mut(*second_child) {
+            t.0 = String::from(": Registered!");
+          }
+        }
       }
     }
   }
 }
 
-fn press_to_join_text(available_config: &AvailablePlayerConfig) -> String {
-  format!(
-    "Player {}: Press [{:?}] to join",
-    available_config.id.0, available_config.input.action,
+fn press_to_join_text(available_config: &AvailablePlayerConfig) -> (String, String) {
+  (
+    format!("Player {}", available_config.id.0),
+    format!(": Press [{:?}] to join", available_config.input.action),
   )
 }
 
@@ -161,13 +213,13 @@ fn despawn_lobby_ui_system(mut commands: Commands, roots: Query<Entity, With<Lob
   }
 }
 
-// TODO: Colour the player's name (e.g. "Player 1") with their chosen colour
-fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, asset_server: Res<AssetServer>) {
+fn spawn_game_over_ui_system(
+  mut commands: Commands,
+  winner: Res<WinnerInfo>,
+  asset_server: Res<AssetServer>,
+  registered_players: Res<RegisteredPlayers>,
+) {
   let font = asset_server.load(DEFAULT_FONT);
-  let message = match winner.winner {
-    Some(id) => format!("Player {} wins!", id.0),
-    None => "No winner this round.".to_string(),
-  };
 
   commands
     .spawn((
@@ -182,21 +234,61 @@ fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, as
       },
     ))
     .with_children(|parent| {
-      parent.spawn((
-        Text::new(message),
-        TextFont {
-          font: font.clone(),
-          font_size: 60.0,
-          ..default()
-        },
-        TextColor(Color::WHITE),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-      ));
+      match winner.winner {
+        Some(id) => {
+          let colour = registered_players
+            .players
+            .iter()
+            .find(|p| p.id == id)
+            .map(|p| p.colour)
+            .unwrap_or(Color::WHITE);
+          parent
+            .spawn((Node {
+              flex_direction: FlexDirection::Row,
+              justify_content: JustifyContent::Center,
+              align_items: AlignItems::Center,
+              ..default()
+            },))
+            .with_children(|row| {
+              row.spawn((
+                Text::new(format!("Player {}", id.0)),
+                TextFont {
+                  font: font.clone(),
+                  font_size: 60.0,
+                  ..default()
+                },
+                TextColor(colour),
+              ));
+              row.spawn((
+                Text::new(" wins!"),
+                TextFont {
+                  font: font.clone(),
+                  font_size: 60.0,
+                  ..default()
+                },
+                TextColor(Color::WHITE),
+              ));
+            });
+        }
+        None => {
+          parent.spawn((
+            Text::new("No winner this round."),
+            TextFont {
+              font: font.clone(),
+              font_size: 60.0,
+              ..default()
+            },
+            TextColor(Color::WHITE),
+          ));
+        }
+      }
+
       parent.spawn((
         Text::new("Press [Space] to continue..."),
         TextFont {
           font,
           font_size: 38.0,
+          line_height: LineHeight::RelativeToFont(3.0),
           ..default()
         },
         TextColor(Color::WHITE),
