@@ -1,6 +1,5 @@
 use crate::app_states::AppState;
-use crate::player::SnakeTail;
-use crate::prelude::{PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo};
+use crate::prelude::{PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, SnakeTail, WinnerInfo};
 use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
 use bevy::ecs::entity::Entity;

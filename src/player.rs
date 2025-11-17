@@ -1,6 +1,6 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::*;
-use crate::prelude::{Player, PlayerId, RegisteredPlayers, SnakeHead, SpawnPoints, WrapAroundEntity};
+use crate::prelude::{Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeTail, SpawnPoints, WrapAroundEntity};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
@@ -53,7 +53,7 @@ impl Controller {
 
 /// A continuous drawn segment of the snake tail.
 #[derive(Component)]
-struct SnakeSegment {
+pub struct SnakeSegment {
   /// Sampled world positions along this segment.
   /// - Index 0 is the *oldest* position (furthest behind the head),
   /// - The last index is the *newest* position (closest to the head).
@@ -68,37 +68,6 @@ impl Default for SnakeSegment {
       positions: Vec::with_capacity(SNAKE_LENGTH_MAX_CONTINUOUS),
       mesh_entity: None,
       collider_entity: None,
-    }
-  }
-}
-
-/// The snake tail component that manages all [`SnakeSegment`]s and sampling.
-#[derive(Component)]
-pub struct SnakeTail {
-  segments: Vec<SnakeSegment>,
-  distance_since_last_sample: f32,
-  gap_samples_remaining: usize,
-  colour: Color,
-}
-
-impl Default for SnakeTail {
-  fn default() -> Self {
-    Self {
-      segments: vec![SnakeSegment::default()],
-      distance_since_last_sample: 0.0,
-      gap_samples_remaining: 0,
-      colour: Color::default(),
-    }
-  }
-}
-
-impl SnakeTail {
-  fn new(colour: Color) -> Self {
-    Self {
-      segments: vec![SnakeSegment::default()],
-      distance_since_last_sample: 0.0,
-      gap_samples_remaining: 0,
-      colour,
     }
   }
 }
