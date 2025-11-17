@@ -73,6 +73,13 @@ impl Default for SnakeSegment {
   }
 }
 
+impl SnakeSegment {
+  /// Read-only accessor for sampled positions.
+  pub fn positions(&self) -> &[Vec2] {
+    &self.positions
+  }
+}
+
 /// The collision layers used for snake head and tail.
 #[derive(PhysicsLayer, Default)]
 enum CollisionLayer {

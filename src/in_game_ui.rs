@@ -161,7 +161,7 @@ fn despawn_lobby_ui_system(mut commands: Commands, roots: Query<Entity, With<Lob
   }
 }
 
-// TODO: Colour the player name with their chosen colour
+// TODO: Colour the player's name (e.g. "Player 1") with their chosen colour
 fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, asset_server: Res<AssetServer>) {
   let font = asset_server.load(DEFAULT_FONT);
   let message = match winner.winner {

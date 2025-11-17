@@ -69,4 +69,4 @@ pub(crate) const SNAKE_HEAD_SIZE: f32 = 5.0;
 /// Number of most-recent sampled positions (closest to the head) that are *not* included in the tail collider polyline.
 /// This creates a "safe" buffer directly behind the head so that the head does not immediately collide with its own
 /// tail.
-pub(crate) const TAIL_COLLIDER_SKIP_RECENT: usize = 10;
+pub(crate) const TAIL_COLLIDER_SKIP_RECENT: usize = 2;
