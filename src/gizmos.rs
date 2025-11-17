@@ -74,9 +74,9 @@ fn draw_snake_tail_gizmos(gizmos: &mut Gizmos, snake_tail_query: Query<(&GlobalT
 
       // Sampled tail positions
       for position in positions.iter() {
-        gizmos.circle_2d(
+        gizmos.cross_2d(
           Isometry2d::from_translation(Vec2::new(translation.x + position.x, translation.y + position.y)),
-          0.35,
+          0.5,
           colour.with_alpha(0.6),
         );
       }
