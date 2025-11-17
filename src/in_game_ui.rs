@@ -13,6 +13,7 @@ use bevy::prelude::{
   LineBreak, Node, OnEnter, OnExit, Query, Res, ResMut, Text, TextColor, TextFont, TextLayout, Val, With, default,
   in_state,
 };
+use bevy::text::LineHeight;
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;
@@ -42,12 +43,14 @@ struct LobbyUiEntry {
 #[derive(Component)]
 struct VictoryUiRoot;
 
+// TODO: Colour the player name with their chosen colour
 fn setup_lobby_ui_system(
   mut commands: Commands,
   available: Res<AvailablePlayerConfigs>,
   asset_server: Res<AssetServer>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
+
   let root = commands
     .spawn((
       LobbyUiRoot,
@@ -72,7 +75,7 @@ fn setup_lobby_ui_system(
         Text::new(text),
         TextFont {
           font: font.clone(),
-          font_size: 26.0,
+          font_size: 38.0,
           ..default()
         },
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
@@ -81,8 +84,26 @@ fn setup_lobby_ui_system(
       .id();
     commands.entity(root).add_child(entry);
   }
+
+  // TODO: Only show this if at least one player has registered
+  let prompt = commands
+    .spawn((
+      Text::new("Press [Space] to start..."),
+      TextFont {
+        font,
+        font_size: 38.0,
+        line_height: LineHeight::RelativeToFont(3.0),
+        ..default()
+      },
+      TextColor(Color::WHITE),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+    ))
+    .id();
+
+  commands.entity(root).add_child(prompt);
 }
 
+// TODO: Colour the player name with their chosen colour
 // TODO: Move to controls plugin and use messages to notify registration changes
 fn registration_input_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
@@ -140,11 +161,12 @@ fn despawn_lobby_ui_system(mut commands: Commands, roots: Query<Entity, With<Lob
   }
 }
 
+// TODO: Colour the player name with their chosen colour
 fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, asset_server: Res<AssetServer>) {
   let font = asset_server.load(DEFAULT_FONT);
   let message = match winner.winner {
-    Some(id) => format!("Player {} wins!\nPress [Space] to continue...", id.0),
-    None => "No winner this round.\nPress [Space] to continue...".to_string(),
+    Some(id) => format!("Player {} wins!", id.0),
+    None => "No winner this round.".to_string(),
   };
 
   commands
@@ -163,8 +185,18 @@ fn spawn_game_over_ui_system(mut commands: Commands, winner: Res<WinnerInfo>, as
       parent.spawn((
         Text::new(message),
         TextFont {
+          font: font.clone(),
+          font_size: 60.0,
+          ..default()
+        },
+        TextColor(Color::WHITE),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      ));
+      parent.spawn((
+        Text::new("Press [Space] to continue..."),
+        TextFont {
           font,
-          font_size: 42.0,
+          font_size: 38.0,
           ..default()
         },
         TextColor(Color::WHITE),

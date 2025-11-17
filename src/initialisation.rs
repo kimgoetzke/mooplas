@@ -99,6 +99,7 @@ fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: Re
   }
 }
 
+// TODO: Create lambda equivalent for tracker boilerplate
 // TODO: Ensure spawn points are not to close to each other
 // TODO: Add random rotation so that players don't all face the same direction
 /// A system that provides random but safe spawn points for players.
@@ -119,6 +120,7 @@ fn generate_valid_spawn_points_system(
     spawn_points.points.push((x, y));
     trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
   }
+
   tracker.mark_done(this_step);
 }
 
