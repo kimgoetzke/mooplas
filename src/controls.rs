@@ -14,6 +14,7 @@ use bevy::prelude::{
   Time, Transform, Window, With, in_state,
 };
 
+// TODO: Add touch screen support
 /// A plugin that manages all player controls and input handling.
 pub struct ControlsPlugin;
 
@@ -34,7 +35,7 @@ impl Plugin for ControlsPlugin {
       )
       .add_systems(
         Update,
-        game_over_to_lobby_transition_system.run_if(in_state(AppState::GameOver)),
+        game_over_to_reinitialising_transition_system.run_if(in_state(AppState::GameOver)),
       );
   }
 }
@@ -102,6 +103,7 @@ fn process_inputs(
   }
 }
 
+// TODO: Stop moving player when they die
 /// Responds to [`InputAction`] events and moves character controllers accordingly.
 fn player_action_system(
   time: Res<Time>,
@@ -165,12 +167,12 @@ fn settings_controls_system(
   }
 }
 
-fn game_over_to_lobby_transition_system(
+fn game_over_to_reinitialising_transition_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   mut next_state: ResMut<NextState<AppState>>,
 ) {
   if keyboard_input.just_pressed(KeyCode::Space) {
-    next_state.set(AppState::Registering);
+    next_state.set(AppState::Reinitialising);
   }
 }
 

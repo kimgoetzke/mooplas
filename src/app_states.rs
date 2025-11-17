@@ -45,6 +45,8 @@ pub enum AppState {
   Playing,
   /// The state after a game has finished.
   GameOver,
+  /// The state for reinitialising the game (e.g., generating new spawn points). Runs between games.
+  Reinitialising,
 }
 
 impl AppState {

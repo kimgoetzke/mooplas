@@ -22,6 +22,7 @@ impl Plugin for PlayerPlugin {
           update_snake_tail_segments_system,
           update_active_segment_collider_system,
           update_active_segment_mesh_system,
+          disable_eliminated_players_system,
         )
           .chain(),),
       );
@@ -433,6 +434,19 @@ fn wraparound_system(
           }
         }
       }
+    }
+  }
+}
+
+fn disable_eliminated_players_system(
+  mut commands: Commands,
+  registered_players: Res<RegisteredPlayers>,
+  snake_head_query: Query<(Entity, &PlayerId), With<SnakeHead>>,
+) {
+  for (entity, player_id) in snake_head_query.iter() {
+    if !registered_players.players.iter().any(|p| p.id == *player_id && p.alive) {
+      debug!("Removed [{:?}] because they are eliminated", player_id);
+      commands.entity(entity).remove::<SnakeHead>().insert(RigidBody::Static);
     }
   }
 }

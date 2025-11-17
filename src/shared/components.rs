@@ -1,5 +1,6 @@
 use bevy::color::Color;
 use bevy::prelude::Component;
+use std::fmt::{Debug, Display};
 
 /// A marker component for the player entity.
 #[derive(Component)]
@@ -14,8 +15,20 @@ pub struct SnakeHead;
 pub struct WrapAroundEntity;
 
 /// A component identifying which player an entity belongs to. Used to route input and per-player logic, etc.
-#[derive(Component, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub struct PlayerId(pub u8);
+
+impl Display for PlayerId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Player {}", self.0)
+  }
+}
+
+impl Debug for PlayerId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Player {}", self.0)
+  }
+}
 
 /// The snake tail component that manages all [`crate::player::SnakeSegment`]s and sampling.
 #[derive(Component)]

@@ -1,5 +1,4 @@
 use crate::app_states::AppState;
-use crate::initialisation::InitialisationStep::InitialiseAvailablePlayerConfigs;
 use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, SpawnPoints};
 use bevy::app::{App, Plugin};
@@ -18,18 +17,20 @@ impl Plugin for InitialisationPlugin {
   fn build(&self, app: &mut App) {
     app
       .init_resource::<InitialisationTracker>()
-      .add_systems(
-        Update,
-        check_initialisation_progress_system.run_if(in_state(AppState::Initialising)),
-      )
+      .add_systems(Update, check_progress_system.run_if(in_state(AppState::Initialising)))
       .add_systems(
         OnEnter(AppState::Initialising),
         (
-          reset_initialisation_tracker_system,
+          initialise_tracker_system,
           generate_valid_spawn_points_system,
           initialise_available_player_configurations_system,
         )
           .chain(),
+      )
+      .add_systems(Update, check_progress_system.run_if(in_state(AppState::Reinitialising)))
+      .add_systems(
+        OnEnter(AppState::Reinitialising),
+        (reset_tracker_system, generate_valid_spawn_points_system).chain(),
       );
   }
 }
@@ -66,24 +67,32 @@ impl InitialisationTracker {
 ///
 /// New steps must be added here as needed. In addition, the corresponding systems must be added to the initialisation
 /// chain in the plugin.
-fn reset_initialisation_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
+fn initialise_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
+  let required = vec![
+    InitialisationStep::GenerateSpawnPoints,
+    InitialisationStep::InitialiseAvailablePlayerConfigs,
+  ];
+  tracker.reset(required);
+}
+
+/// Resets the tracker with the required [`InitialisationStep`]s.
+///
+/// New steps must be added here as needed. In addition, the corresponding systems must be added to the initialisation
+/// chain in the plugin.
+fn reset_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
   let required = vec![InitialisationStep::GenerateSpawnPoints];
   tracker.reset(required);
 }
 
-/// Polling system that runs in parallel to the initialisation process and advances the app state once all steps are
+/// Polling system that runs in parallel to the re-/initialisation process and advances the app state once all steps are
 /// complete.
-fn check_initialisation_progress_system(
-  tracker: Res<InitialisationTracker>,
-  mut next_state: ResMut<NextState<AppState>>,
-) {
+fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: ResMut<NextState<AppState>>) {
   if tracker.all_done() {
-    debug!("✅  Initialisation completed");
+    debug!("✅  (Re-)initialisation completed");
     next_state.set(AppState::Registering);
   }
 }
 
-// TODO: Re-initialise spawn points each round
 // TODO: Ensure spawn points are not to close to each other
 // TODO: Add random rotation so that players don't all face the same direction
 /// A system that provides random but safe spawn points for players.
@@ -91,8 +100,9 @@ fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut spawn_points: ResMut<SpawnPoints>,
 ) {
+  spawn_points.points.clear();
   let mut rng = rand::rng();
-  for i in 0..5 {
+  for i in 0..10 {
     let (x, y) = random_start_position(&mut rng);
     spawn_points.points.push((x, y));
     trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
@@ -140,5 +150,5 @@ fn initialise_available_player_configurations_system(
       colour: Color::from(tailwind::SKY_500),
     },
   ];
-  tracker.mark_done(InitialiseAvailablePlayerConfigs);
+  tracker.mark_done(InitialisationStep::InitialiseAvailablePlayerConfigs);
 }

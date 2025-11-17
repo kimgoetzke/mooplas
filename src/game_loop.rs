@@ -1,5 +1,7 @@
 use crate::app_states::AppState;
-use crate::prelude::{PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, SnakeTail, WinnerInfo};
+use crate::prelude::{
+  PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, SnakeTail, WinnerInfo, WrapAroundEntity,
+};
 use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
 use bevy::ecs::entity::Entity;
@@ -56,16 +58,13 @@ fn check_snake_collisions_system(
           if let Some(player) = registered_players.players.iter_mut().find(|p| p.id == this_player_id) {
             if let Some(other_player_id) = resolve_player_id(other_entity) {
               if other_player_id.0 != this_player_id.0 {
-                debug!("Player [{:?}] collided with player [{:?}]", player.id, other_player_id);
+                debug!("[{:?}] collided with [{:?}]", player.id, other_player_id);
               } else {
-                debug!("Player [{:?}] collided with themselves", player.id);
+                debug!("[{:?}] collided with themselves", player.id);
               }
               player.alive = false;
             } else {
-              error!(
-                "Player [{:?}] collided with non-tail entity [{:?}]",
-                player.id, other_entity
-              );
+              error!("[{:?}] collided with non-tail entity [{:?}]", player.id, other_entity);
             }
           } else {
             error!("Cannot find alive player for head entity [{:?}]", this_entity);
@@ -90,10 +89,12 @@ fn transition_to_game_over_system(
     (_, 0) => {
       winner.winner = None;
       next.set(AppState::GameOver);
+      info!("Game over: No winner this round.");
     }
     (registered_players, 1) if registered_players > 1 => {
       winner.winner = Some(alive_players[0].id);
       next.set(AppState::GameOver);
+      info!("Game over: [{:?}] wins the round", alive_players[0].id);
     }
     _ => {}
   }
@@ -107,9 +108,10 @@ fn unpause_game(mut time: ResMut<Time<Virtual>>) {
   time.unpause();
 }
 
+// TODO: Check if I cannot just despawn the Player root entity
 fn despawn_players_system(
   mut commands: Commands,
-  heads: Query<Entity, With<SnakeHead>>,
+  heads: Query<Entity, With<WrapAroundEntity>>,
   tails: Query<Entity, With<SnakeTail>>,
 ) {
   for entity in &heads {
