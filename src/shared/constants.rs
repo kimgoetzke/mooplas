@@ -51,9 +51,6 @@ pub(crate) const ROTATION_SPEED: f32 = 120.0;
 /// opposite side.
 pub(crate) const WRAPAROUND_MARGIN: f32 = 2.; // Must be divisible by 2
 
-/// The base colour of the snake tail mesh.
-pub(crate) const SNAKE_BASE_COLOUR: Srgba = Srgba::new(0.0, 0.419607, 0.4239524, 1.0);
-
 /// The length (in pixel) to which the snake tail needs to grow before certain logic is applied, such as introducing
 /// gaps.
 pub(crate) const SNAKE_TAIL_POSITION_SAMPLE_DISTANCE: f32 = 5.0;

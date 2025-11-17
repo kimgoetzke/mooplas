@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::DEFAULT_FONT;
 use crate::prelude::{
-  AvailablePlayerInput, AvailablePlayerInputs, PlayerId, RegisteredPlayer, RegisteredPlayers, WinnerInfo,
+  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayer, RegisteredPlayers, WinnerInfo,
 };
 use bevy::app::{Plugin, Update};
 use bevy::asset::AssetServer;
@@ -44,7 +44,7 @@ struct VictoryUiRoot;
 
 fn setup_lobby_ui_system(
   mut commands: Commands,
-  available: Res<AvailablePlayerInputs>,
+  available: Res<AvailablePlayerConfigs>,
   asset_server: Res<AssetServer>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
@@ -62,7 +62,7 @@ fn setup_lobby_ui_system(
     ))
     .id();
 
-  for available_input in &available.inputs {
+  for available_input in &available.configs {
     let text = press_to_join_text(available_input);
     let entry = commands
       .spawn((
@@ -86,46 +86,51 @@ fn setup_lobby_ui_system(
 // TODO: Move to controls plugin and use messages to notify registration changes
 fn registration_input_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
-  available: Res<AvailablePlayerInputs>,
-  mut registered: ResMut<RegisteredPlayers>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  mut registered_players: ResMut<RegisteredPlayers>,
   mut query: Query<(&LobbyUiEntry, &mut Text)>,
 ) {
-  for available_input in &available.inputs {
-    if !keyboard_input.just_pressed(available_input.input.action) {
+  for available_config in &available_configs.configs {
+    if !keyboard_input.just_pressed(available_config.input.action) {
       continue;
     }
 
     // Unregister if already registered
-    if let Some(pos) = registered.players.iter().position(|p| p.id == available_input.id) {
-      registered.players.remove(pos);
+    if let Some(pos) = registered_players
+      .players
+      .iter()
+      .position(|p| p.id == available_config.id)
+    {
+      registered_players.players.remove(pos);
       for (entry, mut text) in &mut query {
-        if entry.player_id == available_input.id {
-          debug!("Player [{}] has unregistered", available_input.id.0);
-          text.0 = press_to_join_text(available_input);
+        if entry.player_id == available_config.id {
+          debug!("Player [{}] has unregistered", available_config.id.0);
+          text.0 = press_to_join_text(available_config);
         }
       }
       continue;
     }
 
     // Register if not already registered
-    registered.players.push(RegisteredPlayer {
-      id: available_input.id,
-      input: available_input.input.clone(),
+    registered_players.players.push(RegisteredPlayer {
+      id: available_config.id,
+      input: available_config.input.clone(),
+      colour: available_config.colour,
       alive: true,
     });
     for (entry, mut text) in &mut query {
-      if entry.player_id == available_input.id {
-        debug!("Player [{}] has registered", available_input.id.0);
-        text.0 = format!("Player {}: Registered!", available_input.id.0);
+      if entry.player_id == available_config.id {
+        debug!("Player [{}] has registered", available_config.id.0);
+        text.0 = format!("Player {}: Registered!", available_config.id.0);
       }
     }
   }
 }
 
-fn press_to_join_text(available_input: &AvailablePlayerInput) -> String {
+fn press_to_join_text(available_config: &AvailablePlayerConfig) -> String {
   format!(
     "Player {}: Press [{:?}] to join",
-    available_input.id.0, available_input.input.action
+    available_config.id.0, available_config.input.action,
   )
 }
 

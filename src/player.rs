@@ -78,6 +78,7 @@ pub struct SnakeTail {
   segments: Vec<SnakeSegment>,
   distance_since_last_sample: f32,
   gap_samples_remaining: usize,
+  colour: Color,
 }
 
 impl Default for SnakeTail {
@@ -86,6 +87,18 @@ impl Default for SnakeTail {
       segments: vec![SnakeSegment::default()],
       distance_since_last_sample: 0.0,
       gap_samples_remaining: 0,
+      colour: Color::default(),
+    }
+  }
+}
+
+impl SnakeTail {
+  fn new(colour: Color) -> Self {
+    Self {
+      segments: vec![SnakeSegment::default()],
+      distance_since_last_sample: 0.0,
+      gap_samples_remaining: 0,
+      colour,
     }
   }
 }
@@ -134,7 +147,7 @@ fn spawn_player_system(
       ));
       parent.spawn((
         Name::new("Snake Tail"),
-        SnakeTail::default(),
+        SnakeTail::new(player.colour),
         Transform::default(),
         PIXEL_PERFECT_LAYER,
       ));
@@ -157,7 +170,7 @@ fn update_snake_tail_segments_system(
     let parent_entity = parent.get();
     if let Ok(children) = children_query.get(parent_entity) {
       for child in children.iter() {
-        if let Ok((tail_entity, mut snake_tail)) = snake_tail_query.get_mut(child) {
+        if let Ok((snake_tail_entity, mut snake_tail)) = snake_tail_query.get_mut(child) {
           let gap_samples_remaining = snake_tail.gap_samples_remaining;
           let active_segment_index = snake_tail.segments.len() - 1;
           let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
@@ -166,9 +179,17 @@ fn update_snake_tail_segments_system(
           // gap samples remaining
           if is_active_segment_positions_empty && gap_samples_remaining == 0 {
             snake_tail.distance_since_last_sample = 0.0;
+            let snake_tail_colour = snake_tail.colour.clone();
             let active_segment = &mut snake_tail.segments[active_segment_index];
             active_segment.positions.push(current_position);
-            create_segment_mesh_if_none_exist(&mut commands, &mut meshes, &mut materials, active_segment, tail_entity);
+            create_segment_mesh_if_none_exist(
+              &mut commands,
+              &mut meshes,
+              &mut materials,
+              active_segment,
+              snake_tail_entity,
+              snake_tail_colour,
+            );
             continue;
           }
 
@@ -181,7 +202,7 @@ fn update_snake_tail_segments_system(
             &mut meshes,
             &mut materials,
             &mut snake_tail,
-            tail_entity,
+            snake_tail_entity,
             active_segment_index,
             current_position,
           );
@@ -198,13 +219,14 @@ fn create_segment_mesh_if_none_exist(
   materials: &mut ResMut<Assets<ColorMaterial>>,
   active_segment: &mut SnakeSegment,
   snake_tail_entity: Entity,
+  colour: Color,
 ) {
   if active_segment.mesh_entity.is_none() {
     let mesh_entity = commands
       .spawn((
         Name::new("Snake Tail Segment Mesh"),
         Mesh2d(meshes.add(Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default()))),
-        MeshMaterial2d(materials.add(Color::from(SNAKE_BASE_COLOUR))),
+        MeshMaterial2d(materials.add(colour)),
         Transform::default(),
         PIXEL_PERFECT_LAYER,
       ))
@@ -258,6 +280,7 @@ fn handle_sample_distance_reached(
   }
 
   // Add current position to active segment and create mesh if needed
+  let snake_tail_colour = snake_tail.colour.clone();
   let active_segment = &mut snake_tail.segments[active_segment_index];
   active_segment.positions.push(current_position);
   create_segment_mesh_if_none_exist(
@@ -266,6 +289,7 @@ fn handle_sample_distance_reached(
     &mut materials,
     active_segment,
     snake_tail_entity,
+    snake_tail_colour,
   );
 
   // Create collider entity in the active segment once we have enough points, if none exists

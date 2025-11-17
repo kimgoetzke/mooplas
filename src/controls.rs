@@ -1,12 +1,11 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AvailablePlayerInput, AvailablePlayerInputs, DebugStateMessage, GeneralSettings, PlayerId, PlayerInput,
-  RegisteredPlayers, Settings, SnakeHead,
+  DebugStateMessage, GeneralSettings, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
-use bevy::app::{App, Plugin, Startup, Update};
+use bevy::app::{App, Plugin, Update};
 use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
@@ -22,7 +21,6 @@ impl Plugin for ControlsPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<InputAction>()
-      .add_systems(Startup, initialise_available_player_inputs_system)
       .add_systems(Update, settings_controls_system)
       .add_systems(
         Update,
@@ -46,26 +44,6 @@ impl Plugin for ControlsPlugin {
 enum InputAction {
   Move(PlayerId, Scalar),
   Action(PlayerId),
-}
-
-fn initialise_available_player_inputs_system(mut available: ResMut<AvailablePlayerInputs>) {
-  if !available.inputs.is_empty() {
-    return;
-  }
-  available.inputs = vec![
-    AvailablePlayerInput {
-      id: PlayerId(0),
-      input: PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyW),
-    },
-    AvailablePlayerInput {
-      id: PlayerId(1),
-      input: PlayerInput::new(PlayerId(1), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
-    },
-    AvailablePlayerInput {
-      id: PlayerId(2),
-      input: PlayerInput::new(PlayerId(2), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyH),
-    },
-  ];
 }
 
 /// Transitions the game from the loading state to the running state.

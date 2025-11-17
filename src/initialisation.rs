@@ -1,10 +1,13 @@
 use crate::app_states::AppState;
-use crate::prelude::SpawnPoints;
+use crate::initialisation::InitialisationStep::InitialiseAvailablePlayerConfigs;
 use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
+use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, SpawnPoints};
 use bevy::app::{App, Plugin};
+use bevy::color::Color;
+use bevy::color::palettes::tailwind;
 use bevy::log::*;
 use bevy::platform::collections::HashSet;
-use bevy::prelude::{IntoScheduleConfigs, NextState, OnEnter, Res, ResMut, Resource, Update, in_state};
+use bevy::prelude::{IntoScheduleConfigs, KeyCode, NextState, OnEnter, Res, ResMut, Resource, Update, in_state};
 use rand::Rng;
 use rand::prelude::ThreadRng;
 
@@ -21,7 +24,12 @@ impl Plugin for InitialisationPlugin {
       )
       .add_systems(
         OnEnter(AppState::Initialising),
-        (reset_initialisation_tracker_system, generate_valid_spawn_points_system).chain(),
+        (
+          reset_initialisation_tracker_system,
+          generate_valid_spawn_points_system,
+          initialise_available_player_configurations_system,
+        )
+          .chain(),
       );
   }
 }
@@ -29,6 +37,7 @@ impl Plugin for InitialisationPlugin {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum InitialisationStep {
   GenerateSpawnPoints,
+  InitialiseAvailablePlayerConfigs,
 }
 
 #[derive(Resource, Default)]
@@ -107,4 +116,28 @@ fn random_start_position(rng: &mut ThreadRng) -> (f32, f32) {
   let y = rng.random_range(min_y..=max_y).trunc();
 
   (x, y)
+}
+
+fn initialise_available_player_configurations_system(
+  mut tracker: ResMut<InitialisationTracker>,
+  mut available_configs: ResMut<AvailablePlayerConfigs>,
+) {
+  available_configs.configs = vec![
+    AvailablePlayerConfig {
+      id: PlayerId(0),
+      input: PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyW),
+      colour: Color::from(tailwind::LIME_500),
+    },
+    AvailablePlayerConfig {
+      id: PlayerId(1),
+      input: PlayerInput::new(PlayerId(1), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
+      colour: Color::from(tailwind::ROSE_500),
+    },
+    AvailablePlayerConfig {
+      id: PlayerId(2),
+      input: PlayerInput::new(PlayerId(2), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyH),
+      colour: Color::from(tailwind::SKY_500),
+    },
+  ];
+  tracker.mark_done(InitialiseAvailablePlayerConfigs);
 }

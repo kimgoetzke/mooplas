@@ -1,4 +1,4 @@
-use crate::prelude::{AvailablePlayerInput, PlayerId, RegisteredPlayer};
+use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 use bevy_inspector_egui::InspectorOptions;
@@ -16,7 +16,7 @@ impl Plugin for SharedResourcesPlugin {
       .register_type::<GeneralSettings>()
       .register_type::<SpawnPoints>()
       .init_resource::<SpawnPoints>()
-      .init_resource::<AvailablePlayerInputs>()
+      .init_resource::<AvailablePlayerConfigs>()
       .init_resource::<RegisteredPlayers>()
       .init_resource::<WinnerInfo>();
   }
@@ -55,11 +55,13 @@ pub struct SpawnPoints {
   pub points: Vec<(f32, f32)>,
 }
 
+/// A resource that holds all pre-configured player configurations available for players to choose from.
 #[derive(Resource, Default)]
-pub struct AvailablePlayerInputs {
-  pub(crate) inputs: Vec<AvailablePlayerInput>,
+pub struct AvailablePlayerConfigs {
+  pub(crate) configs: Vec<AvailablePlayerConfig>,
 }
 
+/// A resource that holds information and configuration data about all players that have registered to play a round.
 #[derive(Resource, Default)]
 pub struct RegisteredPlayers {
   pub players: Vec<RegisteredPlayer>,
@@ -100,7 +102,7 @@ mod tests {
       .get_resource::<SpawnPoints>()
       .expect("Failed to retrieve SpawnPoints");
     assert!(spawn_points.points.is_empty());
-    assert!(world.contains_resource::<AvailablePlayerInputs>());
+    assert!(world.contains_resource::<AvailablePlayerConfigs>());
     assert!(world.contains_resource::<RegisteredPlayers>());
     assert!(world.contains_resource::<WinnerInfo>());
   }
