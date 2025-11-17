@@ -172,7 +172,7 @@ fn game_over_to_reinitialising_transition_system(
   mut next_state: ResMut<NextState<AppState>>,
 ) {
   if keyboard_input.just_pressed(KeyCode::Space) {
-    next_state.set(AppState::Reinitialising);
+    next_state.set(AppState::Initialising);
   }
 }
 

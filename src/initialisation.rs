@@ -21,16 +21,11 @@ impl Plugin for InitialisationPlugin {
       .add_systems(
         OnEnter(AppState::Initialising),
         (
-          initialise_tracker_system,
+          reset_tracker_system,
           generate_valid_spawn_points_system,
           initialise_available_player_configurations_system,
         )
           .chain(),
-      )
-      .add_systems(Update, check_progress_system.run_if(in_state(AppState::Reinitialising)))
-      .add_systems(
-        OnEnter(AppState::Reinitialising),
-        (reset_tracker_system, generate_valid_spawn_points_system).chain(),
       );
   }
 }
@@ -41,16 +36,31 @@ enum InitialisationStep {
   InitialiseAvailablePlayerConfigs,
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource)]
 struct InitialisationTracker {
+  is_first_run: bool,
   completed: HashSet<InitialisationStep>,
   required: Vec<InitialisationStep>,
+}
+
+impl Default for InitialisationTracker {
+  fn default() -> Self {
+    Self {
+      is_first_run: true,
+      completed: HashSet::new(),
+      required: Vec::new(),
+    }
+  }
 }
 
 impl InitialisationTracker {
   fn reset(&mut self, required: Vec<InitialisationStep>) {
     self.completed = HashSet::new();
     self.required = required;
+  }
+
+  fn should_skip(&self, step: InitialisationStep) -> bool {
+    !self.required.contains(&step)
   }
 
   fn mark_done(&mut self, step: InitialisationStep) {
@@ -67,20 +77,16 @@ impl InitialisationTracker {
 ///
 /// New steps must be added here as needed. In addition, the corresponding systems must be added to the initialisation
 /// chain in the plugin.
-fn initialise_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
-  let required = vec![
-    InitialisationStep::GenerateSpawnPoints,
-    InitialisationStep::InitialiseAvailablePlayerConfigs,
-  ];
-  tracker.reset(required);
-}
-
-/// Resets the tracker with the required [`InitialisationStep`]s.
-///
-/// New steps must be added here as needed. In addition, the corresponding systems must be added to the initialisation
-/// chain in the plugin.
 fn reset_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
-  let required = vec![InitialisationStep::GenerateSpawnPoints];
+  let required = if tracker.is_first_run {
+    vec![
+      InitialisationStep::GenerateSpawnPoints,
+      InitialisationStep::InitialiseAvailablePlayerConfigs,
+    ]
+  } else {
+    vec![InitialisationStep::GenerateSpawnPoints]
+  };
+  tracker.is_first_run = false;
   tracker.reset(required);
 }
 
@@ -88,7 +94,7 @@ fn reset_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
 /// complete.
 fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: ResMut<NextState<AppState>>) {
   if tracker.all_done() {
-    debug!("✅  (Re-)initialisation completed");
+    debug!("✅  Initialisation completed");
     next_state.set(AppState::Registering);
   }
 }
@@ -100,6 +106,12 @@ fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut spawn_points: ResMut<SpawnPoints>,
 ) {
+  let this_step = InitialisationStep::GenerateSpawnPoints;
+  if tracker.should_skip(this_step) {
+    debug!("Skipping [{:?}] step...", this_step);
+    return;
+  }
+
   spawn_points.points.clear();
   let mut rng = rand::rng();
   for i in 0..10 {
@@ -107,7 +119,7 @@ fn generate_valid_spawn_points_system(
     spawn_points.points.push((x, y));
     trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
   }
-  tracker.mark_done(InitialisationStep::GenerateSpawnPoints);
+  tracker.mark_done(this_step);
 }
 
 /// Calculates a random start position for the player that is at least [`EDGE_MARGIN`] pixels away from the screen edges.
@@ -133,6 +145,12 @@ fn initialise_available_player_configurations_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut available_configs: ResMut<AvailablePlayerConfigs>,
 ) {
+  let this_step = InitialisationStep::InitialiseAvailablePlayerConfigs;
+  if tracker.should_skip(this_step) {
+    debug!("Skipping [{:?}] step...", this_step);
+    return;
+  }
+
   available_configs.configs = vec![
     AvailablePlayerConfig {
       id: PlayerId(0),
@@ -150,5 +168,6 @@ fn initialise_available_player_configurations_system(
       colour: Color::from(tailwind::SKY_500),
     },
   ];
-  tracker.mark_done(InitialisationStep::InitialiseAvailablePlayerConfigs);
+
+  tracker.mark_done(this_step);
 }
