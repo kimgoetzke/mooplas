@@ -43,6 +43,9 @@ struct LobbyUiEntry {
 }
 
 #[derive(Component)]
+struct LobbyUiPrompt;
+
+#[derive(Component)]
 struct VictoryUiRoot;
 
 fn setup_lobby_ui_system(
@@ -51,6 +54,7 @@ fn setup_lobby_ui_system(
   available_configs: Res<AvailablePlayerConfigs>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
+  let default_font = default_font(&font);
 
   let root = commands
     .spawn((
@@ -89,39 +93,93 @@ fn setup_lobby_ui_system(
         // Player
         parent.spawn((
           Text::new(format!("Player {}", available_config.id.0)),
-          TextFont {
-            font: font.clone(),
-            font_size: 38.0,
-            ..default()
-          },
+          default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           TextColor(colour),
         ));
 
-        // Prompt
+        // Player prompt
         player_join_prompt(&font, available_config, parent);
       })
       .id();
-
     commands.entity(root).add_child(entry);
   }
 
-  // TODO: Only show this if at least one player has registered
+  // Call to action
   let prompt = commands
     .spawn((
-      Text::new("Press [Space] to start..."),
-      TextFont {
-        font,
-        font_size: 38.0,
-        line_height: LineHeight::RelativeToFont(3.0),
-        ..default()
-      },
+      LobbyUiPrompt,
+      Text::new("You need players..."),
+      default_font.with_line_height(LineHeight::RelativeToFont(3.)),
       TextColor(Color::WHITE),
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
     ))
     .id();
-
   commands.entity(root).add_child(prompt);
+}
+
+// TODO: Move to controls plugin and use messages to notify registration changes
+fn registration_input_system(
+  mut commands: Commands,
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  asset_server: Res<AssetServer>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
+  mut root_query: Query<&mut Text, With<LobbyUiPrompt>>,
+) {
+  let font = asset_server.load(DEFAULT_FONT);
+  for available_config in &available_configs.configs {
+    if !keyboard_input.just_pressed(available_config.input.action) {
+      continue;
+    }
+
+    // Unregister if already registered
+    if let Some(position) = registered_players
+      .players
+      .iter()
+      .position(|p| p.id == available_config.id)
+    {
+      registered_players.players.remove(position);
+      for (entity, entry, children) in &mut entries_query {
+        if entry.player_id == available_config.id {
+          debug!("Player [{}] has unregistered", available_config.id.0);
+          if let Some(prompt_node) = children.get(1) {
+            commands.entity(*prompt_node).despawn();
+            commands.entity(entity).with_children(|parent| {
+              player_join_prompt(&font, available_config, parent);
+            });
+          }
+        }
+      }
+
+      // Update call to action under player list
+      update_call_to_action_to_start(&registered_players, &mut root_query);
+      continue;
+    }
+
+    // Register if not already registered
+    registered_players.players.push(RegisteredPlayer {
+      id: available_config.id,
+      input: available_config.input.clone(),
+      colour: available_config.colour,
+      alive: true,
+    });
+    for (entity, entry, children) in &mut entries_query {
+      if entry.player_id == available_config.id {
+        debug!("Player [{}] has registered", available_config.id.0);
+        if let Some(prompt_node) = children.get(1) {
+          commands.entity(*prompt_node).despawn();
+          commands.entity(entity).with_children(|parent| {
+            player_registered_prompt(&font, available_config, parent);
+          });
+        }
+      }
+    }
+
+    // Update call to action under player list
+    update_call_to_action_to_start(&registered_players, &mut root_query);
+  }
 }
 
 fn player_join_prompt(
@@ -162,14 +220,6 @@ fn player_join_prompt(
     });
 }
 
-fn default_font(font: &Handle<Font>) -> TextFont {
-  TextFont {
-    font: font.clone(),
-    font_size: 38.0,
-    ..default()
-  }
-}
-
 fn player_registered_prompt(
   font: &Handle<Font>,
   _available_config: &AvailablePlayerConfig,
@@ -185,7 +235,7 @@ fn player_registered_prompt(
     .with_children(|parent| {
       parent.spawn((
         // Press...
-        Text::new(": Registered!"),
+        Text::new(": Registered"),
         default_font(font),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
@@ -193,60 +243,16 @@ fn player_registered_prompt(
     });
 }
 
-// TODO: Move to controls plugin and use messages to notify registration changes
-fn registration_input_system(
-  mut commands: Commands,
-  keyboard_input: Res<ButtonInput<KeyCode>>,
-  available_configs: Res<AvailablePlayerConfigs>,
-  asset_server: Res<AssetServer>,
-  mut registered_players: ResMut<RegisteredPlayers>,
-  mut entries: Query<(Entity, &LobbyUiEntry, &Children)>,
+fn update_call_to_action_to_start(
+  registered_players: &ResMut<RegisteredPlayers>,
+  root_query: &mut Query<&mut Text, With<LobbyUiPrompt>>,
 ) {
-  let font = asset_server.load(DEFAULT_FONT);
-  for available_config in &available_configs.configs {
-    if !keyboard_input.just_pressed(available_config.input.action) {
-      continue;
-    }
-
-    // Unregister if already registered
-    if let Some(pos) = registered_players
-      .players
-      .iter()
-      .position(|p| p.id == available_config.id)
-    {
-      registered_players.players.remove(pos);
-      for (entity, entry, children) in &mut entries {
-        if entry.player_id == available_config.id {
-          debug!("Player [{}] has unregistered", available_config.id.0);
-          if let Some(prompt_node) = children.get(1) {
-            commands.entity(*prompt_node).despawn();
-            commands.entity(entity).with_children(|parent| {
-              player_join_prompt(&font, available_config, parent);
-            });
-          }
-        }
-      }
-      continue;
-    }
-
-    // Register if not already registered
-    registered_players.players.push(RegisteredPlayer {
-      id: available_config.id,
-      input: available_config.input.clone(),
-      colour: available_config.colour,
-      alive: true,
-    });
-    for (entity, entry, children) in &mut entries {
-      if entry.player_id == available_config.id {
-        debug!("Player [{}] has registered", available_config.id.0);
-        if let Some(prompt_node) = children.get(1) {
-          commands.entity(*prompt_node).despawn();
-          commands.entity(entity).with_children(|parent| {
-            player_registered_prompt(&font, available_config, parent);
-          });
-        }
-      }
-    }
+  for mut text in root_query.iter_mut() {
+    text.0 = if registered_players.players.len() > 0 {
+      "Press [Space] to start...".to_string()
+    } else {
+      "More players needed to start...".to_string()
+    };
   }
 }
 
@@ -277,6 +283,7 @@ fn spawn_game_over_ui_system(
       },
     ))
     .with_children(|parent| {
+      let large_text = large_text(&font);
       match winner.winner {
         Some(id) => {
           let colour = registered_players
@@ -295,32 +302,16 @@ fn spawn_game_over_ui_system(
             .with_children(|row| {
               row.spawn((
                 Text::new(format!("Player {}", id.0)),
-                TextFont {
-                  font: font.clone(),
-                  font_size: 60.0,
-                  ..default()
-                },
+                large_text.clone(),
                 TextColor(colour),
               ));
-              row.spawn((
-                Text::new(" wins!"),
-                TextFont {
-                  font: font.clone(),
-                  font_size: 60.0,
-                  ..default()
-                },
-                TextColor(Color::WHITE),
-              ));
+              row.spawn((Text::new(" wins!"), large_text.clone(), TextColor(Color::WHITE)));
             });
         }
         None => {
           parent.spawn((
             Text::new("No winner this round."),
-            TextFont {
-              font: font.clone(),
-              font_size: 60.0,
-              ..default()
-            },
+            large_text.clone(),
             TextColor(Color::WHITE),
           ));
         }
@@ -328,16 +319,27 @@ fn spawn_game_over_ui_system(
 
       parent.spawn((
         Text::new("Press [Space] to continue..."),
-        TextFont {
-          font,
-          font_size: 38.0,
-          line_height: LineHeight::RelativeToFont(3.0),
-          ..default()
-        },
+        default_font(&font).with_line_height(LineHeight::RelativeToFont(3.)),
         TextColor(Color::WHITE),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       ));
     });
+}
+
+fn default_font(font: &Handle<Font>) -> TextFont {
+  TextFont {
+    font: font.clone(),
+    font_size: 38.0,
+    ..default()
+  }
+}
+
+fn large_text(font: &Handle<Font>) -> TextFont {
+  TextFont {
+    font: font.clone(),
+    font_size: 60.0,
+    ..default()
+  }
 }
 
 fn despawn_game_over_ui_system(mut commands: Commands, roots: Query<Entity, With<VictoryUiRoot>>) {
