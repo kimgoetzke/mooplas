@@ -1,7 +1,6 @@
 use crate::app_states::AppState;
-use crate::prelude::{
-  PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, SnakeTail, WinnerInfo, WrapAroundEntity,
-};
+use crate::prelude::{PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo};
+use crate::shared::Player;
 use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
 use bevy::ecs::entity::Entity;
@@ -108,16 +107,8 @@ fn unpause_game(mut time: ResMut<Time<Virtual>>) {
   time.unpause();
 }
 
-// TODO: Check if I cannot just despawn the Player root entity
-fn despawn_players_system(
-  mut commands: Commands,
-  heads: Query<Entity, With<WrapAroundEntity>>,
-  tails: Query<Entity, With<SnakeTail>>,
-) {
-  for entity in &heads {
-    commands.entity(entity).despawn();
-  }
-  for entity in &tails {
+fn despawn_players_system(mut commands: Commands, players_query: Query<Entity, With<Player>>) {
+  for entity in &players_query {
     commands.entity(entity).despawn();
   }
 }
