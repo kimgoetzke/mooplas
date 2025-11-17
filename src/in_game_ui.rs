@@ -109,11 +109,36 @@ fn setup_lobby_ui_system(
   let prompt = commands
     .spawn((
       LobbyUiPrompt,
-      Text::new("You need players..."),
-      default_font.with_line_height(LineHeight::RelativeToFont(3.)),
-      TextColor(Color::WHITE),
-      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      Node {
+        flex_direction: FlexDirection::Row,
+        justify_content: JustifyContent::Center,
+        align_items: AlignItems::Center,
+        ..default()
+      },
     ))
+    .with_children(|parent| {
+      // Part 1 - Always white
+      parent.spawn((
+        Text::new("More players needed to start..."),
+        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+        TextColor(Color::WHITE),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      ));
+      // Part 2 - Always yellow and initially empty
+      parent.spawn((
+        Text::new(""),
+        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+        TextColor(Color::from(tailwind::YELLOW_400)),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      ));
+      // Part 3 - Always white and initially empty
+      parent.spawn((
+        Text::new(""),
+        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+        TextColor(Color::WHITE),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      ));
+    })
     .id();
   commands.entity(root).add_child(prompt);
 }
@@ -126,7 +151,8 @@ fn registration_input_system(
   asset_server: Res<AssetServer>,
   mut registered_players: ResMut<RegisteredPlayers>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
-  mut root_query: Query<&mut Text, With<LobbyUiPrompt>>,
+  prompt_query: Query<(Entity, &Children), With<LobbyUiPrompt>>,
+  mut texts_query: Query<&mut Text>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
   for available_config in &available_configs.configs {
@@ -154,7 +180,7 @@ fn registration_input_system(
       }
 
       // Update call to action under player list
-      update_call_to_action_to_start(&registered_players, &mut root_query);
+      update_call_to_action_to_start(&*registered_players, &prompt_query, &mut texts_query);
       continue;
     }
 
@@ -178,7 +204,7 @@ fn registration_input_system(
     }
 
     // Update call to action under player list
-    update_call_to_action_to_start(&registered_players, &mut root_query);
+    update_call_to_action_to_start(&*registered_players, &prompt_query, &mut texts_query);
   }
 }
 
@@ -244,15 +270,42 @@ fn player_registered_prompt(
 }
 
 fn update_call_to_action_to_start(
-  registered_players: &ResMut<RegisteredPlayers>,
-  root_query: &mut Query<&mut Text, With<LobbyUiPrompt>>,
+  registered_players: &RegisteredPlayers,
+  prompt_query: &Query<(Entity, &Children), With<LobbyUiPrompt>>,
+  texts_query: &mut Query<&mut Text>,
 ) {
-  for mut text in root_query.iter_mut() {
-    text.0 = if registered_players.players.len() > 0 {
-      "Press [Space] to start...".to_string()
-    } else {
-      "More players needed to start...".to_string()
-    };
+  for (_entity, children) in prompt_query.iter() {
+    let has_players = !registered_players.players.is_empty();
+    // Part 1
+    if let Some(prefix_ent) = children.get(0) {
+      if let Ok(mut t) = texts_query.get_mut(*prefix_ent) {
+        t.0 = if has_players {
+          "Press ".to_string()
+        } else {
+          "More players needed to start...".to_string()
+        };
+      }
+    }
+    // Part 2
+    if let Some(key_ent) = children.get(1) {
+      if let Ok(mut t) = texts_query.get_mut(*key_ent) {
+        t.0 = if has_players {
+          "[Space]".to_string()
+        } else {
+          String::new()
+        };
+      }
+    }
+    // Part 3
+    if let Some(suffix_ent) = children.get(2) {
+      if let Ok(mut t) = texts_query.get_mut(*suffix_ent) {
+        t.0 = if has_players {
+          " to start...".to_string()
+        } else {
+          String::new()
+        };
+      }
+    }
   }
 }
 
@@ -283,6 +336,7 @@ fn spawn_game_over_ui_system(
       },
     ))
     .with_children(|parent| {
+      // Match result
       let large_text = large_text(&font);
       match winner.winner {
         Some(id) => {
@@ -317,12 +371,34 @@ fn spawn_game_over_ui_system(
         }
       }
 
-      parent.spawn((
-        Text::new("Press [Space] to continue..."),
-        default_font(&font).with_line_height(LineHeight::RelativeToFont(3.)),
-        TextColor(Color::WHITE),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-      ));
+      // Call to action
+      parent
+        .spawn((Node {
+          flex_direction: FlexDirection::Row,
+          justify_content: JustifyContent::Center,
+          align_items: AlignItems::Center,
+          ..default()
+        },))
+        .with_children(|parent| {
+          parent.spawn((
+            Text::new("Press "),
+            default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+            TextColor(Color::WHITE),
+            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          ));
+          parent.spawn((
+            Text::new("[Space]"),
+            default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+            TextColor(Color::from(tailwind::YELLOW_400)),
+            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          ));
+          parent.spawn((
+            Text::new(" to continue..."),
+            default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+            TextColor(Color::WHITE),
+            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          ));
+        });
     });
 }
 
