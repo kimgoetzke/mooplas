@@ -1,3 +1,4 @@
+use crate::shared::{AvailablePlayerConfig, PlayerId};
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
 
@@ -6,7 +7,9 @@ pub struct SharedMessagesPlugin;
 
 impl Plugin for SharedMessagesPlugin {
   fn build(&self, app: &mut App) {
-    app.add_message::<DebugStateMessage>();
+    app
+      .add_message::<DebugStateMessage>()
+      .add_message::<PlayerRegistrationMessage>();
   }
 }
 
@@ -15,6 +18,15 @@ impl Plugin for SharedMessagesPlugin {
 #[derive(Message)]
 pub struct DebugStateMessage {
   pub display_player_gizmos: bool,
+}
+
+/// A message that communicates a change to a user's registration status in the lobby.
+#[derive(Message, Debug)]
+pub struct PlayerRegistrationMessage {
+  pub player_id: PlayerId,
+  pub available_player_config: AvailablePlayerConfig,
+  pub has_registered: bool,
+  pub is_anyone_registered: bool,
 }
 
 #[cfg(test)]
@@ -40,6 +52,7 @@ mod tests {
   fn shared_messages_plugin_registers_debug_state_message() {
     let app = setup();
     assert!(app.world().contains_resource::<Messages<DebugStateMessage>>());
+    assert!(app.world().contains_resource::<Messages<PlayerRegistrationMessage>>());
   }
 
   #[test]

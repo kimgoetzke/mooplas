@@ -1,8 +1,10 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  DebugStateMessage, GeneralSettings, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
+  AvailablePlayerConfigs, DebugStateMessage, GeneralSettings, PlayerId, PlayerInput, RegisteredPlayer,
+  RegisteredPlayers, Settings, SnakeHead,
 };
+use crate::shared::PlayerRegistrationMessage;
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
@@ -31,6 +33,10 @@ impl Plugin for ControlsPlugin {
       )
       .add_systems(
         Update,
+        registration_input_system.run_if(in_state(AppState::Registering)),
+      )
+      .add_systems(
+        Update,
         (player_input_system, player_action_system).run_if(in_state(AppState::Playing)),
       )
       .add_systems(
@@ -45,6 +51,54 @@ impl Plugin for ControlsPlugin {
 enum InputAction {
   Move(PlayerId, Scalar),
   Action(PlayerId),
+}
+
+// TODO: Move updates to the Res<RegisteredPlayer> to game_loop.rs
+/// Handles player registration and unregistration based on keyboard input. Updates the lobby UI accordingly.
+fn registration_input_system(
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  mut message_writer: MessageWriter<PlayerRegistrationMessage>,
+) {
+  for available_config in &available_configs.configs {
+    if !keyboard_input.just_pressed(available_config.input.action) {
+      continue;
+    }
+
+    let has_registered = !registered_players
+      .players
+      .iter()
+      .filter(|p| p.id == available_config.id)
+      .collect::<Vec<&RegisteredPlayer>>()
+      .is_empty();
+
+    // Unregister if already registered
+    if has_registered {
+      let position = registered_players
+        .players
+        .iter()
+        .position(|p| p.id == available_config.id)
+        .expect("Failed to find registered player");
+      registered_players.players.remove(position);
+      debug!("Player [{}] has unregistered", available_config.id.0);
+    } else {
+      registered_players.players.push(RegisteredPlayer {
+        id: available_config.id,
+        input: available_config.input.clone(),
+        colour: available_config.colour,
+        alive: true,
+      });
+      debug!("Player [{}] has registered", available_config.id.0);
+    }
+
+    message_writer.write(PlayerRegistrationMessage {
+      player_id: available_config.id,
+      available_player_config: available_config.clone(),
+      has_registered: !has_registered,
+      is_anyone_registered: !registered_players.players.is_empty(),
+    });
+  }
 }
 
 /// Transitions the game from the loading state to the running state.

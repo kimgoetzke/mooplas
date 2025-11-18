@@ -11,7 +11,7 @@ pub struct RegisteredPlayer {
 }
 
 /// Defines the key bindings for a given player.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct PlayerInput {
   pub id: PlayerId,
   pub left: KeyCode,
@@ -31,7 +31,7 @@ impl PlayerInput {
 }
 
 /// Represents an available player input configuration. Predefined for players to choose from.
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AvailablePlayerConfig {
   pub id: PlayerId,
   pub input: PlayerInput,

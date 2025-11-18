@@ -1,18 +1,16 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::DEFAULT_FONT;
-use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayer, RegisteredPlayers, WinnerInfo,
-};
+use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, WinnerInfo};
+use crate::shared::PlayerRegistrationMessage;
 use bevy::app::{Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
-use bevy::input::ButtonInput;
 use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify,
-  JustifyContent, KeyCode, LineBreak, Node, OnEnter, OnExit, Query, Res, ResMut, Text, TextColor, TextFont, TextLayout,
+  JustifyContent, LineBreak, MessageReader, Node, OnEnter, OnExit, Query, Res, Text, TextColor, TextFont, TextLayout,
   Val, With, default, in_state,
 };
 use bevy::text::LineHeight;
@@ -26,7 +24,7 @@ impl Plugin for InGameUiPlugin {
       .add_systems(OnEnter(AppState::Registering), setup_lobby_ui_system)
       .add_systems(
         Update,
-        registration_input_system.run_if(in_state(AppState::Registering)),
+        handle_player_registration_event.run_if(in_state(AppState::Registering)),
       )
       .add_systems(OnExit(AppState::Registering), despawn_lobby_ui_system)
       .add_systems(OnEnter(AppState::GameOver), spawn_game_over_ui_system)
@@ -150,69 +148,48 @@ fn setup_lobby_ui_system(
   commands.entity(root).add_child(cta);
 }
 
-// TODO: Move to controls plugin and use messages to notify registration changes
-/// Handles player registration and unregistration based on keyboard input. Updates the lobby UI accordingly.
-fn registration_input_system(
+fn handle_player_registration_event(
+  mut player_registration_message: MessageReader<PlayerRegistrationMessage>,
   mut commands: Commands,
-  keyboard_input: Res<ButtonInput<KeyCode>>,
-  available_configs: Res<AvailablePlayerConfigs>,
   asset_server: Res<AssetServer>,
-  mut registered_players: ResMut<RegisteredPlayers>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
   cta_query: Query<&Children, With<LobbyUiCta>>,
   mut texts_query: Query<&mut Text>,
 ) {
-  let font = asset_server.load(DEFAULT_FONT);
-  for available_config in &available_configs.configs {
-    if !keyboard_input.just_pressed(available_config.input.action) {
-      continue;
-    }
+  for message in player_registration_message.read() {
+    debug!("Received message: {:?}", message);
+    let font = asset_server.load(DEFAULT_FONT);
 
-    // Unregister if already registered
-    if let Some(position) = registered_players
-      .players
-      .iter()
-      .position(|p| p.id == available_config.id)
-    {
-      registered_players.players.remove(position);
-      for (entity, entry, children) in &mut entries_query {
-        if entry.player_id == available_config.id {
-          debug!("Player [{}] has unregistered", available_config.id.0);
-          if let Some(prompt_node) = children.get(1) {
-            commands.entity(*prompt_node).despawn();
-            commands.entity(entity).with_children(|parent| {
-              player_join_prompt(&font, available_config, parent);
-            });
+    // Update entry for player
+    match message.has_registered {
+      false => {
+        for (entity, entry, children) in &mut entries_query {
+          if entry.player_id == message.player_id {
+            if let Some(prompt_node) = children.get(1) {
+              commands.entity(*prompt_node).despawn();
+              commands.entity(entity).with_children(|parent| {
+                player_join_prompt(&font, &message.available_player_config, parent);
+              });
+            }
           }
         }
       }
-
-      // Update call to action under player list
-      update_call_to_action_to_start(&*registered_players, &cta_query, &mut texts_query);
-      continue;
-    }
-
-    // Register if not already registered
-    registered_players.players.push(RegisteredPlayer {
-      id: available_config.id,
-      input: available_config.input.clone(),
-      colour: available_config.colour,
-      alive: true,
-    });
-    for (entity, entry, children) in &mut entries_query {
-      if entry.player_id == available_config.id {
-        debug!("Player [{}] has registered", available_config.id.0);
-        if let Some(prompt_node) = children.get(1) {
-          commands.entity(*prompt_node).despawn();
-          commands.entity(entity).with_children(|parent| {
-            player_registered_prompt(&font, parent);
-          });
+      true => {
+        for (entity, entry, children) in &mut entries_query {
+          if entry.player_id == message.player_id {
+            if let Some(prompt_node) = children.get(1) {
+              commands.entity(*prompt_node).despawn();
+              commands.entity(entity).with_children(|parent| {
+                player_registered_prompt(&font, parent);
+              });
+            }
+          }
         }
       }
     }
 
     // Update call to action under player list
-    update_call_to_action_to_start(&*registered_players, &cta_query, &mut texts_query);
+    update_call_to_action_to_start(message.is_anyone_registered, &cta_query, &mut texts_query);
   }
 }
 
@@ -274,12 +251,11 @@ fn player_registered_prompt(font: &Handle<Font>, parent: &mut RelatedSpawnerComm
 }
 
 fn update_call_to_action_to_start(
-  registered_players: &RegisteredPlayers,
+  has_players: bool,
   cta_query: &Query<&Children, With<LobbyUiCta>>,
   texts_query: &mut Query<&mut Text>,
 ) {
   for children in cta_query.iter() {
-    let has_players = !registered_players.players.is_empty();
     // Part 1 - Always white
     if let Some(prefix_entity) = children.get(0) {
       if let Ok(mut text) = texts_query.get_mut(*prefix_entity) {
