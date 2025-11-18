@@ -117,6 +117,7 @@ fn spawn_player_system(
         Sprite {
           image: snake_head_handle.clone(),
           color: player.colour,
+          custom_size: Some(Vec2::new(12., 12.)),
           ..default()
         },
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),

@@ -58,13 +58,13 @@ pub(crate) const SNAKE_TAIL_POSITION_SAMPLE_DISTANCE: f32 = 5.0;
 pub(crate) const SNAKE_LENGTH_MAX_CONTINUOUS: usize = 100;
 
 /// Half of the width of the snake body mesh. The full width will be double this value.
-pub(crate) const SNAKE_BODY_WIDTH: f32 = 3.0;
+pub(crate) const SNAKE_BODY_WIDTH: f32 = 2.0;
 
 /// The size of the gap in the snake body mesh, measured in "samples".
 pub(crate) const SNAKE_GAP_LENGTH: usize = 15;
 
 /// The radius of the snake head collider.
-pub(crate) const SNAKE_HEAD_SIZE: f32 = 5.0;
+pub(crate) const SNAKE_HEAD_SIZE: f32 = 3.5;
 
 /// Number of most-recent sampled positions (closest to the head) that are *not* included in the tail collider polyline.
 /// This creates a "safe" buffer directly behind the head so that the head does not immediately collide with its own
