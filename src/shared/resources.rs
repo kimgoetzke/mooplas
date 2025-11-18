@@ -52,7 +52,7 @@ impl Default for GeneralSettings {
 
 #[derive(Resource, Reflect, Clone, Default)]
 pub struct SpawnPoints {
-  pub points: Vec<(f32, f32)>,
+  pub points: Vec<(f32, f32, f32)>,
 }
 
 /// A resource that holds all pre-configured player configurations available for players to choose from.

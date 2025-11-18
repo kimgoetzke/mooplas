@@ -29,7 +29,7 @@ fn render_gizmos_system(
   }
 
   // Spawn points
-  for (x, y) in spawn_points.points.iter() {
+  for (x, y, _) in spawn_points.points.iter() {
     gizmos.circle_2d(Isometry2d::from_translation(Vec2::new(*x, *y)), 1.0, Color::WHITE);
   }
 

@@ -98,7 +98,7 @@ fn spawn_player_system(
 ) {
   let snake_head_handle = asset_server.load("player.png");
   for player in players.players.iter() {
-    let (x, y) = spawn_points.points.pop().expect("Can't get spawn point for player");
+    let (x, y, rotation) = spawn_points.points.pop().expect("Can't get spawn point for player");
     let index = player.id.0;
     let player_entity = commands
       .spawn((
@@ -120,7 +120,7 @@ fn spawn_player_system(
           ..default()
         },
         Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
-        Transform::default(),
+        Transform::default().with_rotation(Quat::from_rotation_z(rotation)),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Tail, CollisionLayer::Head]),
