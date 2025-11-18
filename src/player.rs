@@ -129,6 +129,7 @@ fn spawn_player_system(
       parent.spawn((
         Name::new("Snake Tail"),
         SnakeTail::new(player.colour),
+        PlayerId(index),
         Transform::default(),
         PIXEL_PERFECT_LAYER,
       ));
