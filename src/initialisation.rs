@@ -156,18 +156,28 @@ fn initialise_available_player_configurations_system(
   available_configs.configs = vec![
     AvailablePlayerConfig {
       id: PlayerId(0),
-      input: PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyD, KeyCode::KeyW),
-      colour: Color::from(tailwind::LIME_500),
-    },
-    AvailablePlayerConfig {
-      id: PlayerId(1),
-      input: PlayerInput::new(PlayerId(1), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
+      input: PlayerInput::new(PlayerId(0), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
       colour: Color::from(tailwind::ROSE_500),
     },
     AvailablePlayerConfig {
+      id: PlayerId(1),
+      input: PlayerInput::new(PlayerId(1), KeyCode::Digit1, KeyCode::KeyA, KeyCode::KeyQ),
+      colour: Color::from(tailwind::LIME_500),
+    },
+    AvailablePlayerConfig {
       id: PlayerId(2),
-      input: PlayerInput::new(PlayerId(2), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyH),
+      input: PlayerInput::new(PlayerId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
       colour: Color::from(tailwind::SKY_500),
+    },
+    AvailablePlayerConfig {
+      id: PlayerId(3),
+      input: PlayerInput::new(PlayerId(3), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyN),
+      colour: Color::from(tailwind::VIOLET_500),
+    },
+    AvailablePlayerConfig {
+      id: PlayerId(4),
+      input: PlayerInput::new(PlayerId(4), KeyCode::End, KeyCode::PageUp, KeyCode::Home),
+      colour: Color::from(tailwind::LIME_500),
     },
   ];
 
