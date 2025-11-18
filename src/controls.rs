@@ -88,7 +88,6 @@ fn registration_input_system(
 
     message_writer.write(PlayerRegistrationMessage {
       player_id: available_config.id,
-      available_player_config: available_config.clone(),
       has_registered: is_now_registered,
       is_anyone_registered: !registered_players.players.is_empty(),
     });

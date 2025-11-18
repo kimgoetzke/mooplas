@@ -1,4 +1,4 @@
-use crate::shared::{AvailablePlayerConfig, PlayerId};
+use crate::shared::{PlayerId};
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
 
@@ -24,7 +24,6 @@ pub struct DebugStateMessage {
 #[derive(Message, Debug)]
 pub struct PlayerRegistrationMessage {
   pub player_id: PlayerId,
-  pub available_player_config: AvailablePlayerConfig,
   pub has_registered: bool,
   pub is_anyone_registered: bool,
 }

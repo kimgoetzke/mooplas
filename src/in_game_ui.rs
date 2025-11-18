@@ -152,13 +152,16 @@ fn handle_player_registration_event(
   mut player_registration_message: MessageReader<PlayerRegistrationMessage>,
   mut commands: Commands,
   asset_server: Res<AssetServer>,
+  available_configs: Res<AvailablePlayerConfigs>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
   cta_query: Query<&Children, With<LobbyUiCta>>,
   mut texts_query: Query<&mut Text>,
 ) {
   for message in player_registration_message.read() {
-    debug!("Received message: {:?}", message);
     let font = asset_server.load(DEFAULT_FONT);
+
+    // Find matching available player config
+    let config = available_configs.configs.iter().find(|p| p.id == message.player_id);
 
     // Update entry for player
     match message.has_registered {
@@ -167,9 +170,11 @@ fn handle_player_registration_event(
           if entry.player_id == message.player_id {
             if let Some(prompt_node) = children.get(1) {
               commands.entity(*prompt_node).despawn();
-              commands.entity(entity).with_children(|parent| {
-                player_join_prompt(&font, &message.available_player_config, parent);
-              });
+              if let Some(ref available_config) = config {
+                commands.entity(entity).with_children(|parent| {
+                  player_join_prompt(&font, available_config, parent);
+                });
+              }
             }
           }
         }
