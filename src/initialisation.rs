@@ -177,7 +177,7 @@ fn initialise_available_player_configurations_system(
     AvailablePlayerConfig {
       id: PlayerId(4),
       input: PlayerInput::new(PlayerId(4), KeyCode::End, KeyCode::PageUp, KeyCode::Home),
-      colour: Color::from(tailwind::LIME_500),
+      colour: Color::from(tailwind::AMBER_500),
     },
   ];
 
