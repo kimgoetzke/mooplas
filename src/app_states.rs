@@ -34,9 +34,11 @@ fn name_from<T: ToString>(state: Option<T>) -> String {
   }
 }
 
+/// The main application states for this application. Drives the overall flow of the game.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States, Reflect)]
 pub enum AppState {
-  /// The initialisation state which loads shared resources. Only runs once at application start.
+  /// The initialisation state which loads shared resources. Runs at application start and after before entering the
+  /// registering state.
   #[default]
   Initialising,
   /// The state where players can register to join the game.

@@ -22,6 +22,7 @@ impl Plugin for SharedResourcesPlugin {
   }
 }
 
+/// A resource that holds various settings that can be configured for the game. Intended for developer use only.
 #[derive(Resource, Reflect, Clone, Copy)]
 pub struct Settings {
   pub general: GeneralSettings,
@@ -35,6 +36,7 @@ impl Default for Settings {
   }
 }
 
+/// A resource that holds general settings, a child of the [`Settings`] resource. Intended for developer use only.
 #[derive(Resource, Reflect, InspectorOptions, Clone, Copy)]
 #[reflect(Resource, InspectorOptions)]
 pub struct GeneralSettings {
@@ -50,9 +52,10 @@ impl Default for GeneralSettings {
   }
 }
 
+/// A resource that holds all valid spawn points in the game world. Contains a list of (x, y, rotation) tuples.
 #[derive(Resource, Reflect, Clone, Default)]
 pub struct SpawnPoints {
-  pub points: Vec<(f32, f32, f32)>,
+  pub data: Vec<(f32, f32, f32)>,
 }
 
 /// A resource that holds all pre-configured player configurations available for players to choose from.
@@ -67,9 +70,27 @@ pub struct RegisteredPlayers {
   pub players: Vec<RegisteredPlayer>,
 }
 
+/// A resource that holds information about the winner of the last round.
 #[derive(Resource, Default)]
 pub struct WinnerInfo {
-  pub winner: Option<PlayerId>,
+  winner: Option<PlayerId>,
+}
+
+impl WinnerInfo {
+  /// Gets the winner's [`PlayerId`], if there is one.
+  pub fn get(&self) -> Option<PlayerId> {
+    self.winner
+  }
+
+  /// Sets the winner's [`PlayerId`].
+  pub fn set(&mut self, player_id: PlayerId) {
+    self.winner = Some(player_id);
+  }
+
+  /// Clears the winner information.
+  pub fn clear(&mut self) {
+    self.winner = None;
+  }
 }
 
 #[cfg(test)]
@@ -101,7 +122,7 @@ mod tests {
     let spawn_points = world
       .get_resource::<SpawnPoints>()
       .expect("Failed to retrieve SpawnPoints");
-    assert!(spawn_points.points.is_empty());
+    assert!(spawn_points.data.is_empty());
     assert!(world.contains_resource::<AvailablePlayerConfigs>());
     assert!(world.contains_resource::<RegisteredPlayers>());
     assert!(world.contains_resource::<WinnerInfo>());

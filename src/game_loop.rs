@@ -17,16 +17,21 @@ impl Plugin for GameLoopPlugin {
         Update,
         (check_snake_collisions_system, transition_to_game_over_system).run_if(in_state(AppState::Playing)),
       )
-      .add_systems(OnEnter(AppState::GameOver), pause_game)
-      .add_systems(OnExit(AppState::GameOver), (unpause_game, despawn_players_system));
+      .add_systems(OnEnter(AppState::GameOver), pause_game_system)
+      .add_systems(
+        OnExit(AppState::GameOver),
+        (unpause_game_system, despawn_players_system),
+      );
   }
 }
 
+/// Resets the registered players and winner information when entering the lobby/registering state.
 fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner: ResMut<WinnerInfo>) {
   registered.players.clear();
-  winner.winner = None;
+  winner.clear();
 }
 
+/// Checks for collisions involving snake heads and marks players as dead if they collide.
 fn check_snake_collisions_system(
   mut registered_players: ResMut<RegisteredPlayers>,
   collisions: Collisions,
@@ -78,6 +83,7 @@ fn check_snake_collisions_system(
   }
 }
 
+/// Transitions to the next game state if there are no alive players or only one alive player remaining.
 fn transition_to_game_over_system(
   registered_players: ResMut<RegisteredPlayers>,
   mut winner: ResMut<WinnerInfo>,
@@ -86,12 +92,12 @@ fn transition_to_game_over_system(
   let alive_players: Vec<&RegisteredPlayer> = registered_players.players.iter().filter(|p| p.alive).collect();
   match (registered_players.players.len(), alive_players.len()) {
     (_, 0) => {
-      winner.winner = None;
+      winner.clear();
       next.set(AppState::GameOver);
       info!("Game over: No winner this round.");
     }
     (registered_players, 1) if registered_players > 1 => {
-      winner.winner = Some(alive_players[0].id);
+      winner.set(alive_players[0].id);
       next.set(AppState::GameOver);
       info!("Game over: [{:?}] wins the round", alive_players[0].id);
     }
@@ -99,14 +105,17 @@ fn transition_to_game_over_system(
   }
 }
 
-fn pause_game(mut time: ResMut<Time<Virtual>>) {
+/// Pauses the game time when called. Intended to be called when entering the game over state.
+fn pause_game_system(mut time: ResMut<Time<Virtual>>) {
   time.pause();
 }
 
-fn unpause_game(mut time: ResMut<Time<Virtual>>) {
+/// Unpauses the game time when called. Intended to be called when exiting the game over state.
+fn unpause_game_system(mut time: ResMut<Time<Virtual>>) {
   time.unpause();
 }
 
+/// Despawns all player entities. Intended to be called when exiting the game over state.
 fn despawn_players_system(mut commands: Commands, players_query: Query<Entity, With<Player>>) {
   for entity in &players_query {
     commands.entity(entity).despawn();

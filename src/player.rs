@@ -98,7 +98,7 @@ fn spawn_player_system(
 ) {
   let snake_head_handle = asset_server.load("player.png");
   for player in players.players.iter() {
-    let (x, y, rotation) = spawn_points.points.pop().expect("Can't get spawn point for player");
+    let (x, y, rotation) = spawn_points.data.pop().expect("Can't get spawn point for player");
     let index = player.id.0;
     let player_entity = commands
       .spawn((
@@ -445,6 +445,8 @@ fn wraparound_system(
   }
 }
 
+/// Disables eliminated players by removing the [`SnakeHead`] component, which prevents input and stops the snake from
+/// growing, and by setting their [`RigidBody`] to static, so that the head doesn't float around.
 fn disable_eliminated_players_system(
   mut commands: Commands,
   registered_players: Res<RegisteredPlayers>,

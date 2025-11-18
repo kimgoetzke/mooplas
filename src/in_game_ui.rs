@@ -34,20 +34,27 @@ impl Plugin for InGameUiPlugin {
   }
 }
 
+/// Marker component for the root of the lobby UI. Used for despawning. All other Lobby UI components must be children
+/// of this.
 #[derive(Component)]
 struct LobbyUiRoot;
 
+/// Marker component for each available player's information and status in the lobby UI.
 #[derive(Component)]
 struct LobbyUiEntry {
   player_id: PlayerId,
 }
 
+/// Marker component for the lobby UI call-to-action (CTA) at the bottom of the player list.
 #[derive(Component)]
-struct LobbyUiPrompt;
+struct LobbyUiCta;
 
+/// Marker component for the root of the victory/game over UI. Used for despawning. All other Victory UI components
+/// must be children of this.
 #[derive(Component)]
 struct VictoryUiRoot;
 
+/// Sets up the lobby UI, displaying available players and prompts to join.
 fn setup_lobby_ui_system(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
@@ -106,9 +113,9 @@ fn setup_lobby_ui_system(
   }
 
   // Call to action
-  let prompt = commands
+  let cta = commands
     .spawn((
-      LobbyUiPrompt,
+      LobbyUiCta,
       Node {
         flex_direction: FlexDirection::Row,
         justify_content: JustifyContent::Center,
@@ -140,10 +147,11 @@ fn setup_lobby_ui_system(
       ));
     })
     .id();
-  commands.entity(root).add_child(prompt);
+  commands.entity(root).add_child(cta);
 }
 
 // TODO: Move to controls plugin and use messages to notify registration changes
+/// Handles player registration and unregistration based on keyboard input. Updates the lobby UI accordingly.
 fn registration_input_system(
   mut commands: Commands,
   keyboard_input: Res<ButtonInput<KeyCode>>,
@@ -151,7 +159,7 @@ fn registration_input_system(
   asset_server: Res<AssetServer>,
   mut registered_players: ResMut<RegisteredPlayers>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
-  prompt_query: Query<(Entity, &Children), With<LobbyUiPrompt>>,
+  cta_query: Query<&Children, With<LobbyUiCta>>,
   mut texts_query: Query<&mut Text>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
@@ -180,7 +188,7 @@ fn registration_input_system(
       }
 
       // Update call to action under player list
-      update_call_to_action_to_start(&*registered_players, &prompt_query, &mut texts_query);
+      update_call_to_action_to_start(&*registered_players, &cta_query, &mut texts_query);
       continue;
     }
 
@@ -197,14 +205,14 @@ fn registration_input_system(
         if let Some(prompt_node) = children.get(1) {
           commands.entity(*prompt_node).despawn();
           commands.entity(entity).with_children(|parent| {
-            player_registered_prompt(&font, available_config, parent);
+            player_registered_prompt(&font, parent);
           });
         }
       }
     }
 
     // Update call to action under player list
-    update_call_to_action_to_start(&*registered_players, &prompt_query, &mut texts_query);
+    update_call_to_action_to_start(&*registered_players, &cta_query, &mut texts_query);
   }
 }
 
@@ -246,11 +254,7 @@ fn player_join_prompt(
     });
 }
 
-fn player_registered_prompt(
-  font: &Handle<Font>,
-  _available_config: &AvailablePlayerConfig,
-  parent: &mut RelatedSpawnerCommands<ChildOf>,
-) {
+fn player_registered_prompt(font: &Handle<Font>, parent: &mut RelatedSpawnerCommands<ChildOf>) {
   parent
     .spawn((Node {
       flex_direction: FlexDirection::Row,
@@ -271,35 +275,35 @@ fn player_registered_prompt(
 
 fn update_call_to_action_to_start(
   registered_players: &RegisteredPlayers,
-  prompt_query: &Query<(Entity, &Children), With<LobbyUiPrompt>>,
+  cta_query: &Query<&Children, With<LobbyUiCta>>,
   texts_query: &mut Query<&mut Text>,
 ) {
-  for (_entity, children) in prompt_query.iter() {
+  for children in cta_query.iter() {
     let has_players = !registered_players.players.is_empty();
-    // Part 1
-    if let Some(prefix_ent) = children.get(0) {
-      if let Ok(mut t) = texts_query.get_mut(*prefix_ent) {
-        t.0 = if has_players {
+    // Part 1 - Always white
+    if let Some(prefix_entity) = children.get(0) {
+      if let Ok(mut text) = texts_query.get_mut(*prefix_entity) {
+        text.0 = if has_players {
           "Press ".to_string()
         } else {
           "More players needed to start...".to_string()
         };
       }
     }
-    // Part 2
-    if let Some(key_ent) = children.get(1) {
-      if let Ok(mut t) = texts_query.get_mut(*key_ent) {
-        t.0 = if has_players {
+    // Part 2 - Always yellow
+    if let Some(key_entity) = children.get(1) {
+      if let Ok(mut text) = texts_query.get_mut(*key_entity) {
+        text.0 = if has_players {
           "[Space]".to_string()
         } else {
           String::new()
         };
       }
     }
-    // Part 3
-    if let Some(suffix_ent) = children.get(2) {
-      if let Ok(mut t) = texts_query.get_mut(*suffix_ent) {
-        t.0 = if has_players {
+    // Part 3 - Always white
+    if let Some(suffix_entity) = children.get(2) {
+      if let Ok(mut text) = texts_query.get_mut(*suffix_entity) {
+        text.0 = if has_players {
           " to start...".to_string()
         } else {
           String::new()
@@ -309,12 +313,14 @@ fn update_call_to_action_to_start(
   }
 }
 
+/// Despawns the entire lobby UI. Call when exiting the registration state.
 fn despawn_lobby_ui_system(mut commands: Commands, roots: Query<Entity, With<LobbyUiRoot>>) {
   for entity in &roots {
     commands.entity(entity).despawn();
   }
 }
 
+/// Spawns the game over UI, displaying the winner and a prompt to continue.
 fn spawn_game_over_ui_system(
   mut commands: Commands,
   winner: Res<WinnerInfo>,
@@ -338,7 +344,7 @@ fn spawn_game_over_ui_system(
     .with_children(|parent| {
       // Match result
       let large_text = large_text(&font);
-      match winner.winner {
+      match winner.get() {
         Some(id) => {
           let colour = registered_players
             .players
@@ -418,8 +424,9 @@ fn large_text(font: &Handle<Font>) -> TextFont {
   }
 }
 
-fn despawn_game_over_ui_system(mut commands: Commands, roots: Query<Entity, With<VictoryUiRoot>>) {
-  for entity in &roots {
+/// Despawns the entire game over UI. Call when exiting the game over state.
+fn despawn_game_over_ui_system(mut commands: Commands, victory_ui_root_query: Query<Entity, With<VictoryUiRoot>>) {
+  for entity in &victory_ui_root_query {
     commands.entity(entity).despawn();
   }
 }

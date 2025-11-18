@@ -103,7 +103,6 @@ fn process_inputs(
   }
 }
 
-// TODO: Stop moving player when they die
 /// Responds to [`InputAction`] events and moves character controllers accordingly.
 fn player_action_system(
   time: Res<Time>,
@@ -139,6 +138,7 @@ fn player_action_system(
   }
 }
 
+/// A system that handles various settings-related controls, such as toggling gizmos.
 fn settings_controls_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   mut settings: ResMut<Settings>,

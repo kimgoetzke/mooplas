@@ -18,15 +18,19 @@ impl Plugin for CameraPlugin {
   }
 }
 
+/// A marker component for the low-resolution game canvas sprite.
 #[derive(Component)]
 struct Canvas;
 
+/// A marker component for the pixel-perfect camera, rendering on the [`PIXEL_PERFECT_LAYER`] layer.
 #[derive(Component)]
-struct InGameCamera; // Cameras rendering on `PIXEL_PERFECT_LAYER`
+struct InGameCamera;
 
+/// A marker component for the high-resolution camera (UI, overlays), rendering on the [`HIGH_RES_LAYER`] layer.
 #[derive(Component)]
-struct OuterCamera; // Camera rendering `HIGH_RES_LAYER`
+struct OuterCamera;
 
+/// Sets up all cameras.
 fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
   let canvas_size = Extent3d {
     width: RESOLUTION_WIDTH,
@@ -52,6 +56,8 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
   canvas.resize(canvas_size);
   let image_handle = images.add(canvas);
   commands.spawn((
+    Name::new("Pixel Perfect Camera"),
+    InGameCamera,
     Camera2d,
     Camera {
       // Render before the "main pass" camera
@@ -61,12 +67,17 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
       ..default()
     },
     Msaa::Off,
-    InGameCamera,
     PIXEL_PERFECT_LAYER,
   ));
 
   commands.spawn((Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYER));
-  commands.spawn((Camera2d, Msaa::Off, OuterCamera, HIGH_RES_LAYER));
+  commands.spawn((
+    Name::new("High-Res Camera"),
+    OuterCamera,
+    Camera2d,
+    Msaa::Off,
+    HIGH_RES_LAYER,
+  ));
 }
 
 // Scales camera projection to fit the window (integer multiples only for pixel-perfect rendering)

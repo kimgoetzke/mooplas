@@ -112,12 +112,12 @@ fn generate_valid_spawn_points_system(
     return;
   }
 
-  spawn_points.points.clear();
+  spawn_points.data.clear();
   let mut rng = rand::rng();
   for i in 0..10 {
     let (x, y) = random_start_position(&mut rng);
     let rotation = rng.random_range(0.0..=360.);
-    spawn_points.points.push((x, y, rotation));
+    spawn_points.data.push((x, y, rotation));
     trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
   }
 
