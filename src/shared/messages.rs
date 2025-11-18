@@ -1,4 +1,4 @@
-use crate::shared::{PlayerId};
+use crate::shared::PlayerId;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
 

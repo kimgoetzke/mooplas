@@ -7,11 +7,10 @@ use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
-use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify,
   JustifyContent, LineBreak, MessageReader, Node, OnEnter, OnExit, Query, Res, Text, TextColor, TextFont, TextLayout,
-  Val, With, default, in_state,
+  TextShadow, Val, With, default, in_state,
 };
 use bevy::text::LineHeight;
 
@@ -60,6 +59,7 @@ fn setup_lobby_ui_system(
 ) {
   let font = asset_server.load(DEFAULT_FONT);
   let default_font = default_font(&font);
+  let default_shadow = default_shadow();
 
   let root = commands
     .spawn((
@@ -101,6 +101,7 @@ fn setup_lobby_ui_system(
           default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           TextColor(colour),
+          default_shadow,
         ));
 
         // Player prompt
@@ -128,6 +129,7 @@ fn setup_lobby_ui_system(
         default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
         TextColor(Color::WHITE),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        default_shadow,
       ));
       // Part 2 - Always yellow and initially empty
       parent.spawn((
@@ -135,6 +137,7 @@ fn setup_lobby_ui_system(
         default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
         TextColor(Color::from(tailwind::YELLOW_400)),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        default_shadow,
       ));
       // Part 3 - Always white and initially empty
       parent.spawn((
@@ -142,6 +145,7 @@ fn setup_lobby_ui_system(
         default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
         TextColor(Color::WHITE),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        default_shadow,
       ));
     })
     .id();
@@ -159,8 +163,6 @@ fn handle_player_registration_event(
 ) {
   for message in player_registration_message.read() {
     let font = asset_server.load(DEFAULT_FONT);
-
-    // Find matching available player config
     let config = available_configs.configs.iter().find(|p| p.id == message.player_id);
 
     // Update entry for player
@@ -203,6 +205,7 @@ fn player_join_prompt(
   available_config: &AvailablePlayerConfig,
   parent: &mut RelatedSpawnerCommands<ChildOf>,
 ) {
+  let default_shadow = default_shadow();
   parent
     .spawn((Node {
       flex_direction: FlexDirection::Row,
@@ -218,6 +221,7 @@ fn player_join_prompt(
         text_font.clone(),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
+        default_shadow,
       ));
       // ...[Key]...
       parent.spawn((
@@ -225,6 +229,7 @@ fn player_join_prompt(
         text_font.clone(),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::from(tailwind::YELLOW_400)),
+        default_shadow,
       ));
       // ...to join
       parent.spawn((
@@ -232,6 +237,7 @@ fn player_join_prompt(
         text_font,
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
+        default_shadow,
       ));
     });
 }
@@ -251,6 +257,7 @@ fn player_registered_prompt(font: &Handle<Font>, parent: &mut RelatedSpawnerComm
         default_font(font),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
+        default_shadow(),
       ));
     });
 }
@@ -309,6 +316,7 @@ fn spawn_game_over_ui_system(
   registered_players: Res<RegisteredPlayers>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
+  let default_shadow = default_shadow();
 
   commands
     .spawn((
@@ -345,8 +353,14 @@ fn spawn_game_over_ui_system(
                 Text::new(format!("Player {}", id.0)),
                 large_text.clone(),
                 TextColor(colour),
+                default_shadow,
               ));
-              row.spawn((Text::new(" wins!"), large_text.clone(), TextColor(Color::WHITE)));
+              row.spawn((
+                Text::new(" wins!"),
+                large_text.clone(),
+                TextColor(Color::WHITE),
+                default_shadow,
+              ));
             });
         }
         None => {
@@ -354,6 +368,7 @@ fn spawn_game_over_ui_system(
             Text::new("No winner this round."),
             large_text.clone(),
             TextColor(Color::WHITE),
+            default_shadow,
           ));
         }
       }
@@ -372,18 +387,21 @@ fn spawn_game_over_ui_system(
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::WHITE),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+            default_shadow,
           ));
           parent.spawn((
             Text::new("[Space]"),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::from(tailwind::YELLOW_400)),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+            default_shadow,
           ));
           parent.spawn((
             Text::new(" to continue..."),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::WHITE),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+            default_shadow,
           ));
         });
     });
@@ -403,6 +421,10 @@ fn large_text(font: &Handle<Font>) -> TextFont {
     font_size: 60.0,
     ..default()
   }
+}
+
+fn default_shadow() -> TextShadow {
+  TextShadow::default()
 }
 
 /// Despawns the entire game over UI. Call when exiting the game over state.
