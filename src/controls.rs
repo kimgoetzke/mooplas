@@ -53,8 +53,7 @@ enum InputAction {
   Action(PlayerId),
 }
 
-// TODO: Move updates to the Res<RegisteredPlayer> to game_loop.rs
-/// Handles player registration and unregistration based on keyboard input. Updates the lobby UI accordingly.
+/// Handles player registration and unregistration based on keyboard input. Sends an event for the UI to update.
 fn registration_input_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   available_configs: Res<AvailablePlayerConfigs>,
@@ -66,23 +65,17 @@ fn registration_input_system(
       continue;
     }
 
-    let has_registered = !registered_players
+    let is_now_registered = if let Some(position) = registered_players
       .players
       .iter()
-      .filter(|p| p.id == available_config.id)
-      .collect::<Vec<&RegisteredPlayer>>()
-      .is_empty();
-
-    // Unregister if already registered
-    if has_registered {
-      let position = registered_players
-        .players
-        .iter()
-        .position(|p| p.id == available_config.id)
-        .expect("Failed to find registered player");
+      .position(|p| p.id == available_config.id)
+    {
+      // Unregister
       registered_players.players.remove(position);
       debug!("Player [{}] has unregistered", available_config.id.0);
+      false
     } else {
+      // Register
       registered_players.players.push(RegisteredPlayer {
         id: available_config.id,
         input: available_config.input.clone(),
@@ -90,12 +83,13 @@ fn registration_input_system(
         alive: true,
       });
       debug!("Player [{}] has registered", available_config.id.0);
-    }
+      true
+    };
 
     message_writer.write(PlayerRegistrationMessage {
       player_id: available_config.id,
       available_player_config: available_config.clone(),
-      has_registered: !has_registered,
+      has_registered: is_now_registered,
       is_anyone_registered: !registered_players.players.is_empty(),
     });
   }
