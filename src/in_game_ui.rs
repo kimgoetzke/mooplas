@@ -8,9 +8,9 @@ use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::{
-  AlignItems, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify,
-  JustifyContent, LineBreak, MessageReader, Node, OnEnter, OnExit, Query, Res, Text, TextColor, TextFont, TextLayout,
-  TextShadow, Val, With, default, in_state,
+  AlignItems, Alpha, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify,
+  JustifyContent, LineBreak, MessageReader, Node, OnEnter, OnExit, Query, Res, Text, TextBackgroundColor, TextColor,
+  TextFont, TextLayout, TextShadow, Val, With, default, in_state,
 };
 use bevy::text::LineHeight;
 
@@ -349,16 +349,18 @@ fn spawn_game_over_ui_system(
             },))
             .with_children(|row| {
               row.spawn((
-                Text::new(format!("Player {}", id.0)),
+                Text::new(format!("  Player {}", id.0)),
                 large_text.clone(),
                 TextColor(colour),
                 default_shadow,
+                TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
               ));
               row.spawn((
-                Text::new(" wins!"),
+                Text::new(" wins!  "),
                 large_text.clone(),
                 TextColor(Color::WHITE),
                 default_shadow,
+                TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
               ));
             });
         }
