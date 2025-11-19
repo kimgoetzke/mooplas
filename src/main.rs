@@ -1,27 +1,20 @@
 mod app_states;
 mod camera;
 mod controls;
+mod debug;
 mod game_loop;
 mod game_world;
-mod gizmos;
 mod in_game_ui;
 mod initialisation;
 mod player;
 mod shared;
-
-mod debug {
-  pub use crate::gizmos::GizmosPlugin;
-  pub use bevy::input::common_conditions::input_toggle_active;
-  pub use bevy_inspector_egui::bevy_egui::EguiPlugin;
-  pub use bevy_inspector_egui::quick::WorldInspectorPlugin;
-}
 
 mod prelude {
   pub use crate::shared::*;
 }
 
 #[cfg(debug_assertions)]
-use debug::*;
+use crate::debug::DebugPlugin;
 
 #[cfg(feature = "online-multiplayer")]
 use bevy_renet::RenetServerPlugin;
@@ -37,7 +30,6 @@ use crate::player::PlayerPlugin;
 use crate::prelude::*;
 use avian2d::PhysicsPlugins;
 use avian2d::prelude::Gravity;
-use bevy::diagnostic::FrameTimeDiagnosticsPlugin;
 use bevy::prelude::*;
 
 fn main() {
@@ -63,11 +55,7 @@ fn main() {
   app.add_plugins(RenetServerPlugin);
 
   #[cfg(debug_assertions)]
-  app
-    .add_plugins(EguiPlugin::default())
-    .add_plugins(FrameTimeDiagnosticsPlugin::default())
-    .add_plugins(WorldInspectorPlugin::default().run_if(input_toggle_active(false, KeyCode::F1)))
-    .add_plugins(GizmosPlugin);
+  app.add_plugins(DebugPlugin);
 
   app.run();
 }

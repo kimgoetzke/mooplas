@@ -1,9 +1,6 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
-use crate::prelude::{
-  AvailablePlayerConfigs, DebugStateMessage, GeneralSettings, PlayerId, PlayerInput, RegisteredPlayer,
-  RegisteredPlayers, Settings, SnakeHead,
-};
+use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerInput, RegisteredPlayer, RegisteredPlayers, SnakeHead};
 use crate::shared::PlayerRegistrationMessage;
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -94,16 +91,9 @@ fn registration_input_system(
   }
 }
 
-/// Transitions the game from the loading state to the running state.
+/// Transitions the game from the registration/lobby state to the running state.
 fn start_game_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut next_app_state: ResMut<NextState<AppState>>) {
-  if keyboard_input.any_pressed([
-    KeyCode::Space,
-    KeyCode::Enter,
-    KeyCode::Escape,
-    KeyCode::Tab,
-    KeyCode::ShiftLeft,
-    KeyCode::ShiftRight,
-  ]) {
+  if keyboard_input.any_pressed([KeyCode::Space, KeyCode::Enter, KeyCode::Escape]) {
     debug_once!("Waiting for keyboard input to start the game...");
   } else {
     return;
@@ -185,25 +175,8 @@ fn player_action_system(
   }
 }
 
-/// A system that handles various settings-related controls, such as toggling gizmos.
-fn settings_controls_system(
-  keyboard_input: Res<ButtonInput<KeyCode>>,
-  mut settings: ResMut<Settings>,
-  mut general_settings: ResMut<GeneralSettings>,
-  mut debug_state_message: MessageWriter<DebugStateMessage>,
-  mut windows: Query<&mut Window>,
-) {
-  if keyboard_input.just_pressed(KeyCode::F9) {
-    settings.general.display_player_gizmos = !settings.general.display_player_gizmos;
-    general_settings.display_player_gizmos = settings.general.display_player_gizmos;
-    info!(
-      "[F9] Set display player gizmos to [{}]",
-      settings.general.display_player_gizmos
-    );
-    debug_state_message.write(DebugStateMessage {
-      display_player_gizmos: settings.general.display_player_gizmos,
-    });
-  }
+/// A system that handles various settings-related controls, such as toggling fullscreen mode.
+fn settings_controls_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut windows: Query<&mut Window>) {
   if keyboard_input.just_pressed(KeyCode::F11) {
     let mut window = windows.single_mut().expect("Failed to get primary window");
     window.mode = match window.mode {

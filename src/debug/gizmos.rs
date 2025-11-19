@@ -1,3 +1,5 @@
+#![cfg(debug_assertions)]
+
 use crate::prelude::SnakeTail;
 use crate::prelude::constants::SNAKE_HEAD_SIZE;
 use crate::prelude::constants::TAIL_COLLIDER_SKIP_RECENT;
