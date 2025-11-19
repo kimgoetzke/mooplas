@@ -6,12 +6,14 @@ use bevy::app::{Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
-use bevy::ecs::relationship::RelatedSpawnerCommands;
+use bevy::ecs::children;
+use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::prelude::{
   AlignItems, Alpha, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify,
   JustifyContent, LineBreak, MessageReader, Node, OnEnter, OnExit, Query, Res, Text, TextBackgroundColor, TextColor,
   TextFont, TextLayout, TextShadow, Val, With, default, in_state,
 };
+use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
@@ -93,20 +95,19 @@ fn setup_lobby_ui_system(
           align_items: AlignItems::Center,
           ..default()
         },
+        children![
+          (
+            // Player
+            Text::new(format!("Player {}", available_config.id.0)),
+            default_font.clone(),
+            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+            TextColor(colour),
+            default_shadow,
+          ),
+          // "Press {} to join"
+          player_join_prompt(&font, available_config)
+        ],
       ))
-      .with_children(|parent| {
-        // Player
-        parent.spawn((
-          Text::new(format!("Player {}", available_config.id.0)),
-          default_font.clone(),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          TextColor(colour),
-          default_shadow,
-        ));
-
-        // Player prompt
-        player_join_prompt(&font, available_config, parent);
-      })
       .id();
     commands.entity(root).add_child(entry);
   }
@@ -121,33 +122,33 @@ fn setup_lobby_ui_system(
         align_items: AlignItems::Center,
         ..default()
       },
+      children![
+        (
+          // Part 1 - Always white
+          Text::new("More players needed to start..."),
+          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::WHITE),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        ),
+        (
+          // Part 2 - Always yellow and initially empty
+          Text::new(""),
+          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::from(tailwind::YELLOW_400)),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        ),
+        (
+          // Part 3 - Always white and initially empty
+          Text::new(""),
+          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::WHITE),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        )
+      ],
     ))
-    .with_children(|parent| {
-      // Part 1 - Always white
-      parent.spawn((
-        Text::new("More players needed to start..."),
-        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-        TextColor(Color::WHITE),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        default_shadow,
-      ));
-      // Part 2 - Always yellow and initially empty
-      parent.spawn((
-        Text::new(""),
-        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-        TextColor(Color::from(tailwind::YELLOW_400)),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        default_shadow,
-      ));
-      // Part 3 - Always white and initially empty
-      parent.spawn((
-        Text::new(""),
-        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-        TextColor(Color::WHITE),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        default_shadow,
-      ));
-    })
     .id();
   commands.entity(root).add_child(cta);
 }
@@ -173,9 +174,8 @@ fn handle_player_registration_event(
             if let Some(prompt_node) = children.get(1) {
               commands.entity(*prompt_node).despawn();
               if let Some(ref available_config) = config {
-                commands.entity(entity).with_children(|parent| {
-                  player_join_prompt(&font, available_config, parent);
-                });
+                let player = commands.spawn(player_join_prompt(&font, available_config)).id();
+                commands.entity(entity).add_child(player);
               }
             }
           }
@@ -186,9 +186,8 @@ fn handle_player_registration_event(
           if entry.player_id == message.player_id {
             if let Some(prompt_node) = children.get(1) {
               commands.entity(*prompt_node).despawn();
-              commands.entity(entity).with_children(|parent| {
-                player_registered_prompt(&font, parent);
-              });
+              let registered_prompt = commands.spawn(player_registered_prompt(&font)).id();
+              commands.entity(entity).add_child(registered_prompt);
             }
           }
         }
@@ -203,62 +202,77 @@ fn handle_player_registration_event(
 fn player_join_prompt(
   font: &Handle<Font>,
   available_config: &AvailablePlayerConfig,
-  parent: &mut RelatedSpawnerCommands<ChildOf>,
+) -> (
+  Node,
+  SpawnRelatedBundle<
+    ChildOf,
+    (
+      Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>,
+      Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>,
+      Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>,
+    ),
+  >,
 ) {
+  let text_font = default_font(font);
   let default_shadow = default_shadow();
-  parent
-    .spawn((Node {
+
+  (
+    Node {
       flex_direction: FlexDirection::Row,
       justify_content: JustifyContent::Center,
       align_items: AlignItems::Center,
       ..default()
-    },))
-    .with_children(|parent| {
-      let text_font = default_font(font);
-      parent.spawn((
+    },
+    children![
+      (
         // Press...
         Text::new(": Press "),
         text_font.clone(),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
         default_shadow,
-      ));
-      // ...[Key]...
-      parent.spawn((
+      ),
+      (
+        // ...[Key]...
         Text::new(format!("[{:?}]", available_config.input.action)),
         text_font.clone(),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::from(tailwind::YELLOW_400)),
         default_shadow,
-      ));
-      // ...to join
-      parent.spawn((
+      ),
+      (
+        // ...to join
         Text::new(" to join"),
         text_font,
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
         default_shadow,
-      ));
-    });
+      )
+    ],
+  )
 }
 
-fn player_registered_prompt(font: &Handle<Font>, parent: &mut RelatedSpawnerCommands<ChildOf>) {
-  parent
-    .spawn((Node {
+fn player_registered_prompt(
+  font: &Handle<Font>,
+) -> (
+  Node,
+  SpawnRelatedBundle<ChildOf, Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>>,
+) {
+  (
+    Node {
       flex_direction: FlexDirection::Row,
       justify_content: JustifyContent::Center,
       align_items: AlignItems::Center,
       ..default()
-    },))
-    .with_children(|parent| {
-      parent.spawn((
-        Text::new(": Registered"),
-        default_font(font),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        TextColor(Color::WHITE),
-        default_shadow(),
-      ));
-    });
+    },
+    children![(
+      Text::new(": Registered"),
+      default_font(font),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      TextColor(Color::WHITE),
+      default_shadow(),
+    )],
+  )
 }
 
 fn update_call_to_action_to_start(
@@ -375,36 +389,37 @@ fn spawn_game_over_ui_system(
       }
 
       // Call to action
-      parent
-        .spawn((Node {
+      parent.spawn((
+        Node {
           flex_direction: FlexDirection::Row,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
           ..default()
-        },))
-        .with_children(|parent| {
-          parent.spawn((
+        },
+        children![
+          (
             Text::new("Press "),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::WHITE),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
-          ));
-          parent.spawn((
+          ),
+          (
             Text::new("[Space]"),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::from(tailwind::YELLOW_400)),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
-          ));
-          parent.spawn((
+          ),
+          (
             Text::new(" to continue..."),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::WHITE),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
-          ));
-        });
+          )
+        ],
+      ));
     });
 }
 
