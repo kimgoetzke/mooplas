@@ -30,12 +30,14 @@ impl Plugin for InitialisationPlugin {
   }
 }
 
+/// An enumeration of all possible initialisation steps. Add new steps here as needed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 enum InitialisationStep {
   GenerateSpawnPoints,
   InitialiseAvailablePlayerConfigs,
 }
 
+/// A resource that tracks the progress of the initialisation steps.
 #[derive(Resource)]
 struct InitialisationTracker {
   is_first_run: bool,
@@ -143,6 +145,7 @@ fn random_start_position(rng: &mut ThreadRng) -> (f32, f32) {
   (x, y)
 }
 
+/// A system that initialises all available player configurations that players can choose from.
 fn initialise_available_player_configurations_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut available_configs: ResMut<AvailablePlayerConfigs>,

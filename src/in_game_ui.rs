@@ -252,7 +252,6 @@ fn player_registered_prompt(font: &Handle<Font>, parent: &mut RelatedSpawnerComm
     },))
     .with_children(|parent| {
       parent.spawn((
-        // Press...
         Text::new(": Registered"),
         default_font(font),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
