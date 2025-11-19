@@ -1,6 +1,8 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::*;
-use crate::prelude::{Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeTail, SpawnPoints, WrapAroundEntity};
+use crate::prelude::{
+  Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeSegment, SnakeTail, SpawnPoints, WrapAroundEntity,
+};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
@@ -49,34 +51,6 @@ impl Controller {
       ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, 0.0, Dir2::NEG_Y).with_max_distance(10.0),
       locked_axes: LockedAxes::ROTATION_LOCKED,
     }
-  }
-}
-
-/// A continuous drawn segment of the snake tail.
-#[derive(Component)]
-pub struct SnakeSegment {
-  /// Sampled world positions along this segment.
-  /// - Index 0 is the *oldest* position (furthest behind the head),
-  /// - The last index is the *newest* position (closest to the head).
-  positions: Vec<Vec2>,
-  mesh_entity: Option<Entity>,
-  collider_entity: Option<Entity>,
-}
-
-impl Default for SnakeSegment {
-  fn default() -> Self {
-    Self {
-      positions: Vec::with_capacity(SNAKE_LENGTH_MAX_CONTINUOUS),
-      mesh_entity: None,
-      collider_entity: None,
-    }
-  }
-}
-
-impl SnakeSegment {
-  /// Read-only accessor for sampled positions.
-  pub fn positions(&self) -> &[Vec2] {
-    &self.positions
   }
 }
 
@@ -156,7 +130,7 @@ fn update_snake_tail_segments_system(
         if let Ok((snake_tail_entity, mut snake_tail)) = snake_tail_query.get_mut(child) {
           let gap_samples_remaining = snake_tail.gap_samples_remaining;
           let active_segment_index = snake_tail.segments.len() - 1;
-          let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions.is_empty();
+          let is_active_segment_positions_empty = snake_tail.segments[active_segment_index].positions().is_empty();
 
           // Add the first point and, if required, the mesh if the active segment has no positions yet and there are no
           // gap samples remaining
@@ -164,7 +138,7 @@ fn update_snake_tail_segments_system(
             snake_tail.distance_since_last_sample = 0.0;
             let snake_tail_colour = snake_tail.colour.clone();
             let active_segment = &mut snake_tail.segments[active_segment_index];
-            active_segment.positions.push(current_position);
+            active_segment.push_position(current_position);
             create_segment_mesh_if_none_exist(
               &mut commands,
               &mut meshes,
@@ -204,7 +178,7 @@ fn create_segment_mesh_if_none_exist(
   snake_tail_entity: Entity,
   colour: Color,
 ) {
-  if active_segment.mesh_entity.is_none() {
+  if active_segment.mesh_entity().is_none() {
     let mesh_entity = commands
       .spawn((
         Name::new("Snake Tail Segment Mesh"),
@@ -215,7 +189,7 @@ fn create_segment_mesh_if_none_exist(
       ))
       .id();
     commands.entity(snake_tail_entity).add_child(mesh_entity);
-    active_segment.mesh_entity = Some(mesh_entity);
+    active_segment.set_mesh_entity(mesh_entity);
   }
 }
 
@@ -227,7 +201,7 @@ fn update_distance_since_last_sample(
   current_position: Vec2,
 ) {
   let last_position = snake_tail.segments[active_segment_index]
-    .positions
+    .positions()
     .last()
     .copied()
     .unwrap_or(current_position);
@@ -265,7 +239,7 @@ fn handle_sample_distance_reached(
   // Add current position to active segment and create mesh if needed
   let snake_tail_colour = snake_tail.colour.clone();
   let active_segment = &mut snake_tail.segments[active_segment_index];
-  active_segment.positions.push(current_position);
+  active_segment.push_position(current_position);
   create_segment_mesh_if_none_exist(
     &mut commands,
     &mut meshes,
@@ -276,32 +250,26 @@ fn handle_sample_distance_reached(
   );
 
   // Create collider entity in the active segment once we have enough points, if none exists
-  if active_segment.collider_entity.is_none() && active_segment.positions.len() > TAIL_COLLIDER_SKIP_RECENT + 2 {
-    let collider_end = active_segment.positions.len() - TAIL_COLLIDER_SKIP_RECENT;
-    let polyline: Vec<Vector> = active_segment.positions[0..collider_end]
-      .iter()
-      .map(|p| Vector::new(p.x, p.y))
-      .collect();
-
-    if polyline.len() >= 2 {
+  if active_segment.collider_entity().is_none() && active_segment.positions().len() > TAIL_COLLIDER_SKIP_RECENT + 2 {
+    if let Some(polyline_vertices) = compute_polyline_vertices(active_segment) {
       // Spawn collider as a child of the snake tail entity (adjust flags/friction as needed)
       let collider_entity = commands
         .spawn((
           Name::new("Snake Tail Segment Collider"),
           RigidBody::Static,
-          Collider::polyline(polyline, None),
+          Collider::polyline(polyline_vertices, None),
           Transform::default(),
           CollisionLayers::new(CollisionLayer::Tail, [CollisionLayer::Head]),
         ))
         .id();
 
       commands.entity(snake_tail_entity).add_child(collider_entity);
-      active_segment.collider_entity = Some(collider_entity);
+      active_segment.set_collider_entity(collider_entity);
     }
   }
 
   // If this segment reached max continuous length, start gap samples
-  if active_segment.positions.len() >= SNAKE_LENGTH_MAX_CONTINUOUS {
+  if active_segment.positions().len() >= SNAKE_LENGTH_MAX_CONTINUOUS {
     snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH;
   }
 }
@@ -317,25 +285,31 @@ fn update_active_segment_collider_system(
     }
 
     if let Some(active_segment) = snake_tail.segments.last() {
-      if active_segment.positions.len() < 2 {
-        continue;
-      }
-
-      if let Some(collider_entity) = active_segment.collider_entity {
-        let collider_end = active_segment.positions.len() - TAIL_COLLIDER_SKIP_RECENT;
-        let vertices: Vec<Vector> = active_segment.positions[0..collider_end]
-          .iter()
-          .map(|p| Vector::new(p.x, p.y))
-          .collect();
-
-        if vertices.len() >= 2 {
+      if let Some(collider_entity) = active_segment.collider_entity() {
+        if let Some(polyline_vertices) = compute_polyline_vertices(active_segment) {
           commands
             .entity(collider_entity)
-            .insert(Collider::polyline(vertices, None));
+            .insert(Collider::polyline(polyline_vertices, None));
         }
       }
     }
   }
+}
+
+/// Generates the polyline vertices for the tail collider, skipping the most recent sampled positions to prevent
+/// immediate self-collision. Returns `None` if there are not enough positions to create a collider.
+fn compute_polyline_vertices(active_segment: &SnakeSegment) -> Option<Vec<Vector>> {
+  if active_segment.positions().len() <= TAIL_COLLIDER_SKIP_RECENT {
+    return None;
+  }
+
+  let collider_end = active_segment.positions().len() - TAIL_COLLIDER_SKIP_RECENT;
+  Some(
+    active_segment.positions()[0..collider_end]
+      .iter()
+      .map(|p| Vector::new(p.x, p.y))
+      .collect(),
+  )
 }
 
 /// Updates the mesh of the active (last) [`SnakeSegment`] every time the [`SnakeTail`] changes.
@@ -349,13 +323,13 @@ fn update_active_segment_mesh_system(
       continue;
     }
     if let Some(active_segment) = snake_tail.segments.last() {
-      if active_segment.positions.len() < 2 {
+      if active_segment.positions().len() < 2 {
         continue;
       }
-      if let Some(mesh_entity) = active_segment.mesh_entity {
+      if let Some(mesh_entity) = active_segment.mesh_entity() {
         if let Ok(mesh2d) = mesh_query.get_mut(mesh_entity) {
           if let Some(m) = meshes.get_mut(&mesh2d.0) {
-            *m = create_snake_tail_mesh(&active_segment.positions);
+            *m = create_snake_tail_mesh(&active_segment.positions());
           }
         }
       }
@@ -466,6 +440,59 @@ fn disable_eliminated_players_system(
 mod tests {
   use super::*;
   use bevy::mesh::Indices;
+
+  #[test]
+  fn compute_polyline_vertices_with_no_segment_positions_returns_none() {
+    let segment = SnakeSegment::default();
+    let polyline = compute_polyline_vertices(&segment);
+    assert!(polyline.is_none());
+  }
+
+  #[test]
+  fn compute_polyline_vertices_with_insufficient_positions_returns_none() {
+    let mut segment = SnakeSegment::default();
+    segment.push_position(Vec2::new(1.0, 1.0));
+    let polyline = compute_polyline_vertices(&segment);
+    assert!(polyline.is_none());
+  }
+
+  #[test]
+  fn compute_polyline_vertices_with_exact_positions_as_skip_recent_returns_none() {
+    let mut segment = SnakeSegment::default();
+    for i in 0..TAIL_COLLIDER_SKIP_RECENT {
+      segment.push_position(Vec2::new(i as f32, i as f32));
+    }
+    let polyline = compute_polyline_vertices(&segment);
+    assert!(polyline.is_none());
+  }
+
+  #[test]
+  fn compute_polyline_vertices_with_sufficient_positions_returns_polyline() {
+    let mut segment = SnakeSegment::default();
+    for i in 0..(TAIL_COLLIDER_SKIP_RECENT + 2) {
+      segment.push_position(Vec2::new(i as f32, i as f32));
+    }
+    let polyline = compute_polyline_vertices(&segment);
+    assert!(polyline.is_some());
+    let polyline = polyline.unwrap();
+    assert_eq!(polyline.len(), 2);
+    assert_eq!(polyline[0], Vector::new(0.0, 0.0));
+    assert_eq!(polyline[1], Vector::new(1.0, 1.0));
+  }
+
+  #[test]
+  fn compute_polyline_vertices_can_compute_long_polyline() {
+    let mut segment = SnakeSegment::default();
+    for i in 0..(TAIL_COLLIDER_SKIP_RECENT + 1000) {
+      segment.push_position(Vec2::new(i as f32, i as f32));
+    }
+    let polyline = compute_polyline_vertices(&segment);
+    assert!(polyline.is_some());
+    let polyline = polyline.unwrap();
+    assert_eq!(polyline.len(), 1000);
+    assert_eq!(polyline[0], Vector::new(0.0, 0.0));
+    assert_eq!(polyline[999], Vector::new(999.0, 999.0));
+  }
 
   #[test]
   fn create_snake_tail_mesh_with_one_point() {
