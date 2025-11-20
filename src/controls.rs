@@ -1,7 +1,9 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
-use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerInput, RegisteredPlayer, RegisteredPlayers, SnakeHead};
-use crate::shared::PlayerRegistrationMessage;
+use crate::prelude::{
+  AvailablePlayerConfigs, InputAction, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
+  TouchControlsToggledMessage,
+};
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
 use bevy::app::{App, Plugin, Update};
@@ -9,28 +11,26 @@ use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
 use bevy::prelude::{
-  IntoScheduleConfigs, KeyCode, Message, MessageReader, MessageWriter, MonitorSelection, NextState, Query, Res, ResMut,
-  Time, Transform, Window, With, in_state,
+  IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, MonitorSelection, NextState, Query, Res, ResMut, Time,
+  Transform, Window, With, in_state,
 };
 
-// TODO: Add touch screen support
 /// A plugin that manages all player controls and input handling.
 pub struct ControlsPlugin;
 
 impl Plugin for ControlsPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_message::<InputAction>()
       .add_systems(Update, settings_controls_system)
+      .add_systems(
+        Update,
+        player_input_action_system.run_if(in_state(AppState::Registering)),
+      )
       .add_systems(
         Update,
         start_game_system
           .run_if(in_state(AppState::Registering))
           .run_if(has_registered_players),
-      )
-      .add_systems(
-        Update,
-        registration_input_system.run_if(in_state(AppState::Registering)),
       )
       .add_systems(
         Update,
@@ -43,51 +43,18 @@ impl Plugin for ControlsPlugin {
   }
 }
 
-/// A [`Message`] written for an input action.
-#[derive(Message)]
-enum InputAction {
-  Move(PlayerId, Scalar),
-  Action(PlayerId),
-}
-
 /// Handles player registration and unregistration based on keyboard input. Sends an event for the UI to update.
-fn registration_input_system(
+fn player_input_action_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   available_configs: Res<AvailablePlayerConfigs>,
-  mut registered_players: ResMut<RegisteredPlayers>,
-  mut message_writer: MessageWriter<PlayerRegistrationMessage>,
+  mut input_action_message: MessageWriter<InputAction>,
 ) {
   for available_config in &available_configs.configs {
     if !keyboard_input.just_pressed(available_config.input.action) {
       continue;
     }
 
-    let is_now_registered = if let Some(position) = registered_players
-      .players
-      .iter()
-      .position(|p| p.id == available_config.id)
-    {
-      // Unregister
-      registered_players.players.remove(position);
-      debug!("Player [{}] has unregistered", available_config.id.0);
-      false
-    } else {
-      // Register
-      registered_players.players.push(RegisteredPlayer {
-        id: available_config.id,
-        input: available_config.input.clone(),
-        colour: available_config.colour,
-        alive: true,
-      });
-      debug!("Player [{}] has registered", available_config.id.0);
-      true
-    };
-
-    message_writer.write(PlayerRegistrationMessage {
-      player_id: available_config.id,
-      has_registered: is_now_registered,
-      is_anyone_registered: !registered_players.players.is_empty(),
-    });
+    input_action_message.write(InputAction::Action(available_config.into()));
   }
 }
 
@@ -176,7 +143,12 @@ fn player_action_system(
 }
 
 /// A system that handles various settings-related controls, such as toggling fullscreen mode.
-fn settings_controls_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut windows: Query<&mut Window>) {
+fn settings_controls_system(
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  mut settings: ResMut<Settings>,
+  mut windows: Query<&mut Window>,
+  mut touch_controls_message: MessageWriter<TouchControlsToggledMessage>,
+) {
   if keyboard_input.just_pressed(KeyCode::F11) {
     let mut window = windows.single_mut().expect("Failed to get primary window");
     window.mode = match window.mode {
@@ -184,6 +156,14 @@ fn settings_controls_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut windo
       _ => bevy::window::WindowMode::Windowed,
     };
     info!("[F11] Set window mode to [{:?}]", window.mode);
+  }
+  if keyboard_input.just_pressed(KeyCode::F10) {
+    settings.general.enable_touch_controls = !settings.general.enable_touch_controls;
+    touch_controls_message.write(TouchControlsToggledMessage::new(settings.general.enable_touch_controls));
+    info!(
+      "[F10] Set touch controls to [{:?}]",
+      settings.general.enable_touch_controls
+    );
   }
 }
 

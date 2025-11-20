@@ -1,4 +1,5 @@
 use crate::shared::PlayerId;
+use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
 
@@ -9,7 +10,9 @@ impl Plugin for SharedMessagesPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<DebugStateMessage>()
-      .add_message::<PlayerRegistrationMessage>();
+      .add_message::<PlayerRegistrationMessage>()
+      .add_message::<TouchControlsToggledMessage>()
+      .add_message::<InputAction>();
   }
 }
 
@@ -26,6 +29,25 @@ pub struct PlayerRegistrationMessage {
   pub player_id: PlayerId,
   pub has_registered: bool,
   pub is_anyone_registered: bool,
+}
+
+/// A message that communicates a change to the touch controls setting.
+#[derive(Message)]
+pub struct TouchControlsToggledMessage {
+  pub enabled: bool,
+}
+
+impl TouchControlsToggledMessage {
+  pub fn new(enabled: bool) -> Self {
+    Self { enabled }
+  }
+}
+
+/// A [`Message`] written for an input action by a player.
+#[derive(Message, Clone, Copy, Debug)]
+pub enum InputAction {
+  Move(PlayerId, Scalar),
+  Action(PlayerId),
 }
 
 #[cfg(test)]
@@ -52,6 +74,7 @@ mod tests {
     let app = setup();
     assert!(app.world().contains_resource::<Messages<DebugStateMessage>>());
     assert!(app.world().contains_resource::<Messages<PlayerRegistrationMessage>>());
+    assert!(app.world().contains_resource::<Messages<TouchControlsToggledMessage>>());
   }
 
   #[test]

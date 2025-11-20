@@ -32,6 +32,12 @@ impl Debug for PlayerId {
   }
 }
 
+impl Into<u8> for PlayerId {
+  fn into(self) -> u8 {
+    self.0
+  }
+}
+
 /// The snake tail component that manages all [`SnakeSegment`]s and sampling.
 #[derive(Component)]
 pub struct SnakeTail {

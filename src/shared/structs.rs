@@ -37,3 +37,15 @@ pub struct AvailablePlayerConfig {
   pub input: PlayerInput,
   pub colour: Color,
 }
+
+impl AvailablePlayerConfig {
+  pub fn id(&self) -> PlayerId {
+    self.id
+  }
+}
+
+impl Into<PlayerId> for &AvailablePlayerConfig {
+  fn into(self) -> PlayerId {
+    self.id
+  }
+}

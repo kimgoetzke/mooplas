@@ -42,12 +42,15 @@ impl Default for Settings {
 pub struct GeneralSettings {
   /// Whether to display player gizmos that help debugging.
   pub display_player_gizmos: bool,
+  /// Whether to enable (i.e. display) touch controls
+  pub enable_touch_controls: bool,
 }
 
 impl Default for GeneralSettings {
   fn default() -> Self {
     Self {
       display_player_gizmos: false,
+      enable_touch_controls: true,
     }
   }
 }

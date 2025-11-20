@@ -1,6 +1,9 @@
 use crate::app_states::AppState;
-use crate::prelude::{PlayerId, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo};
-use crate::shared::Player;
+use crate::prelude::{
+  AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead,
+  WinnerInfo,
+};
+use crate::shared::{InputAction, Player};
 use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
 use bevy::ecs::entity::Entity;
@@ -13,6 +16,10 @@ impl Plugin for GameLoopPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_systems(OnEnter(AppState::Registering), reset_for_lobby_system)
+      .add_systems(
+        Update,
+        player_registration_system.run_if(in_state(AppState::Registering)),
+      )
       .add_systems(
         Update,
         (check_snake_collisions_system, transition_to_game_over_system).run_if(in_state(AppState::Playing)),
@@ -29,6 +36,50 @@ impl Plugin for GameLoopPlugin {
 fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner: ResMut<WinnerInfo>) {
   registered.players.clear();
   winner.clear();
+}
+
+/// Handles player registration messages to add or remove players from the registered players list.
+fn player_registration_system(
+  mut input_action_messages: MessageReader<InputAction>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
+) {
+  for input_action in input_action_messages.read() {
+    if let InputAction::Action(player_id) = input_action {
+      let Some(available_config) = available_configs.configs.iter().find(|config| config.id == *player_id) else {
+        warn!("Received registration action for unknown player ID [{:?}]", player_id);
+        continue;
+      };
+
+      let is_now_registered = if let Some(position) = registered_players
+        .players
+        .iter()
+        .position(|p| p.id == available_config.id)
+      {
+        // Unregister
+        registered_players.players.remove(position);
+        debug!("Player [{}] has unregistered", available_config.id.0);
+        false
+      } else {
+        // Register
+        registered_players.players.push(RegisteredPlayer {
+          id: available_config.id,
+          input: available_config.input.clone(),
+          colour: available_config.colour,
+          alive: true,
+        });
+        debug!("Player [{}] has registered", available_config.id.0);
+        true
+      };
+
+      player_registration_message.write(PlayerRegistrationMessage {
+        player_id: available_config.id,
+        has_registered: is_now_registered,
+        is_anyone_registered: !registered_players.players.is_empty(),
+      });
+    }
+  }
 }
 
 /// Checks for collisions involving snake heads and marks players as dead if they collide.
