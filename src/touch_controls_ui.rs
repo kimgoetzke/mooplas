@@ -144,44 +144,56 @@ fn spawn_touch_controls_ui(
   }
 }
 
-fn controls_positioning_node(config: &AvailablePlayerConfig) -> Node {
+fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransform) {
   match config.id.0 {
-    0 | 1 => Node {
-      position_type: PositionType::Absolute,
-      bottom: Val::Px(10.0),
-      left: Val::Percent(33.0 + (config.id.0 as f32) * 33.0),
-      margin: UiRect::all(Val::Px(10.0)),
-      align_items: AlignItems::Center,
-      justify_content: JustifyContent::Center,
-      ..default()
-    },
-    2 => Node {
-      position_type: PositionType::Absolute,
-      top: Val::Percent(50.0),
-      right: Val::Px(10.0),
-      margin: UiRect::all(Val::Px(10.0)),
-      align_items: AlignItems::Center,
-      justify_content: JustifyContent::Center,
-      ..default()
-    },
-    3 => Node {
-      position_type: PositionType::Absolute,
-      top: Val::Px(10.0),
-      left: Val::Percent(50.0),
-      margin: UiRect::all(Val::Px(10.0)),
-      align_items: AlignItems::Center,
-      justify_content: JustifyContent::Center,
-      ..default()
-    },
-    4 => Node {
-      position_type: PositionType::Absolute,
-      top: Val::Percent(50.0),
-      left: Val::Px(10.0),
-      margin: UiRect::all(Val::Px(10.0)),
-      align_items: AlignItems::Center,
-      justify_content: JustifyContent::Center,
-      ..default()
-    },
+    0 | 1 => (
+      Node {
+        position_type: PositionType::Absolute,
+        bottom: Val::Px(10.0),
+        left: Val::Percent(33.0 + (config.id.0 as f32) * 33.0),
+        margin: UiRect::all(Val::Px(10.0)),
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        ..default()
+      },
+      UiTransform::default(),
+    ),
+    2 => (
+      Node {
+        position_type: PositionType::Absolute,
+        top: Val::Percent(50.0),
+        right: Val::Px(10.0),
+        margin: UiRect::all(Val::Px(10.0)),
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        ..default()
+      },
+      UiTransform::from_rotation(Rot2::degrees(90.0)),
+    ),
+    3 => (
+      Node {
+        position_type: PositionType::Absolute,
+        top: Val::Px(10.0),
+        left: Val::Percent(50.0),
+        margin: UiRect::all(Val::Px(10.0)),
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        ..default()
+      },
+      UiTransform::from_rotation(Rot2::degrees(180.0)),
+    ),
+    4 => (
+      Node {
+        position_type: PositionType::Absolute,
+        top: Val::Percent(50.0),
+        left: Val::Px(10.0),
+        margin: UiRect::all(Val::Px(10.0)),
+        align_items: AlignItems::Center,
+        justify_content: JustifyContent::Center,
+        ..default()
+      },
+      UiTransform::from_rotation(Rot2::degrees(270.0)),
+    ),
     _ => panic!("Unsupported player ID for touch controls UI: {}", config.id.0),
   }
 }
