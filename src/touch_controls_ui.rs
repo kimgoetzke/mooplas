@@ -5,6 +5,7 @@ use avian2d::math::Scalar;
 use bevy::color::palettes::tailwind;
 use bevy::input_focus::InputFocus;
 use bevy::prelude::*;
+use bevy::window::PrimaryWindow;
 
 pub struct TouchControlsUiPlugin;
 
@@ -13,7 +14,14 @@ impl Plugin for TouchControlsUiPlugin {
     app
       .add_systems(Startup, spawn_touch_controls_ui_system)
       .init_resource::<InputFocus>()
-      .add_systems(Update, (button_design_system, button_action_input_system))
+      .add_systems(
+        Update,
+        (
+          button_design_system,
+          button_action_input_system,
+          handle_touch_input_system,
+        ),
+      )
       .add_systems(Update, button_movement_input_system.run_if(in_state(AppState::Playing)))
       .add_systems(Update, handle_toggle_touch_controls_message);
   }
@@ -60,6 +68,13 @@ impl Into<InputAction> for &ButtonAction {
   }
 }
 
+/// Tracks which touch IDs are currently pressing which buttons
+#[derive(Resource, Default)]
+struct TouchState {
+  /// Map of touch ID to the entity being touched
+  active_touches: std::collections::HashMap<u64, Entity>,
+}
+
 /// A system that spawns the touch controls UI if enabled in settings. Intended to be called on startup.
 fn spawn_touch_controls_ui_system(
   mut commands: Commands,
@@ -70,6 +85,8 @@ fn spawn_touch_controls_ui_system(
   if !settings.general.enable_touch_controls {
     return;
   }
+
+  commands.init_resource::<TouchState>();
   spawn_touch_controls_ui(&mut commands, &available_configs, &asset_server);
 }
 
@@ -77,7 +94,6 @@ fn spawn_touch_controls_ui_system(
 // TODO: Design better buttons
 // TODO: Replace text with icons
 // TODO: Position buttons around the screen for more comfortable access
-// TODO: Make buttons respond to touch input
 /// Spawns the touch controls UI.
 fn spawn_touch_controls_ui(
   commands: &mut Commands,
@@ -236,11 +252,102 @@ fn handle_toggle_touch_controls_message(
 ) {
   for message in messages.drain() {
     if message.enabled {
+      commands.init_resource::<TouchState>();
       spawn_touch_controls_ui(&mut commands, &available_configs, &asset_server);
     } else {
       query.iter_mut().for_each(|e| {
         commands.entity(e).despawn();
       });
+      commands.remove_resource::<TouchState>();
+    }
+  }
+}
+
+/// New system to handle touch input and map it to button interactions
+fn handle_touch_input_system(
+  touches: Res<Touches>,
+  window_query: Query<&Window, With<PrimaryWindow>>,
+  mut touch_state: ResMut<TouchState>,
+  mut button_query: Query<
+    (
+      Entity,
+      &GlobalTransform,
+      &Node,
+      &mut Interaction,
+      &mut BorderColor,
+      &mut BackgroundColor,
+    ),
+    With<Button>,
+  >,
+  mut input_focus: ResMut<InputFocus>,
+) {
+  let Ok(window) = window_query.single() else {
+    return;
+  };
+
+  // Handle touch end events - release buttons
+  for touch in touches.iter_just_released() {
+    if let Some(entity) = touch_state.active_touches.remove(&touch.id()) {
+      if let Ok((_, _, _, mut interaction, mut border_colour, mut background_colour)) = button_query.get_mut(entity) {
+        *interaction = Interaction::None;
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
+        input_focus.clear();
+      }
+    }
+  }
+
+  // Handle active touches
+  for touch in touches.iter_just_pressed() {
+    let touch_position = touch.position();
+
+    // Convert touch position to world coordinates (UI uses screen coordinates)
+    let mut touch_over_button = false;
+
+    for (entity, global_transform, node, mut interaction, mut border_colour, mut background_colour) in &mut button_query
+    {
+      // Get the button's position and size
+      let button_pos = global_transform.translation().truncate();
+      let button_size = Vec2::new(
+        node.width.resolve(1., window.width(), Vec2::ZERO).unwrap_or(0.0),
+        node.height.resolve(1., window.height(), Vec2::ZERO).unwrap_or(0.0),
+      );
+
+      // Create a bounding box for the button (centered)
+      let half_size = button_size / 2.0;
+      let min = button_pos - half_size;
+      let max = button_pos + half_size;
+
+      // Check if touch is within button bounds
+      if touch_position.x >= min.x
+        && touch_position.x <= max.x
+        && touch_position.y >= min.y
+        && touch_position.y <= max.y
+      {
+        touch_over_button = true;
+
+        // If this is a new touch on this button, or continuing touch
+        if touch_state.active_touches.get(&touch.id()) == Some(&entity) {
+          touch_state.active_touches.insert(touch.id(), entity);
+          *interaction = Interaction::Pressed;
+          *border_colour = BorderColor::all(Color::from(tailwind::SLATE_100));
+          *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_PRESSED));
+          input_focus.set(entity);
+        }
+        break;
+      }
+    }
+
+    // If touch moved off button, release it
+    if !touch_over_button {
+      if let Some(entity) = touch_state.active_touches.remove(&touch.id()) {
+        if let Ok((_, _, _, mut interaction, mut border_colour, mut background_colour)) = button_query.get_mut(entity) {
+          *interaction = Interaction::None;
+          *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
+          *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
+          input_focus.clear();
+        }
+      }
     }
   }
 }
