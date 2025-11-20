@@ -1,5 +1,5 @@
 use crate::app_states::AppState;
-use crate::prelude::{AvailablePlayerConfigs, PlayerId, Settings, TouchControlsToggledMessage};
+use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, Settings, TouchControlsToggledMessage};
 use crate::shared::InputAction;
 use avian2d::math::Scalar;
 use bevy::color::palettes::tailwind;
@@ -105,11 +105,7 @@ fn spawn_touch_controls_ui(
       let button_style = button_with_style();
       parent.spawn((
         Name::new("Controls for Player ".to_string() + &config.id.to_string()),
-        Node {
-          flex_direction: FlexDirection::Row,
-          margin: UiRect::all(Val::Px(10.0)),
-          ..default()
-        },
+        controls_positioning_node(config),
         children![
           (
             // Left movement button
@@ -145,6 +141,48 @@ fn spawn_touch_controls_ui(
         ],
       ));
     });
+  }
+}
+
+fn controls_positioning_node(config: &AvailablePlayerConfig) -> Node {
+  match config.id.0 {
+    0 | 1 => Node {
+      position_type: PositionType::Absolute,
+      bottom: Val::Px(10.0),
+      left: Val::Percent(33.0 + (config.id.0 as f32) * 33.0),
+      margin: UiRect::all(Val::Px(10.0)),
+      align_items: AlignItems::Center,
+      justify_content: JustifyContent::Center,
+      ..default()
+    },
+    2 => Node {
+      position_type: PositionType::Absolute,
+      top: Val::Percent(50.0),
+      right: Val::Px(10.0),
+      margin: UiRect::all(Val::Px(10.0)),
+      align_items: AlignItems::Center,
+      justify_content: JustifyContent::Center,
+      ..default()
+    },
+    3 => Node {
+      position_type: PositionType::Absolute,
+      top: Val::Px(10.0),
+      left: Val::Percent(50.0),
+      margin: UiRect::all(Val::Px(10.0)),
+      align_items: AlignItems::Center,
+      justify_content: JustifyContent::Center,
+      ..default()
+    },
+    4 => Node {
+      position_type: PositionType::Absolute,
+      top: Val::Percent(50.0),
+      left: Val::Px(10.0),
+      margin: UiRect::all(Val::Px(10.0)),
+      align_items: AlignItems::Center,
+      justify_content: JustifyContent::Center,
+      ..default()
+    },
+    _ => panic!("Unsupported player ID for touch controls UI: {}", config.id.0),
   }
 }
 
