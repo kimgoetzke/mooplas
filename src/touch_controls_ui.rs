@@ -1,5 +1,4 @@
 use crate::app_states::AppState;
-use crate::prelude::constants::DEFAULT_FONT;
 use crate::prelude::{AvailablePlayerConfigs, PlayerId, Settings, TouchControlsToggledMessage};
 use crate::shared::InputAction;
 use avian2d::math::Scalar;
@@ -19,6 +18,9 @@ impl Plugin for TouchControlsUiPlugin {
       .add_systems(Update, handle_toggle_touch_controls_message);
   }
 }
+
+const BUTTON_ALPHA_DEFAULT: f32 = 0.3;
+const BUTTON_ALPHA_PRESSED: f32 = 0.8;
 
 #[derive(Component)]
 struct TouchControlsUi;
@@ -99,38 +101,48 @@ fn spawn_touch_controls_ui(
 
   for config in available_configs.configs.iter() {
     commands.entity(parent).with_children(|parent| {
-      // Left movement button
       let node = button_node();
       let button_style = button_with_style();
       parent.spawn((
-        node.clone(),
-        button_style.clone(),
-        ButtonMovement::new(config.id.into(), -1.0),
-        BorderRadius {
-          top_left: Val::Percent(50.0),
-          bottom_left: Val::Percent(50.0),
-          top_right: Val::Percent(20.0),
-          bottom_right: Val::Percent(20.0),
+        Name::new("Controls for Player ".to_string() + &config.id.to_string()),
+        Node {
+          flex_direction: FlexDirection::Row,
+          margin: UiRect::all(Val::Px(10.0)),
+          ..default()
         },
-      ));
-      // Player action button
-      parent.spawn((
-        node.clone(),
-        button_with_custom_style(config.colour),
-        ButtonAction::new(config.id.into()),
-        BorderRadius::all(Val::Percent(20.0)),
-      ));
-      // Right movement button
-      parent.spawn((
-        node.clone(),
-        button_style.clone(),
-        ButtonMovement::new(config.id.into(), 1.0),
-        BorderRadius {
-          top_left: Val::Percent(20.0),
-          bottom_left: Val::Percent(20.0),
-          top_right: Val::Percent(50.0),
-          bottom_right: Val::Percent(50.0),
-        },
+        children![
+          (
+            // Left movement button
+            node.clone(),
+            button_style.clone(),
+            ButtonMovement::new(config.id.into(), -1.0),
+            BorderRadius {
+              top_left: Val::Percent(50.0),
+              bottom_left: Val::Percent(50.0),
+              top_right: Val::Percent(20.0),
+              bottom_right: Val::Percent(20.0),
+            },
+          ),
+          (
+            // Player action button
+            node.clone(),
+            button_with_custom_style(config.colour),
+            ButtonAction::new(config.id.into()),
+            BorderRadius::all(Val::Percent(20.0)),
+          ),
+          (
+            // Right movement button
+            node.clone(),
+            button_style.clone(),
+            ButtonMovement::new(config.id.into(), 1.0),
+            BorderRadius {
+              top_left: Val::Percent(20.0),
+              bottom_left: Val::Percent(20.0),
+              top_right: Val::Percent(50.0),
+              bottom_right: Val::Percent(50.0),
+            },
+          )
+        ],
       ));
     });
   }
@@ -151,16 +163,16 @@ fn button_node() -> Node {
 fn button_with_style() -> (Button, BackgroundColor, BorderColor) {
   (
     Button,
-    BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(0.5)),
-    BorderColor::all(Color::from(tailwind::SLATE_100)),
+    BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT)),
+    BorderColor::all(Color::from(tailwind::SLATE_500).with_alpha(0.2)),
   )
 }
 
 fn button_with_custom_style(colour: Color) -> (Button, BackgroundColor, BorderColor) {
   (
     Button,
-    BackgroundColor(Color::from(colour).with_alpha(0.5)),
-    BorderColor::all(Color::from(tailwind::SLATE_100).with_alpha(0.5)),
+    BackgroundColor(Color::from(colour).with_alpha(BUTTON_ALPHA_DEFAULT)),
+    BorderColor::all(Color::from(tailwind::SLATE_500).with_alpha(0.2)),
   )
 }
 
@@ -185,23 +197,35 @@ fn handle_toggle_touch_controls_message(
 
 fn button_design_system(
   mut input_focus: ResMut<InputFocus>,
-  mut interaction_query: Query<(Entity, &Interaction, &mut BorderColor, &mut Button), Changed<Interaction>>,
+  mut interaction_query: Query<
+    (
+      Entity,
+      &Interaction,
+      &mut BorderColor,
+      &mut BackgroundColor,
+      &mut Button,
+    ),
+    Changed<Interaction>,
+  >,
 ) {
-  for (entity, interaction, mut border_color, mut button) in &mut interaction_query {
+  for (entity, interaction, mut border_colour, mut background_colour, mut button) in &mut interaction_query {
     match *interaction {
       Interaction::Pressed => {
         input_focus.set(entity);
-        *border_color = BorderColor::all(Color::from(tailwind::RED_300));
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_100));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_PRESSED));
         button.set_changed();
       }
       Interaction::Hovered => {
         input_focus.set(entity);
-        *border_color = BorderColor::all(Color::from(tailwind::BLUE_300));
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_300));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
         button.set_changed();
       }
       Interaction::None => {
         input_focus.clear();
-        *border_color = BorderColor::all(Color::from(tailwind::SLATE_100));
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
       }
     }
   }
