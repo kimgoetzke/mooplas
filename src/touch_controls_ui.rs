@@ -76,14 +76,13 @@ fn spawn_touch_controls_ui_system(
 // TODO: Replace text with icons
 // TODO: Position buttons around the screen for more comfortable access
 // TODO: Make buttons respond to touch input
-// TODO: Ensure input action can be used to register player (decouple from keyboard input)
 /// Spawns the touch controls UI.
 fn spawn_touch_controls_ui(
   commands: &mut Commands,
   available_configs: &AvailablePlayerConfigs,
-  asset_server: &Res<AssetServer>,
+  _asset_server: &Res<AssetServer>,
 ) {
-  let default_font = asset_server.load(DEFAULT_FONT);
+  // let default_font = asset_server.load(DEFAULT_FONT);
   let parent = commands
     .spawn((
       TouchControlsUi,
@@ -100,57 +99,38 @@ fn spawn_touch_controls_ui(
 
   for config in available_configs.configs.iter() {
     commands.entity(parent).with_children(|parent| {
+      // Left movement button
       let node = button_node();
+      let button_style = button_with_style();
       parent.spawn((
-        Button,
         node.clone(),
+        button_style.clone(),
         ButtonMovement::new(config.id.into(), -1.0),
-        BackgroundColor(Color::from(tailwind::SLATE_600)),
-        BorderColor::all(Color::from(tailwind::SLATE_100)),
-        BorderRadius::MAX,
-        children![(
-          Text::new("<"),
-          TextFont {
-            font: default_font.clone(),
-            font_size: 33.0,
-            ..default()
-          },
-          TextColor(Color::srgb(0.9, 0.9, 0.9)),
-        )],
+        BorderRadius {
+          top_left: Val::Percent(50.0),
+          bottom_left: Val::Percent(50.0),
+          top_right: Val::Percent(20.0),
+          bottom_right: Val::Percent(20.0),
+        },
       ));
+      // Player action button
       parent.spawn((
-        Button,
         node.clone(),
+        button_with_custom_style(config.colour),
         ButtonAction::new(config.id.into()),
-        BackgroundColor(Color::from(tailwind::SLATE_600)),
-        BorderColor::all(Color::from(tailwind::SLATE_100)),
-        BorderRadius::MAX,
-        children![(
-          Text::new("  "),
-          TextFont {
-            font: default_font.clone(),
-            font_size: 33.0,
-            ..default()
-          },
-          TextColor(Color::srgb(0.9, 0.9, 0.9)),
-        )],
+        BorderRadius::all(Val::Percent(20.0)),
       ));
+      // Right movement button
       parent.spawn((
-        Button,
         node.clone(),
+        button_style.clone(),
         ButtonMovement::new(config.id.into(), 1.0),
-        BackgroundColor(Color::from(tailwind::SLATE_600)),
-        BorderColor::all(Color::from(tailwind::SLATE_100)),
-        BorderRadius::MAX,
-        children![(
-          Text::new(">"),
-          TextFont {
-            font: default_font.clone(),
-            font_size: 33.0,
-            ..default()
-          },
-          TextColor(Color::srgb(0.9, 0.9, 0.9)),
-        )],
+        BorderRadius {
+          top_left: Val::Percent(20.0),
+          bottom_left: Val::Percent(20.0),
+          top_right: Val::Percent(50.0),
+          bottom_right: Val::Percent(50.0),
+        },
       ));
     });
   }
@@ -160,12 +140,28 @@ fn button_node() -> Node {
   Node {
     width: px(40),
     height: px(40),
-    border: UiRect::all(px(5)),
+    border: UiRect::all(px(2)),
     justify_content: JustifyContent::Center,
     align_items: AlignItems::Center,
     margin: UiRect::all(px(10)),
     ..default()
   }
+}
+
+fn button_with_style() -> (Button, BackgroundColor, BorderColor) {
+  (
+    Button,
+    BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(0.5)),
+    BorderColor::all(Color::from(tailwind::SLATE_100)),
+  )
+}
+
+fn button_with_custom_style(colour: Color) -> (Button, BackgroundColor, BorderColor) {
+  (
+    Button,
+    BackgroundColor(Color::from(colour).with_alpha(0.5)),
+    BorderColor::all(Color::from(tailwind::SLATE_100).with_alpha(0.5)),
+  )
 }
 
 /// A system that handles toggling the touch controls UI via messages.
