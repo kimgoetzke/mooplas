@@ -23,6 +23,7 @@ impl Plugin for TouchControlsUiPlugin {
           button_action_input_system,
           handle_touch_input_system,
           debug_touch_input_system,
+          debug_button_hit_gizmos_system,
         ),
       )
       .add_systems(Update, button_movement_input_system.run_if(in_state(AppState::Playing)))
@@ -36,7 +37,6 @@ const BUTTON_WIDTH: f32 = 60.0;
 const BUTTON_HEIGHT: f32 = 50.0;
 const BUTTON_MARGIN: f32 = 15.0;
 const BUTTON_BORDER_WIDTH: f32 = 2.0;
-const BUTTON_TOTAL_WIDTH: f32 = BUTTON_WIDTH + ((BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.0);
 
 #[derive(Component)]
 struct TouchControlsUi;
@@ -188,7 +188,7 @@ fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransfo
         ..default()
       },
       UiTransform {
-        translation: Val2::new(Val::Px(-half_control_node_width()), Val::Auto),
+        translation: Val2::new(Val::Px(horizontal_offset()), Val::Auto),
         ..default()
       },
     ),
@@ -202,7 +202,11 @@ fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransfo
         justify_content: JustifyContent::Center,
         ..default()
       },
-      UiTransform::from_rotation(Rot2::degrees(90.0)),
+      UiTransform {
+        translation: Val2::new(Val::Px(BUTTON_HEIGHT), Val::Px(vertical_offset())),
+        rotation: Rot2::degrees(90.0),
+        ..default()
+      },
     ),
     3 => (
       Node {
@@ -215,7 +219,7 @@ fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransfo
         ..default()
       },
       UiTransform {
-        translation: Val2::new(Val::Px(-half_control_node_width()), Val::Auto),
+        translation: Val2::new(Val::Px(horizontal_offset()), Val::Auto),
         rotation: Rot2::degrees(180.),
         ..default()
       },
@@ -230,14 +234,22 @@ fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransfo
         justify_content: JustifyContent::Center,
         ..default()
       },
-      UiTransform::from_rotation(Rot2::degrees(270.0)),
+      UiTransform {
+        translation: Val2::new(Val::Px(-BUTTON_HEIGHT), Val::Px(vertical_offset())),
+        rotation: Rot2::degrees(270.0),
+        ..default()
+      },
     ),
     _ => panic!("Unsupported player ID for touch controls UI: {}", config.id.0),
   }
 }
 
-fn half_control_node_width() -> f32 {
-  ((BUTTON_TOTAL_WIDTH * 3.) / 2.) + 4.
+fn horizontal_offset() -> f32 {
+  -((((BUTTON_WIDTH + ((BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.0)) * 3.) / 2.) + 4.)
+}
+
+fn vertical_offset() -> f32 {
+  -((BUTTON_HEIGHT / 3.) + (BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.)
 }
 
 fn button_node() -> Node {
@@ -335,6 +347,108 @@ fn debug_touch_input_system(
   }
 }
 
+fn debug_button_hit_gizmos_system(
+  touches: Res<Touches>,
+  mut gizmos: Gizmos,
+  window_query: Query<&Window, With<PrimaryWindow>>,
+  button_query: Query<(&UiGlobalTransform, &TouchButton), With<TouchButton>>,
+) {
+  let Ok(window) = window_query.single() else { return };
+
+  // logical canvas size (same as your game world / UI)
+  let canvas_w = RESOLUTION_WIDTH as f32;
+  let canvas_h = RESOLUTION_HEIGHT as f32;
+
+  // compute integer scale and letterbox offsets (same as your other systems)
+  let h_scale = window.width() / canvas_w;
+  let v_scale = window.height() / canvas_h;
+  let scale = h_scale.min(v_scale).round().max(1.0);
+  let rendered_w = canvas_w * scale;
+  let rendered_h = canvas_h * scale;
+  let offset_x = (window.width() - rendered_w) * 0.5;
+  let offset_y = (window.height() - rendered_h) * 0.5;
+
+  // helpers
+  let to_canvas = |p: Vec2| -> Option<Vec2> {
+    let cx = (p.x - offset_x) / scale;
+    let cy = (p.y - offset_y) / scale;
+    if cx < 0.0 || cx > canvas_w || cy < 0.0 || cy > canvas_h {
+      None
+    } else {
+      Some(Vec2::new(cx, cy))
+    }
+  };
+
+  let canvas_to_world = |c: Vec2| -> Vec2 {
+    // shift origin to canvas center and flip Y to match your world coord convention
+    Vec2::new(c.x - canvas_w * 0.5, (canvas_h * 0.5) - c.y)
+  };
+
+  // Draw each button's assumed area (center + corner markers)
+  for (ui_global, touch_button) in &button_query {
+    let button_center_canvas = ui_global.translation; // Vec2 in canvas space (top-left origin)
+    let half_size = touch_button.size * 0.5;
+    let min = button_center_canvas - half_size;
+    let max = button_center_canvas + half_size;
+
+    // center gizmo
+    let center_world = canvas_to_world(button_center_canvas);
+    gizmos.circle_2d(center_world, 18.0, Color::srgba(0.2, 0.6, 1.0, 0.35)); // bluish semi-transparent
+
+    // corner gizmos (smaller)
+    let min_world = canvas_to_world(min);
+    let max_world = canvas_to_world(max);
+    gizmos.circle_2d(min_world, 6.0, Color::srgba(0.2, 0.6, 1.0, 0.25));
+    gizmos.circle_2d(
+      Vec2::new(min_world.x, max_world.y),
+      6.0,
+      Color::srgba(0.2, 0.6, 1.0, 0.25),
+    );
+    gizmos.circle_2d(
+      Vec2::new(max_world.x, min_world.y),
+      6.0,
+      Color::srgba(0.2, 0.6, 1.0, 0.25),
+    );
+    gizmos.circle_2d(max_world, 6.0, Color::srgba(0.2, 0.6, 1.0, 0.25));
+  }
+
+  // For each touch, compute canvas pos and test against button rects — draw touch gizmo green if hit, red if not.
+  for touch in touches.iter() {
+    if let Some(canvas_pos) = to_canvas(touch.position()) {
+      let mut hit = false;
+
+      // test against buttons using same logic as your input system
+      for (ui_global, touch_button) in &button_query {
+        let button_pos = ui_global.translation;
+        let half_size = touch_button.size * 0.5;
+        let min = button_pos - half_size;
+        let max = button_pos + half_size;
+
+        if canvas_pos.x >= min.x && canvas_pos.x <= max.x && canvas_pos.y >= min.y && canvas_pos.y <= max.y {
+          hit = true;
+          break;
+        }
+      }
+
+      let touch_world = canvas_to_world(canvas_pos);
+      if hit {
+        gizmos.circle_2d(touch_world, 14.0, Color::srgba(0.0, 1.0, 0.0, 0.45)); // green
+      } else {
+        gizmos.circle_2d(touch_world, 14.0, Color::srgba(1.0, 0.0, 0.0, 0.45)); // red
+      }
+    } else {
+      // touch outside canvas — show faint off-canvas marker near where it maps in window (optional)
+      // convert window pos to canvas-space clamped inside canvas bounds for visualization
+      let raw = touch.position();
+      let clamped_x = (raw.x - offset_x) / scale;
+      let clamped_y = (raw.y - offset_y) / scale;
+      let clamped = Vec2::new(clamped_x.clamp(0.0, canvas_w), clamped_y.clamp(0.0, canvas_h));
+      let world = canvas_to_world(clamped);
+      gizmos.circle_2d(world, 10.0, Color::srgba(1.0, 0.65, 0.0, 0.25)); // orange for out-of-canvas
+    }
+  }
+}
+
 /// Handles touch input and map it to button interactions.
 fn handle_touch_input_system(
   touches: Res<Touches>,
@@ -354,13 +468,42 @@ fn handle_touch_input_system(
   >,
   mut input_focus: ResMut<InputFocus>,
   mut input_action_writer: MessageWriter<InputAction>,
+  window_query: Query<&Window, With<PrimaryWindow>>,
 ) {
-  // --- released touches: reset visuals ---
+  let Ok(window) = window_query.single() else { return };
+
+  // \* same logical canvas space as the game world and UI
+  let canvas_w = RESOLUTION_WIDTH as f32;
+  let canvas_h = RESOLUTION_HEIGHT as f32;
+
+  // \* scale and letterboxing used by `fit_canvas_system`
+  let h_scale = window.width() / canvas_w;
+  let v_scale = window.height() / canvas_h;
+  let scale = h_scale.min(v_scale).round().max(1.0);
+  let rendered_w = canvas_w * scale;
+  let rendered_h = canvas_h * scale;
+  let offset_x = (window.width() - rendered_w) * 0.5;
+  let offset_y = (window.height() - rendered_h) * 0.5;
+
+  // helper: window touch \-\> canvas space (origin top\-left, *not* centered)
+  let to_canvas = |p: Vec2| -> Option<Vec2> {
+    let cx = (p.x - offset_x) / scale;
+    let cy = (p.y - offset_y) / scale;
+    if cx < 0.0 || cx > canvas_w || cy < 0.0 || cy > canvas_h {
+      None
+    } else {
+      Some(Vec2::new(cx, cy))
+    }
+  };
+
+  // released touches
   handle_released_touches(&touches, &mut touch_state, &mut button_query, &mut input_focus);
 
-  // --- new presses: UI-space hit test, fire actions ---
+  // new presses
   for touch in touches.iter_just_pressed() {
-    let screen_pos = touch.position(); // window/UI space, origin top-left
+    let Some(canvas_pos) = to_canvas(touch.position()) else {
+      continue;
+    };
     let mut pressed_entity: Option<Entity> = None;
 
     for (
@@ -374,25 +517,19 @@ fn handle_touch_input_system(
       maybe_action,
     ) in &mut button_query
     {
-      // `UiGlobalTransform.translation` is also in screen/UI pixels (top-left origin)
+      // UiGlobalTransform is in the same canvas space (origin top\-left)
       let button_pos = ui_transform.translation;
-
       let half_size = touch_button.size * 0.5;
       let min = button_pos - half_size;
       let max = button_pos + half_size;
 
-      debug!(
-        "Testing [{:?}] against button [{:?}]: min={:?} max={:?}",
-        screen_pos, entity, min, max
-      );
+      // debug!(
+      //   "Testing canvas_pos={:?} against button {:?}: min={:?} max={:?}",
+      //   canvas_pos, entity, min, max
+      // );
 
-      if screen_pos.x >= min.x
-        && screen_pos.x <= max.x
-        && screen_pos.y >= min.y
-        && screen_pos.y <= max.y
-      {
+      if canvas_pos.x >= min.x && canvas_pos.x <= max.x && canvas_pos.y >= min.y && canvas_pos.y <= max.y {
         pressed_entity = Some(entity);
-
         *border_colour = BorderColor::all(Color::from(tailwind::SLATE_100));
         background_colour.0.set_alpha(BUTTON_ALPHA_PRESSED);
         input_focus.set(entity);
@@ -413,31 +550,33 @@ fn handle_touch_input_system(
     }
   }
 
-  // --- held touches: keep / clear pressed visuals ---
+  // held touches
   for touch in touches.iter() {
-    let screen_pos = touch.position();
+    let Some(canvas_position) = to_canvas(touch.position()) else {
+      continue;
+    };
 
     if let Some(&entity) = touch_state.active_touches.get(&touch.id()) {
       if let Ok((
-                  _,
-                  ui_transform,
-                  touch_button,
-                  mut border_colour,
-                  mut background_colour,
-                  _player_id,
-                  _maybe_move,
-                  _maybe_action,
-                )) = button_query.get_mut(entity)
+        _,
+        ui_transform,
+        touch_button,
+        mut border_colour,
+        mut background_colour,
+        _player_id,
+        _maybe_move,
+        _maybe_action,
+      )) = button_query.get_mut(entity)
       {
         let button_pos = ui_transform.translation;
         let half_size = touch_button.size * 0.5;
         let min = button_pos - half_size;
         let max = button_pos + half_size;
 
-        if screen_pos.x < min.x
-          || screen_pos.x > max.x
-          || screen_pos.y < min.y
-          || screen_pos.y > max.y
+        if canvas_position.x < min.x
+          || canvas_position.x > max.x
+          || canvas_position.y < min.y
+          || canvas_position.y > max.y
         {
           *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
           background_colour.0.set_alpha(BUTTON_ALPHA_DEFAULT);
@@ -451,7 +590,6 @@ fn handle_touch_input_system(
     }
   }
 }
-
 
 fn handle_released_touches(
   touches: &Res<Touches>,
