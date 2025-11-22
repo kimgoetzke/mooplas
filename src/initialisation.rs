@@ -114,7 +114,6 @@ fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: Re
   }
 }
 
-// TODO: Ensure spawn points are not to close to each other
 /// A system that provides random but safe spawn points for players.
 fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,
@@ -123,12 +122,31 @@ fn generate_valid_spawn_points_system(
   run_initialisation_step(&mut tracker, InitialisationStep::GenerateSpawnPoints, || {
     spawn_points.data.clear();
     let mut rng = rand::rng();
-    for i in 0..10 {
+    let mut valid_spawn_points: Vec<(f32, f32, f32)> = Vec::new();
+    while valid_spawn_points.len() < 10 {
       let (x, y) = random_start_position(&mut rng);
       let rotation = rng.random_range(0.0..=360.);
-      spawn_points.data.push((x, y, rotation));
-      trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
+      if valid_spawn_points.iter().any(|(other_x, other_y, _)| {
+        let dx = other_x - x;
+        let dy = other_y - y;
+        let distance_squared = dx * dx + dy * dy;
+        distance_squared < (EDGE_MARGIN * EDGE_MARGIN)
+      }) {
+        trace!(
+          "Rejected spawn point at ({}, {}) due to proximity to existing spawn points",
+          x, y
+        );
+        continue;
+      }
+      valid_spawn_points.push((x, y, rotation));
+      trace!(
+        "Generated spawn point [{}] at position: ({}, {})",
+        valid_spawn_points.len(),
+        x,
+        y
+      );
     }
+    spawn_points.data = valid_spawn_points;
   });
 }
 
