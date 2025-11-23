@@ -18,6 +18,7 @@ use bevy::prelude::{
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
+use bevy::ui::BackgroundColor;
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;
@@ -107,10 +108,12 @@ fn spawn_lobby_ui(
         LobbyUiEntry {
           player_id: available_config.id,
         },
+        BackgroundColor::from(Color::BLACK.with_alpha(0.5)),
         Node {
           flex_direction: FlexDirection::Row,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
+          width: Val::Percent(100.),
           ..default()
         },
         children![
