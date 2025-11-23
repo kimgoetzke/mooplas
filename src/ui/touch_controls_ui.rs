@@ -1,9 +1,9 @@
 use crate::app_states::AppState;
+use crate::prelude::constants::*;
 use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, Settings, TouchControlsToggledMessage};
 use crate::shared::InputAction;
 use avian2d::math::Scalar;
 use bevy::color::palettes::tailwind;
-use bevy::input_focus::InputFocus;
 use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use std::fmt::Debug;
@@ -13,11 +13,8 @@ pub struct TouchControlsUiPlugin;
 impl Plugin for TouchControlsUiPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins(MeshPickingPlugin)
-      .init_resource::<InputFocus>()
       .init_resource::<ActiveMovementTracker>()
       .add_systems(Startup, spawn_touch_controls_ui_system)
-      .add_systems(Update, button_design_system)
       .add_systems(
         Update,
         player_movement_input_action_emitter_system.run_if(in_state(AppState::Playing)),
@@ -26,15 +23,8 @@ impl Plugin for TouchControlsUiPlugin {
   }
 }
 
-const BUTTON_ALPHA_DEFAULT: f32 = 0.3;
-const BUTTON_ALPHA_PRESSED: f32 = 0.8;
-const BUTTON_WIDTH: f32 = 60.0;
-const BUTTON_HEIGHT: f32 = 50.0;
-const BUTTON_MARGIN: f32 = 15.0;
-const BUTTON_BORDER_WIDTH: f32 = 2.0;
-
 #[derive(Component)]
-struct TouchControlsUi;
+struct TouchControlsUiRoot;
 
 #[derive(Component, Clone)]
 struct TouchButton;
@@ -101,10 +91,9 @@ fn spawn_touch_controls_ui(
   available_configs: &AvailablePlayerConfigs,
   _asset_server: &Res<AssetServer>,
 ) {
-  // let default_font = asset_server.load(DEFAULT_FONT);
   let parent = commands
     .spawn((
-      TouchControlsUi,
+      TouchControlsUiRoot,
       Node {
         width: percent(100),
         height: percent(100),
@@ -123,7 +112,7 @@ fn spawn_touch_controls_ui(
       parent
         .spawn((
           Name::new("Controls for Player ".to_string() + &config.id.to_string()),
-          controls_positioning_node(config),
+          controller_positioning_node(config),
         ))
         .with_children(|parent| {
           parent
@@ -133,10 +122,10 @@ fn spawn_touch_controls_ui(
               button.clone(),
               ButtonMovement::new(config.id.into(), -1.0),
               BorderRadius {
-                top_left: Val::Percent(50.0),
-                bottom_left: Val::Percent(50.0),
-                top_right: Val::Percent(20.0),
-                bottom_right: Val::Percent(20.0),
+                top_left: percent(50),
+                bottom_left: percent(50),
+                top_right: percent(20),
+                bottom_right: percent(20),
               },
               config.id,
             ))
@@ -151,7 +140,7 @@ fn spawn_touch_controls_ui(
               node.clone(),
               button_with_custom_style(config.colour),
               ButtonAction::new(config.id.into()),
-              BorderRadius::all(Val::Percent(20.0)),
+              BorderRadius::all(percent(20)),
               config.id,
             ))
             .observe(click_player_action);
@@ -163,10 +152,10 @@ fn spawn_touch_controls_ui(
               button.clone(),
               ButtonMovement::new(config.id.into(), 1.0),
               BorderRadius {
-                top_left: Val::Percent(20.0),
-                bottom_left: Val::Percent(20.0),
-                top_right: Val::Percent(50.0),
-                bottom_right: Val::Percent(50.0),
+                top_left: percent(20),
+                bottom_left: percent(20),
+                top_right: percent(50),
+                bottom_right: percent(50),
               },
               config.id,
             ))
@@ -265,35 +254,39 @@ fn player_movement_input_action_emitter_system(
   }
 }
 
-fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransform) {
+/// The node that positions the touch controls for a given player on screen based on their player ID.
+fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransform) {
+  const HORIZONTAL_OFFSET: f32 = -((((BUTTON_WIDTH + ((BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.0)) * 3.) / 2.) + 4.);
+  const VERTICAL_OFFSET: f32 = -((BUTTON_HEIGHT / 3.) + (BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.);
+
   match config.id.0 {
     0 | 1 => (
       Node {
         position_type: PositionType::Absolute,
-        bottom: Val::Px(10.0),
-        left: Val::Percent(33.0 + (config.id.0 as f32) * 33.0),
-        margin: UiRect::all(Val::Px(10.0)),
+        bottom: px(10),
+        left: percent(33 + config.id.0 * 33),
+        margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
       },
       UiTransform {
-        translation: Val2::new(Val::Px(horizontal_offset()), Val::Auto),
+        translation: Val2::new(px(HORIZONTAL_OFFSET), Val::Auto),
         ..default()
       },
     ),
     2 => (
       Node {
         position_type: PositionType::Absolute,
-        top: Val::Percent(50.0),
+        top: percent(50),
         right: Val::ZERO,
-        margin: UiRect::all(Val::Px(10.0)),
+        margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
       },
       UiTransform {
-        translation: Val2::new(Val::Px(BUTTON_HEIGHT), Val::Px(vertical_offset())),
+        translation: Val2::new(px(BUTTON_HEIGHT), px(VERTICAL_OFFSET)),
         rotation: Rot2::degrees(90.0),
         ..default()
       },
@@ -301,15 +294,15 @@ fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransfo
     3 => (
       Node {
         position_type: PositionType::Absolute,
-        top: Val::Px(10.),
-        left: Val::Percent(50.),
-        margin: UiRect::all(Val::Px(10.)),
+        top: px(10),
+        left: percent(50),
+        margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
       },
       UiTransform {
-        translation: Val2::new(Val::Px(horizontal_offset()), Val::Auto),
+        translation: Val2::new(px(HORIZONTAL_OFFSET), Val::Auto),
         rotation: Rot2::degrees(180.),
         ..default()
       },
@@ -317,29 +310,21 @@ fn controls_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransfo
     4 => (
       Node {
         position_type: PositionType::Absolute,
-        top: Val::Percent(50.0),
+        top: percent(50),
         left: Val::ZERO,
-        margin: UiRect::all(Val::Px(10.0)),
+        margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
       },
       UiTransform {
-        translation: Val2::new(Val::Px(-BUTTON_HEIGHT), Val::Px(vertical_offset())),
+        translation: Val2::new(px(-BUTTON_HEIGHT), px(VERTICAL_OFFSET)),
         rotation: Rot2::degrees(270.0),
         ..default()
       },
     ),
     _ => panic!("Unsupported player ID for touch controls UI: {}", config.id.0),
   }
-}
-
-fn horizontal_offset() -> f32 {
-  -((((BUTTON_WIDTH + ((BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.0)) * 3.) / 2.) + 4.)
-}
-
-fn vertical_offset() -> f32 {
-  -((BUTTON_HEIGHT / 3.) + (BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.)
 }
 
 fn button_node() -> Node {
@@ -375,7 +360,7 @@ fn handle_toggle_touch_controls_message(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
   mut messages: MessageReader<TouchControlsToggledMessage>,
-  mut touch_controls_ui_query: Query<Entity, With<TouchControlsUi>>,
+  mut touch_controls_ui_query: Query<Entity, With<TouchControlsUiRoot>>,
   available_configs: Res<AvailablePlayerConfigs>,
 ) {
   for message in messages.read() {
@@ -385,43 +370,6 @@ fn handle_toggle_touch_controls_message(
       touch_controls_ui_query
         .iter_mut()
         .for_each(|e| commands.entity(e).despawn());
-    }
-  }
-}
-
-// TODO: Absorb into observers above
-fn button_design_system(
-  mut input_focus: ResMut<InputFocus>,
-  mut interaction_query: Query<
-    (
-      Entity,
-      &Interaction,
-      &mut BorderColor,
-      &mut BackgroundColor,
-      &mut TouchButton,
-    ),
-    Changed<Interaction>,
-  >,
-) {
-  for (entity, interaction, mut border_colour, mut background_colour, mut button) in &mut interaction_query {
-    match *interaction {
-      Interaction::Pressed => {
-        input_focus.set(entity);
-        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_100));
-        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_PRESSED));
-        button.set_changed();
-      }
-      Interaction::Hovered => {
-        input_focus.set(entity);
-        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_300));
-        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
-        button.set_changed();
-      }
-      Interaction::None => {
-        input_focus.clear();
-        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
-        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
-      }
     }
   }
 }

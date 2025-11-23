@@ -70,3 +70,13 @@ pub(crate) const SNAKE_HEAD_SIZE: f32 = 3.5;
 /// This creates a "safe" buffer directly behind the head so that the head does not immediately collide with its own
 /// tail.
 pub(crate) const TAIL_COLLIDER_SKIP_RECENT: usize = 2;
+
+// UI and touch controls
+// --------------------------------//
+
+pub(crate) const BUTTON_ALPHA_DEFAULT: f32 = 0.3;
+pub(crate) const BUTTON_ALPHA_PRESSED: f32 = 0.8;
+pub(crate) const BUTTON_WIDTH: f32 = 60.0;
+pub(crate) const BUTTON_HEIGHT: f32 = 50.0;
+pub(crate) const BUTTON_MARGIN: f32 = 15.0;
+pub(crate) const BUTTON_BORDER_WIDTH: f32 = 2.0;

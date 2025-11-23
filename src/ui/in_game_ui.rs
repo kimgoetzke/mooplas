@@ -11,14 +11,17 @@ use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::children;
 use bevy::ecs::spawn::SpawnRelatedBundle;
+use bevy::input_focus::InputFocus;
+use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, Alpha, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify,
-  JustifyContent, LineBreak, MessageReader, Node, OnEnter, OnExit, Query, Res, Text, TextBackgroundColor, TextColor,
-  TextFont, TextLayout, TextShadow, Val, With, default, in_state,
+  AlignItems, Alpha, Bundle, Button, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
+  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, Node, OnEnter, OnExit, Query,
+  Res, ResMut, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, ZIndex, default,
+  in_state, px,
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
-use bevy::ui::BackgroundColor;
+use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, Interaction, PositionType, UiRect};
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;
@@ -26,12 +29,14 @@ pub struct InGameUiPlugin;
 impl Plugin for InGameUiPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
     app
+      .init_resource::<InputFocus>()
       .add_systems(OnEnter(AppState::Registering), spawn_lobby_ui_system)
       .add_systems(
         Update,
         (
           handle_player_registration_message,
           handle_touch_controls_toggled_message,
+          toggle_touch_controls_button_system,
         )
           .run_if(in_state(AppState::Registering)),
       )
@@ -94,6 +99,22 @@ fn spawn_lobby_ui(
         ..default()
       },
     ))
+    .with_children(|parent| {
+      parent.spawn((
+        Node {
+          width: px(200),
+          height: px(100),
+          position_type: PositionType::Absolute,
+          align_items: AlignItems::Center,
+          justify_content: JustifyContent::Center,
+          top: Val::ZERO,
+          right: Val::ZERO,
+          ..default()
+        },
+        ZIndex(1000),
+        children![button(asset_server)],
+      ));
+    })
     .id();
 
   for available_config in &available_configs.configs {
@@ -172,6 +193,50 @@ fn spawn_lobby_ui(
     ))
     .id();
   commands.entity(root).add_child(cta);
+}
+
+fn toggle_touch_controls_button_system(
+  mut query: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
+  mut touch_controls_toggled_message: MessageWriter<TouchControlsToggledMessage>,
+  mut settings: ResMut<Settings>,
+) {
+  for interaction in &mut query {
+    if *interaction == Interaction::Pressed {
+      settings.general.enable_touch_controls = !settings.general.enable_touch_controls;
+      touch_controls_toggled_message.write(TouchControlsToggledMessage::new(settings.general.enable_touch_controls));
+      info!(
+        "[Button] Set touch controls to [{:?}]",
+        settings.general.enable_touch_controls
+      );
+    }
+  }
+}
+
+fn button(asset_server: &AssetServer) -> impl Bundle {
+  (
+    Button,
+    Node {
+      width: px(150),
+      height: px(65),
+      border: UiRect::all(px(3)),
+      justify_content: JustifyContent::Center, // Horizontally center child text
+      align_items: AlignItems::Center,         // Vertically center child text
+      ..default()
+    },
+    BorderColor::all(Color::WHITE),
+    BorderRadius::all(px(5)),
+    BackgroundColor(Color::from(tailwind::SLATE_500)),
+    children![(
+      Text::new("Touch controls"),
+      TextFont {
+        font: asset_server.load(DEFAULT_FONT),
+        font_size: 20.0,
+        ..default()
+      },
+      TextColor(Color::srgb(0.9, 0.9, 0.9)),
+      TextShadow::default(),
+    )],
+  )
 }
 
 /// A system that handles player registration messages and updates the lobby UI based on the player's registration
