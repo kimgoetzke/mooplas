@@ -16,8 +16,8 @@ use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, Bundle, Button, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
   IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, Node, OnEnter, OnExit, Query,
-  Res, ResMut, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, ZIndex, default,
-  in_state, px,
+  Res, ResMut, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, Visibility, With, ZIndex,
+  default, in_state, px,
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
@@ -175,6 +175,7 @@ fn spawn_lobby_ui(
   }
 
   // Call to action
+  let has_any_registered = registered_players.players.len() > 0;
   let cta = commands
     .spawn((
       LobbyUiCta,
@@ -184,34 +185,46 @@ fn spawn_lobby_ui(
         align_items: AlignItems::Center,
         ..default()
       },
-      children![
-        (
-          // Part 1 - Always white
+    ))
+    .with_children(|parent| {
+      if !has_any_registered {
+        parent.spawn((
           Text::new("More players needed to start..."),
           default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
           TextColor(Color::WHITE),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           default_shadow,
-        ),
-        (
-          // Part 2 - Always yellow and initially empty
-          Text::new(""),
-          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::from(tailwind::YELLOW_400)),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ),
-        (
-          // Part 3 - Always white and initially empty
-          Text::new(""),
+        ));
+      } else {
+        parent.spawn((
+          Text::new("Press "),
           default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
           TextColor(Color::WHITE),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           default_shadow,
-        )
-      ],
-    ))
+        ));
+        if is_touch_controlled {
+          parent.spawn(button(asset_server, ContinueButton, "HERE", 38.));
+        } else {
+          parent.spawn((
+            Text::new("[Space]"),
+            default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+            TextColor(Color::from(tailwind::YELLOW_400)),
+            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+            default_shadow,
+          ));
+        }
+        parent.spawn((
+          Text::new(" to start..."),
+          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::WHITE),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        ));
+      }
+    })
     .id();
+
   commands.entity(root).add_child(cta);
 }
 
@@ -283,8 +296,7 @@ fn handle_player_registration_message(
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
-  cta_query: Query<&Children, With<LobbyUiCta>>,
-  mut texts_query: Query<&mut Text>,
+  cta_query: Query<(Entity, &Children), With<LobbyUiCta>>,
 ) {
   for message in player_registration_message.read() {
     let font = asset_server.load(DEFAULT_FONT);
@@ -322,7 +334,13 @@ fn handle_player_registration_message(
     }
 
     // Update call to action under player list
-    update_call_to_action_to_start(message.is_anyone_registered, &cta_query, &mut texts_query);
+    update_call_to_action_to_start(
+      &mut commands,
+      message.is_anyone_registered,
+      &cta_query,
+      &asset_server,
+      &settings,
+    );
   }
 }
 
@@ -415,40 +433,59 @@ fn player_registered_prompt(
 }
 
 fn update_call_to_action_to_start(
+  commands: &mut Commands,
   has_players: bool,
-  cta_query: &Query<&Children, With<LobbyUiCta>>,
-  texts_query: &mut Query<&mut Text>,
+  cta_query: &Query<(Entity, &Children), With<LobbyUiCta>>,
+  asset_server: &Res<AssetServer>,
+  settings: &Res<Settings>,
 ) {
-  for children in cta_query.iter() {
-    // Part 1 - Always white
-    if let Some(prefix_entity) = children.get(0) {
-      if let Ok(mut text) = texts_query.get_mut(*prefix_entity) {
-        text.0 = if has_players {
-          "Press ".to_string()
-        } else {
-          "More players needed to start...".to_string()
-        };
-      }
+  for (entity, children) in cta_query.iter() {
+    for child in children.iter() {
+      commands.entity(*child).despawn();
     }
-    // Part 2 - Always yellow
-    if let Some(key_entity) = children.get(1) {
-      if let Ok(mut text) = texts_query.get_mut(*key_entity) {
-        text.0 = if has_players {
-          "[Space]".to_string()
+    let font = asset_server.load(DEFAULT_FONT);
+    let default_font = default_font(&font);
+    let default_shadow = default_shadow();
+    let is_touch_controlled = settings.general.enable_touch_controls;
+
+    if !has_players {
+      commands.entity(entity).with_children(|parent| {
+        parent.spawn((
+          Text::new("More players needed to start..."),
+          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::WHITE),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        ));
+      });
+    } else {
+      commands.entity(entity).with_children(|parent| {
+        parent.spawn((
+          Text::new("Press "),
+          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::WHITE),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        ));
+        if is_touch_controlled {
+          parent.spawn(button(asset_server, ContinueButton, "HERE", 38.));
         } else {
-          String::new()
-        };
-      }
-    }
-    // Part 3 - Always white
-    if let Some(suffix_entity) = children.get(2) {
-      if let Ok(mut text) = texts_query.get_mut(*suffix_entity) {
-        text.0 = if has_players {
-          " to start...".to_string()
-        } else {
-          String::new()
-        };
-      }
+          parent.spawn((
+            Text::new("[Space]"),
+            default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+            TextColor(Color::from(tailwind::YELLOW_400)),
+            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+            default_shadow,
+          ));
+        }
+        parent.spawn((
+          Text::new(" to start..."),
+          default_font.with_line_height(LineHeight::RelativeToFont(3.)),
+          TextColor(Color::WHITE),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          default_shadow,
+        ));
+      });
     }
   }
 }
