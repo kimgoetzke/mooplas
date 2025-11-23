@@ -17,7 +17,7 @@ pub struct SnakeHead;
 pub struct WrapAroundEntity;
 
 /// A component identifying a player. Used to link player entities together.
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PlayerId(pub u8);
 
 impl Display for PlayerId {
