@@ -11,6 +11,7 @@ impl Plugin for SharedMessagesPlugin {
     app
       .add_message::<DebugStateMessage>()
       .add_message::<PlayerRegistrationMessage>()
+      .add_message::<ContinueMessage>()
       .add_message::<TouchControlsToggledMessage>()
       .add_message::<InputAction>();
   }
@@ -49,6 +50,9 @@ pub enum InputAction {
   Move(PlayerId, Scalar),
   Action(PlayerId),
 }
+
+#[derive(Message)]
+pub struct ContinueMessage;
 
 #[cfg(test)]
 mod tests {

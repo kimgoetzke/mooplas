@@ -4,7 +4,7 @@ use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
   WinnerInfo,
 };
-use crate::shared::PlayerRegistrationMessage;
+use crate::shared::{ContinueMessage, PlayerRegistrationMessage};
 use bevy::app::{Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
@@ -21,7 +21,7 @@ use bevy::prelude::{
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
-use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, Interaction, PositionType, UiRect};
+use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, Interaction, PositionType, UiRect, percent};
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;
@@ -37,12 +37,14 @@ impl Plugin for InGameUiPlugin {
           handle_player_registration_message,
           handle_touch_controls_toggled_message,
           toggle_touch_controls_button_system,
+          continue_button_system,
         )
           .run_if(in_state(AppState::Registering)),
       )
       .add_systems(OnExit(AppState::Registering), despawn_lobby_ui_system)
       .add_systems(OnEnter(AppState::GameOver), spawn_game_over_ui_system)
-      .add_systems(OnExit(AppState::GameOver), despawn_game_over_ui_system);
+      .add_systems(OnExit(AppState::GameOver), despawn_game_over_ui_system)
+      .add_systems(Update, continue_button_system.run_if(in_state(AppState::GameOver)));
   }
 }
 
@@ -66,14 +68,29 @@ struct LobbyUiCta;
 #[derive(Component)]
 struct VictoryUiRoot;
 
+/// Marker component for the touch controls toggle button.
+#[derive(Component)]
+struct ToggleTouchControlsButton;
+
+/// Marker component for the touch continue button.
+#[derive(Component)]
+struct ContinueButton;
+
 /// Sets up the lobby UI, displaying available players and prompts to join.
 fn spawn_lobby_ui_system(
   mut commands: Commands,
   settings: Res<Settings>,
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
+  registered_players: Res<RegisteredPlayers>,
 ) {
-  spawn_lobby_ui(&mut commands, &settings, &asset_server, &available_configs);
+  spawn_lobby_ui(
+    &mut commands,
+    &settings,
+    &asset_server,
+    &available_configs,
+    &registered_players,
+  );
 }
 
 fn spawn_lobby_ui(
@@ -81,6 +98,7 @@ fn spawn_lobby_ui(
   settings: &Res<Settings>,
   asset_server: &Res<AssetServer>,
   available_configs: &Res<AvailablePlayerConfigs>,
+  registered_players: &Res<RegisteredPlayers>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
   let default_font = default_font(&font);
@@ -98,9 +116,7 @@ fn spawn_lobby_ui(
         align_items: AlignItems::Center,
         ..default()
       },
-    ))
-    .with_children(|parent| {
-      parent.spawn((
+      children![(
         Node {
           width: px(200),
           height: px(100),
@@ -112,9 +128,9 @@ fn spawn_lobby_ui(
           ..default()
         },
         ZIndex(1000),
-        children![button(asset_server)],
-      ));
-    })
+        children![button(asset_server, ToggleTouchControlsButton, "Touch Controls", 22.)],
+      )],
+    ))
     .id();
 
   for available_config in &available_configs.configs {
@@ -124,6 +140,7 @@ fn spawn_lobby_ui(
       .find(|p| p.id == available_config.id)
       .map(|p| p.colour)
       .unwrap_or(Color::WHITE);
+    let is_registered = registered_players.players.iter().any(|p| p.id == available_config.id);
     let entry = commands
       .spawn((
         LobbyUiEntry {
@@ -137,19 +154,22 @@ fn spawn_lobby_ui(
           width: Val::Percent(100.),
           ..default()
         },
-        children![
-          (
-            // Player
-            Text::new(format!("Player {}", available_config.id.0)),
-            default_font.clone(),
-            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-            TextColor(colour),
-            default_shadow,
-          ),
-          // "Press {} to join"
-          player_join_prompt(&font, available_config, is_touch_controlled)
-        ],
       ))
+      .with_children(|parent| {
+        parent.spawn((
+          // Player
+          Text::new(format!("Player {}", available_config.id.0)),
+          default_font.clone(),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          TextColor(colour),
+          default_shadow,
+        ));
+        if is_registered {
+          parent.spawn(player_registered_prompt(&font));
+        } else {
+          parent.spawn(player_join_prompt(&font, available_config, is_touch_controlled));
+        }
+      })
       .id();
     commands.entity(root).add_child(entry);
   }
@@ -195,8 +215,38 @@ fn spawn_lobby_ui(
   commands.entity(root).add_child(cta);
 }
 
+fn button(asset_server: &AssetServer, button_type: impl Component, button_text: &str, font_size: f32) -> impl Bundle {
+  (
+    Button,
+    button_type,
+    Node {
+      width: px(150),
+      height: px(65),
+      border: UiRect::all(px(3)),
+      justify_content: JustifyContent::Center, // Horizontally center child text
+      align_items: AlignItems::Center,         // Vertically center child text
+      padding: UiRect::all(px(2)),
+      ..default()
+    },
+    BorderColor::all(Color::WHITE),
+    BorderRadius::all(px(5)),
+    BackgroundColor(Color::from(tailwind::SLATE_500)),
+    children![(
+      Text::new(button_text),
+      TextFont {
+        font: asset_server.load(DEFAULT_FONT),
+        font_size,
+        ..default()
+      },
+      TextColor(Color::srgb(0.9, 0.9, 0.9)),
+      TextShadow::default(),
+    )],
+  )
+}
+
+/// A system that toggles touch controls when the corresponding button is pressed.
 fn toggle_touch_controls_button_system(
-  mut query: Query<&Interaction, (Changed<Interaction>, With<Button>)>,
+  mut query: Query<&Interaction, (Changed<Interaction>, With<ToggleTouchControlsButton>)>,
   mut touch_controls_toggled_message: MessageWriter<TouchControlsToggledMessage>,
   mut settings: ResMut<Settings>,
 ) {
@@ -212,31 +262,16 @@ fn toggle_touch_controls_button_system(
   }
 }
 
-fn button(asset_server: &AssetServer) -> impl Bundle {
-  (
-    Button,
-    Node {
-      width: px(150),
-      height: px(65),
-      border: UiRect::all(px(3)),
-      justify_content: JustifyContent::Center, // Horizontally center child text
-      align_items: AlignItems::Center,         // Vertically center child text
-      ..default()
-    },
-    BorderColor::all(Color::WHITE),
-    BorderRadius::all(px(5)),
-    BackgroundColor(Color::from(tailwind::SLATE_500)),
-    children![(
-      Text::new("Touch controls"),
-      TextFont {
-        font: asset_server.load(DEFAULT_FONT),
-        font_size: 20.0,
-        ..default()
-      },
-      TextColor(Color::srgb(0.9, 0.9, 0.9)),
-      TextShadow::default(),
-    )],
-  )
+fn continue_button_system(
+  mut query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
+  mut continue_message: MessageWriter<ContinueMessage>,
+) {
+  for interaction in &mut query {
+    if *interaction == Interaction::Pressed {
+      continue_message.write(ContinueMessage);
+      info!("[Button] Pressed continue button");
+    }
+  }
 }
 
 /// A system that handles player registration messages and updates the lobby UI based on the player's registration
@@ -427,12 +462,19 @@ fn handle_touch_controls_toggled_message(
   settings: Res<Settings>,
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
+  registered_players: Res<RegisteredPlayers>,
 ) {
   for _ in messages.read() {
     for entity in &lobby_ui_root_query {
       commands.entity(entity).despawn();
     }
-    spawn_lobby_ui(&mut commands, &settings, &asset_server, &available_configs);
+    spawn_lobby_ui(
+      &mut commands,
+      &settings,
+      &asset_server,
+      &available_configs,
+      &registered_players,
+    );
   }
 }
 
@@ -446,6 +488,7 @@ fn despawn_lobby_ui_system(mut commands: Commands, lobby_ui_root_query: Query<En
 /// Spawns the game over UI, displaying the winner and a prompt to continue.
 fn spawn_game_over_ui_system(
   mut commands: Commands,
+  settings: Res<Settings>,
   winner: Res<WinnerInfo>,
   asset_server: Res<AssetServer>,
   registered_players: Res<RegisteredPlayers>,
@@ -457,8 +500,8 @@ fn spawn_game_over_ui_system(
     .spawn((
       VictoryUiRoot,
       Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
+        width: percent(100),
+        height: percent(100),
         flex_direction: FlexDirection::Column,
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
@@ -476,29 +519,30 @@ fn spawn_game_over_ui_system(
             .find(|p| p.id == id)
             .map(|p| p.colour)
             .unwrap_or(Color::WHITE);
-          parent
-            .spawn((Node {
+          parent.spawn((
+            Node {
               flex_direction: FlexDirection::Row,
               justify_content: JustifyContent::Center,
               align_items: AlignItems::Center,
               ..default()
-            },))
-            .with_children(|row| {
-              row.spawn((
+            },
+            children![
+              (
                 Text::new(format!("  Player {}", id.0)),
                 large_text.clone(),
                 TextColor(colour),
                 default_shadow,
                 TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
-              ));
-              row.spawn((
+              ),
+              (
                 Text::new(" wins!  "),
                 large_text.clone(),
                 TextColor(Color::WHITE),
                 default_shadow,
                 TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
-              ));
-            });
+              )
+            ],
+          ));
         }
         None => {
           parent.spawn((
@@ -511,37 +555,42 @@ fn spawn_game_over_ui_system(
       }
 
       // Call to action
-      parent.spawn((
-        Node {
+      parent
+        .spawn(Node {
           flex_direction: FlexDirection::Row,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
           ..default()
-        },
-        children![
-          (
+        })
+        .with_children(|parent| {
+          parent.spawn((
             Text::new("Press "),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::WHITE),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
-          ),
-          (
-            Text::new("[Space]"),
-            default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
-            TextColor(Color::from(tailwind::YELLOW_400)),
-            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-            default_shadow,
-          ),
-          (
+          ));
+
+          if settings.general.enable_touch_controls {
+            parent.spawn(button(&asset_server, ContinueButton, "HERE", 38.));
+          } else {
+            parent.spawn((
+              Text::new("[Space]"),
+              default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+              TextColor(Color::from(tailwind::YELLOW_400)),
+              TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+              default_shadow,
+            ));
+          }
+
+          parent.spawn((
             Text::new(" to continue..."),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
             TextColor(Color::WHITE),
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
-          )
-        ],
-      ));
+          ));
+        });
     });
 }
 

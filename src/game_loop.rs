@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::prelude::{
-  AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead,
-  WinnerInfo,
+  AvailablePlayerConfigs, ContinueMessage, PlayerId, PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers,
+  SnakeHead, WinnerInfo, has_registered_players,
 };
 use crate::shared::{InputAction, Player};
 use avian2d::prelude::Collisions;
@@ -15,10 +15,15 @@ pub struct GameLoopPlugin;
 impl Plugin for GameLoopPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_systems(OnEnter(AppState::Registering), reset_for_lobby_system)
       .add_systems(
         Update,
         player_registration_system.run_if(in_state(AppState::Registering)),
+      )
+      .add_systems(
+        Update,
+        handle_continue_message
+          .run_if(in_state(AppState::Registering))
+          .run_if(has_registered_players),
       )
       .add_systems(
         Update,
@@ -26,8 +31,12 @@ impl Plugin for GameLoopPlugin {
       )
       .add_systems(OnEnter(AppState::GameOver), pause_game_system)
       .add_systems(
+        Update,
+        game_over_to_initialising_transition_system.run_if(in_state(AppState::GameOver)),
+      )
+      .add_systems(
         OnExit(AppState::GameOver),
-        (unpause_game_system, despawn_players_system),
+        (unpause_game_system, despawn_players_system, reset_for_lobby_system),
       );
   }
 }
@@ -80,6 +89,19 @@ fn player_registration_system(
       });
     }
   }
+}
+
+/// Transitions the game from the registration/lobby state to the running state.
+fn handle_continue_message(
+  mut continue_messages: MessageReader<ContinueMessage>,
+  mut next_app_state: ResMut<NextState<AppState>>,
+) {
+  debug_once!("Waiting for message to start the game...");
+  let messages = continue_messages.read().collect::<Vec<&ContinueMessage>>();
+  if messages.is_empty() {
+    return;
+  }
+  next_app_state.set(AppState::Playing);
 }
 
 /// Checks for collisions involving snake heads and marks players as dead if they collide.
@@ -164,6 +186,18 @@ fn pause_game_system(mut time: ResMut<Time<Virtual>>) {
 /// Unpauses the game time when called. Intended to be called when exiting the game over state.
 fn unpause_game_system(mut time: ResMut<Time<Virtual>>) {
   time.unpause();
+}
+
+fn game_over_to_initialising_transition_system(
+  mut continue_messages: MessageReader<ContinueMessage>,
+  mut next_app_state: ResMut<NextState<AppState>>,
+) {
+  debug_once!("Waiting for message to continue...");
+  let messages = continue_messages.read().collect::<Vec<&ContinueMessage>>();
+  if messages.is_empty() {
+    return;
+  }
+  next_app_state.set(AppState::Initialising);
 }
 
 /// Despawns all player entities. Intended to be called when exiting the game over state.
