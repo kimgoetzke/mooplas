@@ -1,3 +1,4 @@
+use crate::prelude::TouchButton;
 use crate::prelude::constants::*;
 use bevy::app::Update;
 use bevy::color::Color;
@@ -18,14 +19,17 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
   fn build(&self, app: &mut App) {
     app
+      .init_resource::<InputFocus>()
       .add_plugins(MeshPickingPlugin)
       .add_plugins((InGameUiPlugin, TouchControlsUiPlugin))
-      .add_systems(Update, button_design_system);
+      .add_systems(
+        Update,
+        (button_reactive_design_system, touch_button_reactive_design_system),
+      );
   }
 }
 
-// TODO: Make this work for touch controls UI buttons as well
-fn button_design_system(
+fn button_reactive_design_system(
   mut input_focus: ResMut<InputFocus>,
   mut interaction_query: Query<
     (
@@ -54,6 +58,32 @@ fn button_design_system(
       }
       Interaction::None => {
         input_focus.clear();
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
+      }
+    }
+  }
+}
+
+fn touch_button_reactive_design_system(
+  mut interaction_query: Query<
+    (&Interaction, &mut BorderColor, &mut BackgroundColor, &mut TouchButton),
+    Changed<Interaction>,
+  >,
+) {
+  for (interaction, mut border_colour, mut background_colour, mut button) in &mut interaction_query {
+    match *interaction {
+      Interaction::Pressed => {
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_100));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_PRESSED));
+        button.set_changed();
+      }
+      Interaction::Hovered => {
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_300));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
+        button.set_changed();
+      }
+      Interaction::None => {
         *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
         *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
       }

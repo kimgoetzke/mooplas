@@ -117,7 +117,10 @@ impl SnakeSegment {
   }
 }
 
-// rust
+/// A marker component for touch control UI buttons.
+#[derive(Component, Clone)]
+pub struct TouchButton;
+
 #[cfg(test)]
 mod tests {
   use super::*;

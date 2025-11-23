@@ -1,6 +1,8 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::*;
-use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, Settings, TouchControlsToggledMessage};
+use crate::prelude::{
+  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, Settings, TouchButton, TouchControlsToggledMessage,
+};
 use crate::shared::InputAction;
 use avian2d::math::Scalar;
 use bevy::color::palettes::tailwind;
@@ -25,9 +27,6 @@ impl Plugin for TouchControlsUiPlugin {
 
 #[derive(Component)]
 struct TouchControlsUiRoot;
-
-#[derive(Component, Clone)]
-struct TouchButton;
 
 #[derive(Component, Clone, Copy, Debug)]
 struct ButtonMovement {
@@ -109,7 +108,6 @@ fn spawn_touch_controls_ui(
   for config in available_configs.configs.iter() {
     commands.entity(parent).with_children(|parent| {
       let node = button_node();
-      let button = button_with_style();
       parent
         .spawn((
           Name::new("Controls for Player ".to_string() + &config.id.to_string()),
@@ -120,7 +118,7 @@ fn spawn_touch_controls_ui(
             .spawn((
               // Left movement button
               node.clone(),
-              button.clone(),
+              touch_button(None),
               ButtonMovement::new(config.id.into(), -1.0),
               BorderRadius {
                 top_left: percent(50),
@@ -139,7 +137,7 @@ fn spawn_touch_controls_ui(
             .spawn((
               // Player action button
               node.clone(),
-              button_with_custom_style(config.colour),
+              touch_button(Some(config.colour)),
               ButtonAction::new(config.id.into()),
               BorderRadius::all(percent(20)),
               config.id,
@@ -150,7 +148,7 @@ fn spawn_touch_controls_ui(
             .spawn((
               // Right movement button
               node.clone(),
-              button.clone(),
+              touch_button(None),
               ButtonMovement::new(config.id.into(), 1.0),
               BorderRadius {
                 top_left: percent(20),
@@ -344,19 +342,16 @@ fn button_node() -> Node {
   }
 }
 
-fn button_with_style() -> (TouchButton, BorderColor, BackgroundColor) {
+fn touch_button(custom_colour: Option<Color>) -> (TouchButton, Interaction, BorderColor, BackgroundColor) {
   (
     TouchButton,
+    Interaction::default(),
     BorderColor::all(Color::from(tailwind::SLATE_500)),
-    BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT)),
-  )
-}
-
-fn button_with_custom_style(colour: Color) -> (TouchButton, BorderColor, BackgroundColor) {
-  (
-    TouchButton,
-    BorderColor::all(Color::from(tailwind::SLATE_500)),
-    BackgroundColor(Color::from(colour).with_alpha(BUTTON_ALPHA_DEFAULT)),
+    if let Some(colour_override) = custom_colour {
+      BackgroundColor(Color::from(colour_override).with_alpha(BUTTON_ALPHA_DEFAULT))
+    } else {
+      BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT))
+    },
   )
 }
 

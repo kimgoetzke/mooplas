@@ -30,7 +30,6 @@ pub struct InGameUiPlugin;
 impl Plugin for InGameUiPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
     app
-      .init_resource::<InputFocus>()
       .add_systems(OnEnter(AppState::Registering), spawn_lobby_ui_system)
       .add_systems(
         Update,
