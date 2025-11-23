@@ -10,14 +10,15 @@ use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::children;
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::input_focus::InputFocus;
 use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, Bundle, Button, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
   IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, Node, OnEnter, OnExit, Query,
-  Res, ResMut, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, Visibility, With, ZIndex,
-  default, in_state, px,
+  Res, ResMut, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, ZIndex, default,
+  in_state, px,
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
@@ -109,8 +110,8 @@ fn spawn_lobby_ui(
     .spawn((
       LobbyUiRoot,
       Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
+        width: percent(100),
+        height: percent(100),
         flex_direction: FlexDirection::Column,
         justify_content: JustifyContent::Center,
         align_items: AlignItems::Center,
@@ -151,7 +152,7 @@ fn spawn_lobby_ui(
           flex_direction: FlexDirection::Row,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
-          width: Val::Percent(100.),
+          width: percent(100.),
           ..default()
         },
       ))
@@ -187,45 +188,63 @@ fn spawn_lobby_ui(
       },
     ))
     .with_children(|parent| {
-      if !has_any_registered {
-        parent.spawn((
-          Text::new("More players needed to start..."),
-          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::WHITE),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ));
-      } else {
-        parent.spawn((
-          Text::new("Press "),
-          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::WHITE),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ));
-        if is_touch_controlled {
-          parent.spawn(button(asset_server, ContinueButton, "HERE", 38.));
-        } else {
-          parent.spawn((
-            Text::new("[Space]"),
-            default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-            TextColor(Color::from(tailwind::YELLOW_400)),
-            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-            default_shadow,
-          ));
-        }
-        parent.spawn((
-          Text::new(" to start..."),
-          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::WHITE),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ));
-      }
+      spawn_call_to_action_to_start(
+        asset_server,
+        default_font,
+        default_shadow,
+        is_touch_controlled,
+        has_any_registered,
+        parent,
+      );
     })
     .id();
 
   commands.entity(root).add_child(cta);
+}
+
+fn spawn_call_to_action_to_start(
+  asset_server: &Res<AssetServer>,
+  default_font: TextFont,
+  default_shadow: TextShadow,
+  is_touch_controlled: bool,
+  has_any_registered: bool,
+  parent: &mut RelatedSpawnerCommands<ChildOf>,
+) {
+  if !has_any_registered {
+    parent.spawn((
+      Text::new("More players needed to start..."),
+      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      TextColor(Color::WHITE),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      default_shadow,
+    ));
+  } else {
+    parent.spawn((
+      Text::new("Press "),
+      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      TextColor(Color::WHITE),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      default_shadow,
+    ));
+    if is_touch_controlled {
+      parent.spawn(button(asset_server, ContinueButton, "HERE", 38.));
+    } else {
+      parent.spawn((
+        Text::new("[Space]"),
+        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+        TextColor(Color::from(tailwind::YELLOW_400)),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        default_shadow,
+      ));
+    }
+    parent.spawn((
+      Text::new(" to start..."),
+      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      TextColor(Color::WHITE),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      default_shadow,
+    ));
+  }
 }
 
 fn button(asset_server: &AssetServer, button_type: impl Component, button_text: &str, font_size: f32) -> impl Bundle {
@@ -233,7 +252,7 @@ fn button(asset_server: &AssetServer, button_type: impl Component, button_text: 
     Button,
     button_type,
     Node {
-      width: px(150),
+      width: px(170),
       height: px(65),
       border: UiRect::all(px(3)),
       justify_content: JustifyContent::Center, // Horizontally center child text
@@ -275,6 +294,7 @@ fn toggle_touch_controls_button_system(
   }
 }
 
+/// A system that handles the continue button press by sending [`ContinueMessage`].
 fn continue_button_system(
   mut query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
   mut continue_message: MessageWriter<ContinueMessage>,
@@ -434,7 +454,7 @@ fn player_registered_prompt(
 
 fn update_call_to_action_to_start(
   commands: &mut Commands,
-  has_players: bool,
+  has_any_players: bool,
   cta_query: &Query<(Entity, &Children), With<LobbyUiCta>>,
   asset_server: &Res<AssetServer>,
   settings: &Res<Settings>,
@@ -448,45 +468,16 @@ fn update_call_to_action_to_start(
     let default_shadow = default_shadow();
     let is_touch_controlled = settings.general.enable_touch_controls;
 
-    if !has_players {
-      commands.entity(entity).with_children(|parent| {
-        parent.spawn((
-          Text::new("More players needed to start..."),
-          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::WHITE),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ));
-      });
-    } else {
-      commands.entity(entity).with_children(|parent| {
-        parent.spawn((
-          Text::new("Press "),
-          default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::WHITE),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ));
-        if is_touch_controlled {
-          parent.spawn(button(asset_server, ContinueButton, "HERE", 38.));
-        } else {
-          parent.spawn((
-            Text::new("[Space]"),
-            default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-            TextColor(Color::from(tailwind::YELLOW_400)),
-            TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-            default_shadow,
-          ));
-        }
-        parent.spawn((
-          Text::new(" to start..."),
-          default_font.with_line_height(LineHeight::RelativeToFont(3.)),
-          TextColor(Color::WHITE),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          default_shadow,
-        ));
-      });
-    }
+    commands.entity(entity).with_children(|parent| {
+      spawn_call_to_action_to_start(
+        asset_server,
+        default_font,
+        default_shadow,
+        is_touch_controlled,
+        has_any_players,
+        parent,
+      );
+    });
   }
 }
 
