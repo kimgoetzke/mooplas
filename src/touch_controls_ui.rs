@@ -374,11 +374,11 @@ fn button_with_custom_style(colour: Color) -> (TouchButton, BackgroundColor, Bor
 fn handle_toggle_touch_controls_message(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
-  mut messages: ResMut<Messages<TouchControlsToggledMessage>>,
+  mut messages: MessageReader<TouchControlsToggledMessage>,
   mut touch_controls_ui_query: Query<Entity, With<TouchControlsUi>>,
   available_configs: Res<AvailablePlayerConfigs>,
 ) {
-  for message in messages.drain() {
+  for message in messages.read() {
     if message.enabled {
       spawn_touch_controls_ui(&mut commands, &available_configs, &asset_server);
     } else {

@@ -1,6 +1,9 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::DEFAULT_FONT;
-use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, WinnerInfo};
+use crate::prelude::{
+  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
+  WinnerInfo,
+};
 use crate::shared::PlayerRegistrationMessage;
 use bevy::app::{Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
@@ -22,10 +25,14 @@ pub struct InGameUiPlugin;
 impl Plugin for InGameUiPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
     app
-      .add_systems(OnEnter(AppState::Registering), setup_lobby_ui_system)
+      .add_systems(OnEnter(AppState::Registering), spawn_lobby_ui_system)
       .add_systems(
         Update,
-        handle_player_registration_event.run_if(in_state(AppState::Registering)),
+        (
+          handle_player_registration_message,
+          handle_touch_controls_toggled_message,
+        )
+          .run_if(in_state(AppState::Registering)),
       )
       .add_systems(OnExit(AppState::Registering), despawn_lobby_ui_system)
       .add_systems(OnEnter(AppState::GameOver), spawn_game_over_ui_system)
@@ -54,14 +61,25 @@ struct LobbyUiCta;
 struct VictoryUiRoot;
 
 /// Sets up the lobby UI, displaying available players and prompts to join.
-fn setup_lobby_ui_system(
+fn spawn_lobby_ui_system(
   mut commands: Commands,
+  settings: Res<Settings>,
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
+) {
+  spawn_lobby_ui(&mut commands, &settings, &asset_server, &available_configs);
+}
+
+fn spawn_lobby_ui(
+  commands: &mut Commands,
+  settings: &Res<Settings>,
+  asset_server: &Res<AssetServer>,
+  available_configs: &Res<AvailablePlayerConfigs>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
   let default_font = default_font(&font);
   let default_shadow = default_shadow();
+  let is_touch_controlled = settings.general.enable_touch_controls;
 
   let root = commands
     .spawn((
@@ -105,7 +123,7 @@ fn setup_lobby_ui_system(
             default_shadow,
           ),
           // "Press {} to join"
-          player_join_prompt(&font, available_config)
+          player_join_prompt(&font, available_config, is_touch_controlled)
         ],
       ))
       .id();
@@ -153,9 +171,12 @@ fn setup_lobby_ui_system(
   commands.entity(root).add_child(cta);
 }
 
-fn handle_player_registration_event(
-  mut player_registration_message: MessageReader<PlayerRegistrationMessage>,
+/// A system that handles player registration messages and updates the lobby UI based on the player's registration
+/// status.
+fn handle_player_registration_message(
   mut commands: Commands,
+  settings: Res<Settings>,
+  mut player_registration_message: MessageReader<PlayerRegistrationMessage>,
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
@@ -165,6 +186,7 @@ fn handle_player_registration_event(
   for message in player_registration_message.read() {
     let font = asset_server.load(DEFAULT_FONT);
     let config = available_configs.configs.iter().find(|p| p.id == message.player_id);
+    let is_touch_controlled = settings.general.enable_touch_controls;
 
     // Update entry for player
     match message.has_registered {
@@ -174,7 +196,9 @@ fn handle_player_registration_event(
             if let Some(prompt_node) = children.get(1) {
               commands.entity(*prompt_node).despawn();
               if let Some(ref available_config) = config {
-                let player = commands.spawn(player_join_prompt(&font, available_config)).id();
+                let player = commands
+                  .spawn(player_join_prompt(&font, available_config, is_touch_controlled))
+                  .id();
                 commands.entity(entity).add_child(player);
               }
             }
@@ -202,6 +226,7 @@ fn handle_player_registration_event(
 fn player_join_prompt(
   font: &Handle<Font>,
   available_config: &AvailablePlayerConfig,
+  is_touch_controlled: bool,
 ) -> (
   Node,
   SpawnRelatedBundle<
@@ -232,14 +257,25 @@ fn player_join_prompt(
         TextColor(Color::WHITE),
         default_shadow,
       ),
-      (
-        // ...[Key]...
-        Text::new(format!("[{:?}]", available_config.input.action)),
-        text_font.clone(),
-        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        TextColor(Color::from(tailwind::YELLOW_400)),
-        default_shadow,
-      ),
+      if !is_touch_controlled {
+        (
+          // ...[Key]...
+          Text::new(format!("[{:?}]", available_config.input.action)),
+          text_font.clone(),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          TextColor(Color::from(tailwind::YELLOW_400)),
+          default_shadow,
+        )
+      } else {
+        (
+          // ...your colour...
+          Text::new("your colour"),
+          text_font.clone(),
+          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+          TextColor(available_config.colour),
+          default_shadow,
+        )
+      },
       (
         // ...to join
         Text::new(" to join"),
@@ -314,9 +350,27 @@ fn update_call_to_action_to_start(
   }
 }
 
+/// A system that handles messages toggling touch controls to update the lobby UI's prompts accordingly. Makes sure that
+/// the prompt doesn't ask for a key press when touch controls are enabled and vice versa.
+fn handle_touch_controls_toggled_message(
+  mut commands: Commands,
+  mut messages: MessageReader<TouchControlsToggledMessage>,
+  lobby_ui_root_query: Query<Entity, With<LobbyUiRoot>>,
+  settings: Res<Settings>,
+  asset_server: Res<AssetServer>,
+  available_configs: Res<AvailablePlayerConfigs>,
+) {
+  for _ in messages.read() {
+    for entity in &lobby_ui_root_query {
+      commands.entity(entity).despawn();
+    }
+    spawn_lobby_ui(&mut commands, &settings, &asset_server, &available_configs);
+  }
+}
+
 /// Despawns the entire lobby UI. Call when exiting the registration state.
-fn despawn_lobby_ui_system(mut commands: Commands, roots: Query<Entity, With<LobbyUiRoot>>) {
-  for entity in &roots {
+fn despawn_lobby_ui_system(mut commands: Commands, lobby_ui_root_query: Query<Entity, With<LobbyUiRoot>>) {
+  for entity in &lobby_ui_root_query {
     commands.entity(entity).despawn();
   }
 }
