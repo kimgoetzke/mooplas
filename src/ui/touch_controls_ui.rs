@@ -278,7 +278,6 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       },
     ),
     2 => (
-      // TODO: Fix inverted controls for blue player
       // Right side (player 3)
       Node {
         position_type: PositionType::Absolute,
@@ -291,7 +290,7 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       },
       UiTransform {
         translation: Val2::new(px(BUTTON_HEIGHT), px(VERTICAL_OFFSET)),
-        rotation: Rot2::degrees(90.),
+        rotation: Rot2::degrees(-90.),
         ..default()
       },
     ),
