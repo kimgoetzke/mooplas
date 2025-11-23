@@ -84,7 +84,6 @@ fn spawn_touch_controls_ui_system(
 }
 
 // TODO: Design better buttons
-// TODO: Add visual feedback for button presses
 /// Spawns the touch controls UI.
 fn spawn_touch_controls_ui(
   commands: &mut Commands,

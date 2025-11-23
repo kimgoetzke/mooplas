@@ -29,6 +29,7 @@ impl Plugin for UiPlugin {
   }
 }
 
+/// A system that updates regular button colours based on their interaction state to provide visual feedback.
 fn button_reactive_design_system(
   mut input_focus: ResMut<InputFocus>,
   mut interaction_query: Query<
@@ -65,6 +66,8 @@ fn button_reactive_design_system(
   }
 }
 
+/// A system that updates touch button colours based on their interaction state to provide visual feedback. Does not
+/// require input focus changes and is therefore multitouch friendly.
 fn touch_button_reactive_design_system(
   mut interaction_query: Query<
     (&Interaction, &mut BorderColor, &mut BackgroundColor, &mut TouchButton),
