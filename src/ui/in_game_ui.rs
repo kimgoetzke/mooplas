@@ -1,5 +1,5 @@
 use crate::app_states::AppState;
-use crate::prelude::constants::DEFAULT_FONT;
+use crate::prelude::constants::{BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT};
 use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
   WinnerInfo,
@@ -69,6 +69,7 @@ struct LobbyUiCta;
 #[derive(Component)]
 struct VictoryUiRoot;
 
+// TODO: Disable mouse so buttons work
 /// Marker component for the touch controls toggle button.
 #[derive(Component)]
 struct ToggleTouchControlsButton;
@@ -254,15 +255,15 @@ fn button(asset_server: &AssetServer, button_type: impl Component, button_text: 
     Node {
       width: px(170),
       height: px(65),
-      border: UiRect::all(px(3)),
+      border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
       justify_content: JustifyContent::Center, // Horizontally center child text
       align_items: AlignItems::Center,         // Vertically center child text
       padding: UiRect::all(px(2)),
       ..default()
     },
-    BorderColor::all(Color::WHITE),
-    BorderRadius::all(px(5)),
-    BackgroundColor(Color::from(tailwind::SLATE_500)),
+    BorderRadius::all(px(10)),
+    BorderColor::all(Color::from(tailwind::SLATE_500)),
+    BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
     children![(
       Text::new(button_text),
       TextFont {

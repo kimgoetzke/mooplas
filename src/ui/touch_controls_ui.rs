@@ -85,6 +85,7 @@ fn spawn_touch_controls_ui_system(
 }
 
 // TODO: Design better buttons
+// TODO: Add visual feedback for button presses
 /// Spawns the touch controls UI.
 fn spawn_touch_controls_ui(
   commands: &mut Commands,
@@ -261,6 +262,7 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
 
   match config.id.0 {
     0 | 1 => (
+      // Bottom row (players 1 and 2)
       Node {
         position_type: PositionType::Absolute,
         bottom: px(10),
@@ -276,10 +278,12 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       },
     ),
     2 => (
+      // TODO: Fix inverted controls for blue player
+      // Right side (player 3)
       Node {
         position_type: PositionType::Absolute,
         top: percent(50),
-        right: Val::ZERO,
+        right: px(-25),
         margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
@@ -287,11 +291,12 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       },
       UiTransform {
         translation: Val2::new(px(BUTTON_HEIGHT), px(VERTICAL_OFFSET)),
-        rotation: Rot2::degrees(90.0),
+        rotation: Rot2::degrees(90.),
         ..default()
       },
     ),
     3 => (
+      // Top center (player 4)
       Node {
         position_type: PositionType::Absolute,
         top: px(10),
@@ -308,10 +313,11 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       },
     ),
     4 => (
+      // Left side (player 5)
       Node {
         position_type: PositionType::Absolute,
         top: percent(50),
-        left: Val::ZERO,
+        left: px(-25),
         margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
@@ -339,19 +345,19 @@ fn button_node() -> Node {
   }
 }
 
-fn button_with_style() -> (TouchButton, BackgroundColor, BorderColor) {
+fn button_with_style() -> (TouchButton, BorderColor, BackgroundColor) {
   (
     TouchButton,
+    BorderColor::all(Color::from(tailwind::SLATE_500)),
     BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT)),
-    BorderColor::all(Color::from(tailwind::SLATE_500).with_alpha(0.2)),
   )
 }
 
-fn button_with_custom_style(colour: Color) -> (TouchButton, BackgroundColor, BorderColor) {
+fn button_with_custom_style(colour: Color) -> (TouchButton, BorderColor, BackgroundColor) {
   (
     TouchButton,
+    BorderColor::all(Color::from(tailwind::SLATE_500)),
     BackgroundColor(Color::from(colour).with_alpha(BUTTON_ALPHA_DEFAULT)),
-    BorderColor::all(Color::from(tailwind::SLATE_500).with_alpha(0.2)),
   )
 }
 

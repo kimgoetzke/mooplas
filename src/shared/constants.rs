@@ -76,7 +76,7 @@ pub(crate) const TAIL_COLLIDER_SKIP_RECENT: usize = 2;
 
 pub(crate) const BUTTON_ALPHA_DEFAULT: f32 = 0.3;
 pub(crate) const BUTTON_ALPHA_PRESSED: f32 = 0.8;
-pub(crate) const BUTTON_WIDTH: f32 = 60.0;
-pub(crate) const BUTTON_HEIGHT: f32 = 50.0;
-pub(crate) const BUTTON_MARGIN: f32 = 15.0;
-pub(crate) const BUTTON_BORDER_WIDTH: f32 = 2.0;
+pub(crate) const BUTTON_WIDTH: f32 = 60.;
+pub(crate) const BUTTON_HEIGHT: f32 = 60.;
+pub(crate) const BUTTON_MARGIN: f32 = 15.;
+pub(crate) const BUTTON_BORDER_WIDTH: f32 = 3.;
