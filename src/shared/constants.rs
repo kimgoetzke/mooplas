@@ -31,7 +31,7 @@ pub(crate) const GRID_TILES_Y: f32 = 5.;
 pub(crate) const GRID_MARGIN: f32 = 2.;
 
 /// The margin from the screen edges for spawn points.
-pub(crate) const EDGE_MARGIN: f32 = 50.0;
+pub(crate) const EDGE_MARGIN: f32 = 75.0;
 
 // Controls and movement
 // --------------------------------//
