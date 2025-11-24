@@ -7,6 +7,7 @@ use crate::prelude::{
   WinnerInfo,
 };
 use crate::shared::{ContinueMessage, PlayerRegistrationMessage};
+use crate::ui::{ButtonAnimation, default_gradient};
 use bevy::app::{Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
@@ -295,6 +296,7 @@ fn button(
 ) -> impl Bundle {
   (
     Button,
+    ButtonAnimation,
     button_type,
     Node {
       width: px(button_width),
@@ -308,6 +310,7 @@ fn button(
     BorderRadius::all(px(10)),
     BorderColor::all(Color::from(tailwind::SLATE_500)),
     BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
+    default_gradient(0.),
     children![(
       Text::new(button_text),
       TextFont {
