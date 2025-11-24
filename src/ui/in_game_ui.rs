@@ -12,13 +12,12 @@ use bevy::color::palettes::tailwind;
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
-use bevy::input_focus::InputFocus;
 use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, Bundle, Button, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
-  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, Node, OnEnter, OnExit, Query,
-  Res, ResMut, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, ZIndex, default,
-  in_state, px,
+  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection, Node,
+  OnEnter, OnExit, Query, Res, ResMut, Single, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow,
+  Val, Window, With, default, in_state, px,
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
@@ -37,6 +36,7 @@ impl Plugin for InGameUiPlugin {
           handle_player_registration_message,
           handle_touch_controls_toggled_message,
           toggle_touch_controls_button_system,
+          toggle_fullscreen_button_system,
           continue_button_system,
         )
           .run_if(in_state(AppState::Registering)),
@@ -72,6 +72,10 @@ struct VictoryUiRoot;
 /// Marker component for the touch controls toggle button.
 #[derive(Component)]
 struct ToggleTouchControlsButton;
+
+/// Marker component for the fullscreen toggle button.
+#[derive(Component)]
+struct ToggleFullscreenButton;
 
 /// Marker component for the touch continue button.
 #[derive(Component)]
@@ -119,7 +123,7 @@ fn spawn_lobby_ui(
       },
       children![(
         Node {
-          width: px(200),
+          width: px(400),
           height: px(100),
           position_type: PositionType::Absolute,
           align_items: AlignItems::Center,
@@ -128,9 +132,37 @@ fn spawn_lobby_ui(
           right: Val::ZERO,
           ..default()
         },
-        ZIndex(1000),
-        children![button(asset_server, ToggleTouchControlsButton, "Touch Controls", 22.)],
-      )],
+        children![
+          (
+            Node {
+              width: px(200),
+              height: px(100),
+              position_type: PositionType::Relative,
+              align_items: AlignItems::Center,
+              justify_content: JustifyContent::Center,
+              ..default()
+            },
+            children![button(
+              ToggleTouchControlsButton,
+              asset_server,
+              "Touch Controls",
+              170,
+              20.
+            )],
+          ),
+          (
+            Node {
+              width: px(200),
+              height: px(100),
+              position_type: PositionType::Relative,
+              align_items: AlignItems::Center,
+              justify_content: JustifyContent::Center,
+              ..default()
+            },
+            children![button(ToggleFullscreenButton, asset_server, "Fullscreen", 150, 20.)],
+          ),
+        ],
+      ),],
     ))
     .id();
 
@@ -227,7 +259,7 @@ fn spawn_call_to_action_to_start(
       default_shadow,
     ));
     if is_touch_controlled {
-      parent.spawn(button(asset_server, ContinueButton, "HERE", 38.));
+      parent.spawn(button(ContinueButton, asset_server, "HERE", 170, 38.));
     } else {
       parent.spawn((
         Text::new("[Space]"),
@@ -247,12 +279,18 @@ fn spawn_call_to_action_to_start(
   }
 }
 
-fn button(asset_server: &AssetServer, button_type: impl Component, button_text: &str, font_size: f32) -> impl Bundle {
+fn button(
+  button_type: impl Component,
+  asset_server: &AssetServer,
+  button_text: &str,
+  button_width: i32,
+  font_size: f32,
+) -> impl Bundle {
   (
     Button,
     button_type,
     Node {
-      width: px(170),
+      width: px(button_width),
       height: px(65),
       border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
       justify_content: JustifyContent::Center, // Horizontally center child text
@@ -290,6 +328,22 @@ fn toggle_touch_controls_button_system(
         "[Button] Set touch controls to [{:?}]",
         settings.general.enable_touch_controls
       );
+    }
+  }
+}
+
+/// A system that toggles the window mode when the corresponding button is pressed.
+fn toggle_fullscreen_button_system(
+  mut query: Query<&Interaction, (Changed<Interaction>, With<ToggleFullscreenButton>)>,
+  mut window: Single<&mut Window>,
+) {
+  for interaction in &mut query {
+    if *interaction == Interaction::Pressed {
+      window.mode = match window.mode {
+        bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+        _ => bevy::window::WindowMode::Windowed,
+      };
+      info!("[F11] Set window mode to [{:?}]", window.mode);
     }
   }
 }
@@ -600,7 +654,7 @@ fn spawn_game_over_ui_system(
           ));
 
           if settings.general.enable_touch_controls {
-            parent.spawn(button(&asset_server, ContinueButton, "HERE", 38.));
+            parent.spawn(button(ContinueButton, &asset_server, "HERE", 170, 38.));
           } else {
             parent.spawn((
               Text::new("[Space]"),
