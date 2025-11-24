@@ -337,7 +337,7 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       },
       UiTransform {
         translation: Val2::new(px(-TOUCH_CONTROL_HEIGHT), px(VERTICAL_OFFSET)),
-        rotation: Rot2::degrees(270.),
+        rotation: Rot2::degrees(-270.),
         ..default()
       },
     ),
