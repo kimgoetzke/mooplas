@@ -11,8 +11,8 @@ use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
 use bevy::prelude::{
-  IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, MonitorSelection, Query, Res, ResMut, Time, Transform,
-  Window, With, in_state,
+  IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, MonitorSelection, Query, Res, ResMut, Single, Time,
+  Transform, Window, With, in_state,
 };
 
 /// A plugin that manages all player controls and input handling.
@@ -139,11 +139,10 @@ fn player_action_system(
 fn settings_controls_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   mut settings: ResMut<Settings>,
-  mut windows: Query<&mut Window>,
+  mut window: Single<&mut Window>,
   mut touch_controls_message: MessageWriter<TouchControlsToggledMessage>,
 ) {
   if keyboard_input.just_pressed(KeyCode::F11) {
-    let mut window = windows.single_mut().expect("Failed to get primary window");
     window.mode = match window.mode {
       bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
       _ => bevy::window::WindowMode::Windowed,

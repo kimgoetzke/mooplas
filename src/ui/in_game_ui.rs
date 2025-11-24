@@ -53,7 +53,7 @@ impl Plugin for InGameUiPlugin {
 #[derive(Component)]
 struct LobbyUiRoot;
 
-/// Marker component for each available player's information and status in the lobby UI.
+/// The component for each available player's information and status in the lobby UI.
 #[derive(Component)]
 struct LobbyUiEntry {
   player_id: PlayerId,

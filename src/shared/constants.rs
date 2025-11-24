@@ -74,9 +74,11 @@ pub(crate) const TAIL_COLLIDER_SKIP_RECENT: usize = 2;
 // UI and touch controls
 // --------------------------------//
 
+/// The alpha transparency of touch control buttons in their default (unpressed) state.
 pub(crate) const BUTTON_ALPHA_DEFAULT: f32 = 0.3;
+
+/// The alpha transparency of touch control buttons in their pressed state.
 pub(crate) const BUTTON_ALPHA_PRESSED: f32 = 0.8;
-pub(crate) const BUTTON_WIDTH: f32 = 60.;
-pub(crate) const BUTTON_HEIGHT: f32 = 60.;
-pub(crate) const BUTTON_MARGIN: f32 = 15.;
+
+/// The width of the border around any buttons.
 pub(crate) const BUTTON_BORDER_WIDTH: f32 = 3.;

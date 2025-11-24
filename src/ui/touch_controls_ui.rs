@@ -25,48 +25,45 @@ impl Plugin for TouchControlsUiPlugin {
   }
 }
 
+const TOUCH_CONTROL_WIDTH: f32 = 60.;
+const TOUCH_CONTROL_HEIGHT: f32 = 60.;
+const MARGIN: f32 = 15.;
+const VERTICAL_TOUCH_CONTROL_OFFSET: i32 = -25;
+
+/// A marker component for the root entity of the touch controls UI. Used for despawning. All other UI components must
+/// be children of this.
 #[derive(Component)]
 struct TouchControlsUiRoot;
 
+/// A component for touch control buttons identifying their function. Used to map button interactions to input actions.
 #[derive(Component, Clone, Copy, Debug)]
-struct ButtonMovement {
-  player_id: PlayerId,
-  direction: Scalar,
+enum TouchControl {
+  Movement(PlayerId, Scalar),
+  Action(PlayerId),
 }
 
-impl ButtonMovement {
-  fn new(player_id: PlayerId, direction: Scalar) -> Self {
-    Self { player_id, direction }
-  }
-}
-
-impl Into<InputAction> for &ButtonMovement {
+impl Into<InputAction> for &TouchControl {
   fn into(self) -> InputAction {
-    InputAction::Move(self.player_id, self.direction)
+    match self {
+      TouchControl::Movement(player_id, direction) => InputAction::Move(*player_id, *direction),
+      TouchControl::Action(player_id) => InputAction::Action(*player_id),
+    }
   }
 }
 
-#[derive(Component, Clone, Copy, Debug)]
-struct ButtonAction {
-  player_id: PlayerId,
-}
-
-impl ButtonAction {
-  fn new(player_id: PlayerId) -> Self {
-    Self { player_id }
-  }
-}
-
-impl Into<InputAction> for &ButtonAction {
-  fn into(self) -> InputAction {
-    InputAction::Action(self.player_id)
+impl TouchControl {
+  fn get_player_id(&self) -> PlayerId {
+    match self {
+      TouchControl::Movement(player_id, _) => *player_id,
+      TouchControl::Action(player_id) => *player_id,
+    }
   }
 }
 
 // Resource that tracks currently active movements per player.
 #[derive(Resource, Default)]
 struct ActiveMovementTracker {
-  players: HashMap<PlayerId, (Entity, ButtonMovement)>,
+  players: HashMap<PlayerId, (Entity, TouchControl)>,
 }
 
 /// A system that spawns the touch controls UI if enabled in settings. Intended to be called on startup.
@@ -83,7 +80,6 @@ fn spawn_touch_controls_ui_system(
   spawn_touch_controls_ui(&mut commands, &available_configs, &asset_server);
 }
 
-// TODO: Design better buttons
 /// Spawns the touch controls UI.
 fn spawn_touch_controls_ui(
   commands: &mut Commands,
@@ -118,7 +114,7 @@ fn spawn_touch_controls_ui(
               // Left movement button
               node.clone(),
               touch_button(None),
-              ButtonMovement::new(config.id.into(), -1.0),
+              TouchControl::Movement(config.id.into(), -1.0),
               BorderRadius {
                 top_left: percent(50),
                 bottom_left: percent(50),
@@ -137,7 +133,7 @@ fn spawn_touch_controls_ui(
               // Player action button
               node.clone(),
               touch_button(Some(config.colour)),
-              ButtonAction::new(config.id.into()),
+              TouchControl::Action(config.id.into()),
               BorderRadius::all(percent(20)),
               config.id,
             ))
@@ -148,7 +144,7 @@ fn spawn_touch_controls_ui(
               // Right movement button
               node.clone(),
               touch_button(None),
-              ButtonMovement::new(config.id.into(), 1.0),
+              TouchControl::Movement(config.id.into(), 1.0),
               BorderRadius {
                 top_left: percent(20),
                 bottom_left: percent(20),
@@ -168,11 +164,11 @@ fn spawn_touch_controls_ui(
 
 fn click_player_action(
   click: On<Pointer<Click>>,
-  mut button_query: Query<Option<&ButtonAction>, With<TouchButton>>,
+  mut touch_control_query: Query<Option<&TouchControl>, With<TouchButton>>,
   mut input_action_writer: MessageWriter<InputAction>,
 ) {
-  if let Ok(button_action) = button_query.get_mut(click.entity) {
-    if let Some(action) = button_action {
+  if let Ok(touch_control_action) = touch_control_query.get_mut(click.entity) {
+    if let Some(action) = touch_control_action {
       input_action_writer.write(action.into());
     }
   }
@@ -182,10 +178,10 @@ fn click_player_action(
 fn start_movement_by_pressing(
   action: On<Pointer<Press>>,
   mut tracker: ResMut<ActiveMovementTracker>,
+  touch_control_query: Query<&TouchControl>,
   mut input_action_writer: MessageWriter<InputAction>,
-  button_query: Query<&ButtonMovement>,
 ) {
-  start_player_movement(action, &mut tracker, &mut input_action_writer, button_query);
+  start_player_movement(action, &mut tracker, touch_control_query, &mut input_action_writer);
 }
 
 /// Starts movement for a player when they hover over a movement button. This is to support clicking just outside the
@@ -193,21 +189,23 @@ fn start_movement_by_pressing(
 fn start_movement_by_hovering_over(
   action: On<Pointer<Over>>,
   mut tracker: ResMut<ActiveMovementTracker>,
+  touch_control_query: Query<&TouchControl>,
   mut input_action_writer: MessageWriter<InputAction>,
-  button_query: Query<&ButtonMovement>,
 ) {
-  start_player_movement(action, &mut tracker, &mut input_action_writer, button_query);
+  start_player_movement(action, &mut tracker, touch_control_query, &mut input_action_writer);
 }
 
 fn start_player_movement<T: 'static + Clone + Debug + Reflect>(
   action: On<Pointer<T>>,
   tracker: &mut ResMut<ActiveMovementTracker>,
+  touch_control_query: Query<&TouchControl>,
   input_action_writer: &mut MessageWriter<InputAction>,
-  button_query: Query<&ButtonMovement>,
 ) {
-  if let Ok(movement) = button_query.get(action.entity) {
-    tracker.players.insert(movement.player_id, (action.entity, *movement));
-    input_action_writer.write(movement.into());
+  if let Ok(touch_control) = touch_control_query.get(action.entity) {
+    tracker
+      .players
+      .insert(touch_control.get_player_id(), (action.entity, *touch_control));
+    input_action_writer.write(touch_control.into());
   }
 }
 
@@ -254,8 +252,8 @@ fn player_movement_input_action_emitter_system(
 
 /// The node that positions the touch controls for a given player on screen based on their player ID.
 fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTransform) {
-  const HORIZONTAL_OFFSET: f32 = -((((BUTTON_WIDTH + ((BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.0)) * 3.) / 2.) + 4.);
-  const VERTICAL_OFFSET: f32 = -((BUTTON_HEIGHT / 3.) + (BUTTON_MARGIN + BUTTON_BORDER_WIDTH) * 2.);
+  const HORIZONTAL_OFFSET: f32 = -((((TOUCH_CONTROL_WIDTH + ((MARGIN + BUTTON_BORDER_WIDTH) * 2.0)) * 3.) / 2.) + 4.);
+  const VERTICAL_OFFSET: f32 = -((TOUCH_CONTROL_HEIGHT / 3.) + (MARGIN + BUTTON_BORDER_WIDTH) * 2.);
 
   match config.id.0 {
     0 | 1 => (
@@ -279,14 +277,14 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       Node {
         position_type: PositionType::Absolute,
         top: percent(50),
-        right: px(-25),
+        right: px(VERTICAL_TOUCH_CONTROL_OFFSET),
         margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
       },
       UiTransform {
-        translation: Val2::new(px(BUTTON_HEIGHT), px(VERTICAL_OFFSET)),
+        translation: Val2::new(px(TOUCH_CONTROL_HEIGHT), px(VERTICAL_OFFSET)),
         rotation: Rot2::degrees(-90.),
         ..default()
       },
@@ -313,15 +311,15 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
       Node {
         position_type: PositionType::Absolute,
         top: percent(50),
-        left: px(-25),
+        left: px(VERTICAL_TOUCH_CONTROL_OFFSET),
         margin: UiRect::all(px(10)),
         align_items: AlignItems::Center,
         justify_content: JustifyContent::Center,
         ..default()
       },
       UiTransform {
-        translation: Val2::new(px(-BUTTON_HEIGHT), px(VERTICAL_OFFSET)),
-        rotation: Rot2::degrees(270.0),
+        translation: Val2::new(px(-TOUCH_CONTROL_HEIGHT), px(VERTICAL_OFFSET)),
+        rotation: Rot2::degrees(270.),
         ..default()
       },
     ),
@@ -331,12 +329,12 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
 
 fn button_node() -> Node {
   Node {
-    width: px(BUTTON_WIDTH),
-    height: px(BUTTON_HEIGHT),
+    width: px(TOUCH_CONTROL_WIDTH),
+    height: px(TOUCH_CONTROL_HEIGHT),
     border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
     justify_content: JustifyContent::Center,
     align_items: AlignItems::Center,
-    margin: UiRect::all(px(BUTTON_MARGIN)),
+    margin: UiRect::all(px(MARGIN)),
     ..default()
   }
 }
@@ -346,8 +344,8 @@ fn touch_button(custom_colour: Option<Color>) -> (TouchButton, Interaction, Bord
     TouchButton,
     Interaction::default(),
     BorderColor::all(Color::from(tailwind::SLATE_500)),
-    if let Some(colour_override) = custom_colour {
-      BackgroundColor(Color::from(colour_override).with_alpha(BUTTON_ALPHA_DEFAULT))
+    if let Some(colour) = custom_colour {
+      BackgroundColor(Color::from(colour).with_alpha(BUTTON_ALPHA_DEFAULT))
     } else {
       BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT))
     },
