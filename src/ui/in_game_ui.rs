@@ -3,11 +3,14 @@ use crate::prelude::constants::{
   BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT,
 };
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
-  WinnerInfo,
+  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchButton,
+  TouchControlsToggledMessage, WinnerInfo,
 };
-use crate::shared::{ContinueMessage, PlayerRegistrationMessage};
-use crate::ui::{ButtonAnimation, default_gradient};
+use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
+use crate::ui::{
+  ButtonAnimation, default_gradient, set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press,
+  set_interaction_on_release,
+};
 use bevy::app::{Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
@@ -17,14 +20,14 @@ use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, Alpha, Bundle, Button, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
+  AlignItems, Alpha, Bundle, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
   IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection, Node,
-  OnEnter, OnExit, Query, Res, ResMut, Single, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow,
-  Val, Window, With, default, in_state, px,
+  OnEnter, OnExit, Pickable, Query, Res, ResMut, Single, Text, TextBackgroundColor, TextColor, TextFont, TextLayout,
+  TextShadow, Val, Window, With, default, in_state, px,
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
-use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, Interaction, PositionType, UiRect, percent};
+use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, PositionType, UiRect, percent};
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;
@@ -123,8 +126,11 @@ fn spawn_lobby_ui(
         align_items: AlignItems::Center,
         ..default()
       },
-      children![(
-        Node {
+      Pickable::IGNORE,
+    ))
+    .with_children(|parent| {
+      parent
+        .spawn(Node {
           width: px(400),
           height: px(100),
           position_type: PositionType::Absolute,
@@ -133,45 +139,57 @@ fn spawn_lobby_ui(
           top: Val::ZERO,
           right: Val::ZERO,
           ..default()
-        },
-        children![
-          (
-            Node {
+        })
+        .with_children(|parent| {
+          parent
+            .spawn(Node {
               width: px(200),
               height: px(100),
               position_type: PositionType::Relative,
               align_items: AlignItems::Center,
               justify_content: JustifyContent::Center,
               ..default()
-            },
-            children![button(
-              ToggleTouchControlsButton,
-              asset_server,
-              "Touch Controls",
-              170,
-              SMALL_FONT
-            )],
-          ),
-          (
-            Node {
+            })
+            .with_children(|parent| {
+              parent
+                .spawn(button(
+                  ToggleTouchControlsButton,
+                  asset_server,
+                  "Touch Controls",
+                  170,
+                  SMALL_FONT,
+                ))
+                .observe(set_interaction_on_hover)
+                .observe(set_interaction_on_hover_exit)
+                .observe(set_interaction_on_press)
+                .observe(set_interaction_on_release);
+            });
+
+          parent
+            .spawn((Node {
               width: px(200),
               height: px(100),
               position_type: PositionType::Relative,
               align_items: AlignItems::Center,
               justify_content: JustifyContent::Center,
               ..default()
-            },
-            children![button(
-              ToggleFullscreenButton,
-              asset_server,
-              "Fullscreen",
-              150,
-              SMALL_FONT
-            )],
-          ),
-        ],
-      ),],
-    ))
+            },))
+            .with_children(|parent| {
+              parent
+                .spawn(button(
+                  ToggleFullscreenButton,
+                  asset_server,
+                  "Fullscreen",
+                  150,
+                  SMALL_FONT,
+                ))
+                .observe(set_interaction_on_hover)
+                .observe(set_interaction_on_hover_exit)
+                .observe(set_interaction_on_press)
+                .observe(set_interaction_on_release);
+            });
+        });
+    })
     .id();
 
   for available_config in &available_configs.configs {
@@ -295,9 +313,6 @@ fn button(
   font_size: f32,
 ) -> impl Bundle {
   (
-    Button,
-    ButtonAnimation,
-    button_type,
     Node {
       width: px(button_width),
       height: px(65),
@@ -307,6 +322,10 @@ fn button(
       padding: UiRect::all(px(2)),
       ..default()
     },
+    TouchButton,
+    CustomInteraction::default(),
+    ButtonAnimation,
+    button_type,
     BorderRadius::all(px(10)),
     BorderColor::all(Color::from(tailwind::SLATE_500)),
     BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
@@ -326,12 +345,12 @@ fn button(
 
 /// A system that toggles touch controls when the corresponding button is pressed.
 fn toggle_touch_controls_button_system(
-  mut query: Query<&Interaction, (Changed<Interaction>, With<ToggleTouchControlsButton>)>,
+  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ToggleTouchControlsButton>)>,
   mut touch_controls_toggled_message: MessageWriter<TouchControlsToggledMessage>,
   mut settings: ResMut<Settings>,
 ) {
   for interaction in &mut query {
-    if *interaction == Interaction::Pressed {
+    if *interaction == CustomInteraction::Released {
       settings.general.enable_touch_controls = !settings.general.enable_touch_controls;
       touch_controls_toggled_message.write(TouchControlsToggledMessage::new(settings.general.enable_touch_controls));
       info!(
@@ -344,11 +363,11 @@ fn toggle_touch_controls_button_system(
 
 /// A system that toggles the window mode when the corresponding button is pressed.
 fn toggle_fullscreen_button_system(
-  mut query: Query<&Interaction, (Changed<Interaction>, With<ToggleFullscreenButton>)>,
+  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ToggleFullscreenButton>)>,
   mut window: Single<&mut Window>,
 ) {
   for interaction in &mut query {
-    if *interaction == Interaction::Pressed {
+    if *interaction == CustomInteraction::Released {
       window.mode = match window.mode {
         bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
         _ => bevy::window::WindowMode::Windowed,
@@ -360,11 +379,11 @@ fn toggle_fullscreen_button_system(
 
 /// A system that handles the continue button press by sending [`ContinueMessage`].
 fn continue_button_system(
-  mut query: Query<&Interaction, (Changed<Interaction>, With<ContinueButton>)>,
+  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ContinueButton>)>,
   mut continue_message: MessageWriter<ContinueMessage>,
 ) {
   for interaction in &mut query {
-    if *interaction == Interaction::Pressed {
+    if *interaction == CustomInteraction::Released {
       continue_message.write(ContinueMessage);
       info!("[Button] Pressed continue button");
     }

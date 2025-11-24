@@ -117,9 +117,24 @@ impl SnakeSegment {
   }
 }
 
+/// A marker component for buttons that are not directly related to touch controls.
+#[derive(Component, Clone)]
+#[require(CustomInteraction)]
+pub struct TouchButton;
+
 /// A marker component for touch control UI buttons.
 #[derive(Component, Clone)]
-pub struct TouchButton;
+#[require(CustomInteraction)]
+pub struct TouchControlButton;
+
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum CustomInteraction {
+  #[default]
+  None,
+  Hovered,
+  Pressed,
+  Released,
+}
 
 #[cfg(test)]
 mod tests {

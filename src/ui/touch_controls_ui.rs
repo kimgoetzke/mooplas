@@ -1,9 +1,13 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::*;
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, Settings, TouchButton, TouchControlsToggledMessage,
+  AvailablePlayerConfig, AvailablePlayerConfigs, CustomInteraction, PlayerId, Settings, TouchControlButton,
+  TouchControlsToggledMessage,
 };
 use crate::shared::InputAction;
+use crate::ui::{
+  set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press, set_interaction_on_release,
+};
 use avian2d::math::Scalar;
 use bevy::color::palettes::tailwind;
 use bevy::platform::collections::HashMap;
@@ -96,13 +100,13 @@ fn spawn_touch_controls_ui(
         justify_content: JustifyContent::Center,
         ..default()
       },
-      ZIndex::from(ZIndex(100)),
+      ZIndex(100),
+      Pickable::IGNORE,
     ))
     .id();
 
   for config in available_configs.configs.iter() {
     commands.entity(parent).with_children(|parent| {
-      let node = button_node();
       parent
         .spawn((
           Name::new("Controls for Player ".to_string() + &config.id.to_string()),
@@ -112,8 +116,7 @@ fn spawn_touch_controls_ui(
           parent
             .spawn((
               // Left movement button
-              node.clone(),
-              touch_button(None),
+              touch_control_button(None),
               TouchControl::Movement(config.id.into(), -1.0),
               BorderRadius {
                 top_left: percent(50),
@@ -123,6 +126,10 @@ fn spawn_touch_controls_ui(
               },
               config.id,
             ))
+            .observe(set_interaction_on_hover)
+            .observe(set_interaction_on_hover_exit)
+            .observe(set_interaction_on_press)
+            .observe(set_interaction_on_release)
             .observe(start_movement_by_pressing)
             .observe(start_movement_by_hovering_over)
             .observe(stop_player_movement_by_moving_outside_button_bounds)
@@ -131,19 +138,21 @@ fn spawn_touch_controls_ui(
           parent
             .spawn((
               // Player action button
-              node.clone(),
-              touch_button(Some(config.colour)),
+              touch_control_button(Some(config.colour)),
               TouchControl::Action(config.id.into()),
               BorderRadius::all(percent(20)),
               config.id,
             ))
+            .observe(set_interaction_on_hover)
+            .observe(set_interaction_on_hover_exit)
+            .observe(set_interaction_on_press)
+            .observe(set_interaction_on_release)
             .observe(tap_player_action);
 
           parent
             .spawn((
               // Right movement button
-              node.clone(),
-              touch_button(None),
+              touch_control_button(None),
               TouchControl::Movement(config.id.into(), 1.0),
               BorderRadius {
                 top_left: percent(20),
@@ -153,6 +162,10 @@ fn spawn_touch_controls_ui(
               },
               config.id,
             ))
+            .observe(set_interaction_on_hover)
+            .observe(set_interaction_on_hover_exit)
+            .observe(set_interaction_on_press)
+            .observe(set_interaction_on_release)
             .observe(start_movement_by_pressing)
             .observe(start_movement_by_hovering_over)
             .observe(stop_player_movement_by_moving_outside_button_bounds)
@@ -164,7 +177,7 @@ fn spawn_touch_controls_ui(
 
 fn tap_player_action(
   click: On<Pointer<Click>>,
-  mut touch_control_query: Query<Option<&TouchControl>, With<TouchButton>>,
+  mut touch_control_query: Query<Option<&TouchControl>, With<TouchControlButton>>,
   mut input_action_writer: MessageWriter<InputAction>,
   current_app_state: Res<State<AppState>>,
 ) {
@@ -345,22 +358,20 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
   }
 }
 
-fn button_node() -> Node {
-  Node {
-    width: px(TOUCH_CONTROL_WIDTH),
-    height: px(TOUCH_CONTROL_HEIGHT),
-    border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
-    justify_content: JustifyContent::Center,
-    align_items: AlignItems::Center,
-    margin: UiRect::all(px(MARGIN)),
-    ..default()
-  }
-}
-
-fn touch_button(custom_colour: Option<Color>) -> (TouchButton, Interaction, BorderColor, BackgroundColor) {
+/// A bundle for a button that is involved in controlling a player.
+fn touch_control_button(custom_colour: Option<Color>) -> impl Bundle {
   (
-    TouchButton,
-    Interaction::default(),
+    Node {
+      width: px(TOUCH_CONTROL_WIDTH),
+      height: px(TOUCH_CONTROL_HEIGHT),
+      border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
+      justify_content: JustifyContent::Center,
+      align_items: AlignItems::Center,
+      margin: UiRect::all(px(MARGIN)),
+      ..default()
+    },
+    TouchControlButton,
+    CustomInteraction::default(),
     BorderColor::all(Color::from(tailwind::SLATE_500)),
     if let Some(colour) = custom_colour {
       BackgroundColor(Color::from(colour).with_alpha(BUTTON_ALPHA_DEFAULT))
