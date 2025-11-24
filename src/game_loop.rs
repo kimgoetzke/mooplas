@@ -41,7 +41,6 @@ impl Plugin for GameLoopPlugin {
   }
 }
 
-// TODO: Fix but where you can register after this reset and before the lobby shows up
 /// Resets the registered players and winner information when entering the lobby/registering state.
 fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner: ResMut<WinnerInfo>) {
   registered.players.clear();
@@ -97,7 +96,6 @@ fn handle_continue_message(
   mut continue_messages: MessageReader<ContinueMessage>,
   mut next_app_state: ResMut<NextState<AppState>>,
 ) {
-  debug_once!("Waiting for message to start the game...");
   let messages = continue_messages.read().collect::<Vec<&ContinueMessage>>();
   if messages.is_empty() {
     return;

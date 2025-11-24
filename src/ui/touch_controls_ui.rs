@@ -137,7 +137,7 @@ fn spawn_touch_controls_ui(
               BorderRadius::all(percent(20)),
               config.id,
             ))
-            .observe(click_player_action);
+            .observe(tap_player_action);
 
           parent
             .spawn((
@@ -162,13 +162,22 @@ fn spawn_touch_controls_ui(
   }
 }
 
-fn click_player_action(
+fn tap_player_action(
   click: On<Pointer<Click>>,
   mut touch_control_query: Query<Option<&TouchControl>, With<TouchButton>>,
   mut input_action_writer: MessageWriter<InputAction>,
+  current_app_state: Res<State<AppState>>,
 ) {
   if let Ok(touch_control_action) = touch_control_query.get_mut(click.entity) {
     if let Some(action) = touch_control_action {
+      if *current_app_state != AppState::Registering {
+        warn!(
+          "Touch input [{:?}] ignored while not in [{}] state...",
+          action,
+          AppState::Registering
+        );
+        return;
+      }
       input_action_writer.write(action.into());
     }
   }
@@ -245,8 +254,17 @@ fn player_movement_input_action_emitter_system(
   if tracker.players.is_empty() {
     return;
   }
-  for (_player, (_entity, movement)) in tracker.players.iter() {
-    input_action_writer.write(movement.into());
+  for (_player, (_entity, touch_control)) in tracker.players.iter() {
+    match touch_control {
+      TouchControl::Movement(_, _) => input_action_writer.write(touch_control.into()),
+      _ => {
+        warn!(
+          "Unexpected touch control in movement tracker for touch controls: {:?}",
+          touch_control
+        );
+        continue;
+      }
+    };
   }
 }
 
