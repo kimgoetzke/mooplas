@@ -1,5 +1,7 @@
 use crate::app_states::AppState;
-use crate::prelude::constants::{BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT};
+use crate::prelude::constants::{
+  BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT,
+};
 use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
   WinnerInfo,
@@ -68,7 +70,6 @@ struct LobbyUiCta;
 #[derive(Component)]
 struct VictoryUiRoot;
 
-// TODO: Disable mouse so buttons work
 /// Marker component for the touch controls toggle button.
 #[derive(Component)]
 struct ToggleTouchControlsButton;
@@ -147,7 +148,7 @@ fn spawn_lobby_ui(
               asset_server,
               "Touch Controls",
               170,
-              20.
+              SMALL_FONT
             )],
           ),
           (
@@ -159,7 +160,13 @@ fn spawn_lobby_ui(
               justify_content: JustifyContent::Center,
               ..default()
             },
-            children![button(ToggleFullscreenButton, asset_server, "Fullscreen", 150, 20.)],
+            children![button(
+              ToggleFullscreenButton,
+              asset_server,
+              "Fullscreen",
+              150,
+              SMALL_FONT
+            )],
           ),
         ],
       ),],
@@ -259,7 +266,7 @@ fn spawn_call_to_action_to_start(
       default_shadow,
     ));
     if is_touch_controlled {
-      parent.spawn(button(ContinueButton, asset_server, "HERE", 170, 38.));
+      parent.spawn(button(ContinueButton, asset_server, "HERE", 170, NORMAL_FONT));
     } else {
       parent.spawn((
         Text::new("[Space]"),
@@ -433,7 +440,7 @@ fn player_join_prompt(
     ),
   >,
 ) {
-  let text_font = default_font(font);
+  let default_font = default_font(font);
   let default_shadow = default_shadow();
 
   (
@@ -447,7 +454,7 @@ fn player_join_prompt(
       (
         // Press...
         Text::new(": Press "),
-        text_font.clone(),
+        default_font.clone(),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
         default_shadow,
@@ -456,7 +463,7 @@ fn player_join_prompt(
         (
           // ...[Key]...
           Text::new(format!("[{:?}]", available_config.input.action)),
-          text_font.clone(),
+          default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           TextColor(Color::from(tailwind::YELLOW_400)),
           default_shadow,
@@ -465,7 +472,7 @@ fn player_join_prompt(
         (
           // ...your colour...
           Text::new("your colour"),
-          text_font.clone(),
+          default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           TextColor(available_config.colour),
           default_shadow,
@@ -474,7 +481,7 @@ fn player_join_prompt(
       (
         // ...to join
         Text::new(" to join"),
-        text_font,
+        default_font,
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         TextColor(Color::WHITE),
         default_shadow,
@@ -592,7 +599,7 @@ fn spawn_game_over_ui_system(
     ))
     .with_children(|parent| {
       // Match result
-      let large_text = large_text(&font);
+      let large_font = large_font(&font);
       match winner.get() {
         Some(id) => {
           let colour = registered_players
@@ -611,14 +618,14 @@ fn spawn_game_over_ui_system(
             children![
               (
                 Text::new(format!("  Player {}", id.0)),
-                large_text.clone(),
+                large_font.clone(),
                 TextColor(colour),
                 default_shadow,
                 TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
               ),
               (
                 Text::new(" wins!  "),
-                large_text.clone(),
+                large_font.clone(),
                 TextColor(Color::WHITE),
                 default_shadow,
                 TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
@@ -629,7 +636,7 @@ fn spawn_game_over_ui_system(
         None => {
           parent.spawn((
             Text::new("No winner this round."),
-            large_text.clone(),
+            large_font.clone(),
             TextColor(Color::WHITE),
             default_shadow,
           ));
@@ -654,7 +661,7 @@ fn spawn_game_over_ui_system(
           ));
 
           if settings.general.enable_touch_controls {
-            parent.spawn(button(ContinueButton, &asset_server, "HERE", 170, 38.));
+            parent.spawn(button(ContinueButton, &asset_server, "HERE", 170, NORMAL_FONT));
           } else {
             parent.spawn((
               Text::new("[Space]"),
@@ -679,15 +686,15 @@ fn spawn_game_over_ui_system(
 fn default_font(font: &Handle<Font>) -> TextFont {
   TextFont {
     font: font.clone(),
-    font_size: 38.0,
+    font_size: NORMAL_FONT,
     ..default()
   }
 }
 
-fn large_text(font: &Handle<Font>) -> TextFont {
+fn large_font(font: &Handle<Font>) -> TextFont {
   TextFont {
     font: font.clone(),
-    font_size: 60.0,
+    font_size: LARGE_FONT,
     ..default()
   }
 }
