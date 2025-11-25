@@ -285,7 +285,12 @@ fn spawn_call_to_action_to_start(
       default_shadow,
     ));
     if is_touch_controlled {
-      parent.spawn(button(ContinueButton, asset_server, "HERE", 170, NORMAL_FONT));
+      parent
+        .spawn(button(ContinueButton, asset_server, "HERE", 170, NORMAL_FONT))
+        .observe(set_interaction_on_hover)
+        .observe(set_interaction_on_hover_exit)
+        .observe(set_interaction_on_press)
+        .observe(set_interaction_on_release);
     } else {
       parent.spawn((
         Text::new("[Space]"),
@@ -683,7 +688,12 @@ fn spawn_game_over_ui_system(
           ));
 
           if settings.general.enable_touch_controls {
-            parent.spawn(button(ContinueButton, &asset_server, "HERE", 170, NORMAL_FONT));
+            parent
+              .spawn(button(ContinueButton, &asset_server, "HERE", 170, NORMAL_FONT))
+              .observe(set_interaction_on_hover)
+              .observe(set_interaction_on_hover_exit)
+              .observe(set_interaction_on_press)
+              .observe(set_interaction_on_release);
           } else {
             parent.spawn((
               Text::new("[Space]"),
