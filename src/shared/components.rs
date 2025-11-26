@@ -120,7 +120,7 @@ impl SnakeSegment {
 /// A marker component for buttons that are not directly related to touch controls.
 #[derive(Component, Clone)]
 #[require(CustomInteraction)]
-pub struct TouchButton;
+pub struct RegularButton;
 
 /// A marker component for touch control UI buttons.
 #[derive(Component, Clone)]

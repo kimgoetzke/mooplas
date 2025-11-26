@@ -3,16 +3,14 @@ use crate::prelude::constants::{
   BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT,
 };
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchButton,
+  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, RegularButton, Settings,
   TouchControlsToggledMessage, WinnerInfo,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
 use crate::ui::{
-  ButtonAnimation, default_gradient, set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press,
-  set_interaction_on_release,
+  ButtonAnimation, default_gradient, set_interaction_on_cancel, set_interaction_on_hover,
+  set_interaction_on_hover_exit, set_interaction_on_press, set_interaction_on_release,
 };
-use bevy::app::{Plugin, Update};
-use bevy::asset::{AssetServer, Handle};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::children;
@@ -20,10 +18,10 @@ use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, Alpha, Bundle, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
-  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection, Node,
-  OnEnter, OnExit, Pickable, Query, Res, ResMut, Single, Text, TextBackgroundColor, TextColor, TextFont, TextLayout,
-  TextShadow, Val, Window, With, default, in_state, px,
+  AlignItems, Alpha, AssetServer, Bundle, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
+  Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection,
+  Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Text, TextBackgroundColor, TextColor, TextFont,
+  TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
 };
 use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
@@ -162,7 +160,8 @@ fn spawn_lobby_ui(
                 .observe(set_interaction_on_hover)
                 .observe(set_interaction_on_hover_exit)
                 .observe(set_interaction_on_press)
-                .observe(set_interaction_on_release);
+                .observe(set_interaction_on_release)
+                .observe(set_interaction_on_cancel);
             });
 
           parent
@@ -186,7 +185,8 @@ fn spawn_lobby_ui(
                 .observe(set_interaction_on_hover)
                 .observe(set_interaction_on_hover_exit)
                 .observe(set_interaction_on_press)
-                .observe(set_interaction_on_release);
+                .observe(set_interaction_on_release)
+                .observe(set_interaction_on_cancel);
             });
         });
     })
@@ -290,7 +290,8 @@ fn spawn_call_to_action_to_start(
         .observe(set_interaction_on_hover)
         .observe(set_interaction_on_hover_exit)
         .observe(set_interaction_on_press)
-        .observe(set_interaction_on_release);
+        .observe(set_interaction_on_release)
+        .observe(set_interaction_on_cancel);
     } else {
       parent.spawn((
         Text::new("[Space]"),
@@ -327,7 +328,7 @@ fn button(
       padding: UiRect::all(px(2)),
       ..default()
     },
-    TouchButton,
+    RegularButton,
     CustomInteraction::default(),
     ButtonAnimation,
     button_type,
@@ -693,7 +694,8 @@ fn spawn_game_over_ui_system(
               .observe(set_interaction_on_hover)
               .observe(set_interaction_on_hover_exit)
               .observe(set_interaction_on_press)
-              .observe(set_interaction_on_release);
+              .observe(set_interaction_on_release)
+              .observe(set_interaction_on_cancel);
           } else {
             parent.spawn((
               Text::new("[Space]"),

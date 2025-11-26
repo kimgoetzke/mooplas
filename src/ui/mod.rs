@@ -1,15 +1,8 @@
 use crate::prelude::constants::*;
-use crate::prelude::{TouchButton, TouchControlButton};
+use crate::prelude::{RegularButton, TouchControlButton};
 use crate::shared::{CustomInteraction, Settings};
-use bevy::app::Update;
-use bevy::color::Color;
 use bevy::color::palettes::tailwind;
-use bevy::log::debug;
-use bevy::prelude::{
-  Alpha, App, BackgroundColor, BorderColor, BorderGradient, Changed, Component, DetectChangesMut, Entity,
-  IntoScheduleConfigs, On, Out, Over, Plugin, Pointer, Press, Query, Release, Res, Time, With, default,
-};
-use bevy::ui::{Gradient, LinearGradient};
+use bevy::prelude::*;
 use in_game_ui::InGameUiPlugin;
 use touch_controls_ui::TouchControlsUiPlugin;
 
@@ -24,9 +17,10 @@ impl Plugin for UiPlugin {
       .add_plugins((InGameUiPlugin, TouchControlsUiPlugin))
       .add_systems(
         Update,
-        touch_contro_button_reactive_design_system.run_if(has_touch_controls_enabled),
+        touch_control_button_reactive_design_system.run_if(has_touch_controls_enabled),
       )
-      .add_systems(Update, (touch_button_reactive_design_system, animate_button));
+      .add_systems(Update, (regular_button_reactive_design_system, animate_button_system))
+      .add_systems(PostUpdate, clear_released_interaction_system);
   }
 }
 
@@ -38,15 +32,15 @@ fn has_touch_controls_enabled(settings: Res<Settings>) -> bool {
   settings.general.enable_touch_controls
 }
 
-/// A system that updates regular button colours based on their interaction state to provide visual feedback.
-fn touch_button_reactive_design_system(
+/// A system that changes the visual appearance of regular buttons based on their interaction state.
+fn regular_button_reactive_design_system(
   mut interaction_query: Query<
     (
       &CustomInteraction,
       &mut BorderColor,
       &mut BackgroundColor,
       &mut BorderGradient,
-      &mut TouchButton,
+      &mut RegularButton,
     ),
     Changed<CustomInteraction>,
   >,
@@ -75,9 +69,8 @@ fn touch_button_reactive_design_system(
   }
 }
 
-/// A system that updates touch button colours based on their interaction state to provide visual feedback. Does not
-/// require input focus changes and is therefore multitouch friendly.
-fn touch_contro_button_reactive_design_system(
+/// A system that changes the visual appearance of touch button based on their interaction state.
+fn touch_control_button_reactive_design_system(
   mut interaction_query: Query<
     (
       &CustomInteraction,
@@ -95,12 +88,12 @@ fn touch_contro_button_reactive_design_system(
         *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_PRESSED));
         button.set_changed();
       }
-      CustomInteraction::Released | CustomInteraction::Hovered => {
+      CustomInteraction::Hovered => {
         *border_colour = BorderColor::all(Color::from(tailwind::SLATE_300));
         *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
         button.set_changed();
       }
-      CustomInteraction::None => {
+      CustomInteraction::Released | CustomInteraction::None => {
         *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
         *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
       }
@@ -108,14 +101,18 @@ fn touch_contro_button_reactive_design_system(
   }
 }
 
-fn animate_button(time: Res<Time>, mut query: Query<(&mut BorderGradient, &CustomInteraction), With<ButtonAnimation>>) {
+/// A system that animates button border gradients when interacted with by rotating the gradient angle.
+fn animate_button_system(
+  time: Res<Time>,
+  mut query: Query<(&mut BorderGradient, &CustomInteraction), With<ButtonAnimation>>,
+) {
   for (mut gradients, interaction) in query.iter_mut() {
     if *interaction == CustomInteraction::None {
       continue;
     }
     for gradient in gradients.0.iter_mut() {
       if let Gradient::Linear(LinearGradient { angle, .. }) = gradient {
-        *angle += 1. * time.delta_secs();
+        *angle += 1.5 * time.delta_secs();
       }
     }
   }
@@ -141,7 +138,7 @@ fn set_interaction_on_hover(action: On<Pointer<Over>>, mut interaction_query: Qu
       if *interaction != CustomInteraction::Hovered {
         *interaction = CustomInteraction::Hovered;
         interaction.set_changed();
-        debug!("Interaction for {entity} set to [{:?}]", *interaction);
+        trace!("Interaction for {entity} set to [{:?}]", *interaction);
       }
     });
 }
@@ -158,7 +155,7 @@ fn set_interaction_on_hover_exit(
       if *interaction != CustomInteraction::Hovered || *interaction != CustomInteraction::Pressed {
         *interaction = CustomInteraction::None;
         interaction.set_changed();
-        debug!("Interaction for {entity} set to [{:?}]", *interaction);
+        trace!("Interaction for {entity} set to [{:?}]", *interaction);
       }
     });
 }
@@ -175,12 +172,11 @@ fn set_interaction_on_press(
       if *interaction != CustomInteraction::Pressed {
         *interaction = CustomInteraction::Pressed;
         interaction.set_changed();
-        debug!("Interaction for {entity} set to [{:?}]", *interaction);
+        trace!("Interaction for {entity} set to [{:?}]", *interaction);
       }
     });
 }
 
-//noinspection DuplicatedCode
 fn set_interaction_on_release(
   action: On<Pointer<Release>>,
   mut interaction_query: Query<(Entity, &mut CustomInteraction)>,
@@ -191,6 +187,35 @@ fn set_interaction_on_release(
     .for_each(|(entity, mut interaction)| {
       *interaction = CustomInteraction::Released;
       interaction.set_changed();
-      debug!("Interaction for {entity} set to [{:?}]", *interaction);
+      trace!("Interaction for {entity} set to [{:?}]", *interaction);
     });
+}
+
+//noinspection DuplicatedCode
+fn set_interaction_on_cancel(
+  action: On<Pointer<Cancel>>,
+  mut interaction_query: Query<(Entity, &mut CustomInteraction)>,
+) {
+  interaction_query
+    .iter_mut()
+    .filter(|(entity, _)| action.entity == *entity)
+    .for_each(|(entity, mut interaction)| {
+      if *interaction != CustomInteraction::None {
+        *interaction = CustomInteraction::None;
+        interaction.set_changed();
+        trace!("Interaction for {entity} set to [{:?}]", *interaction);
+      }
+    });
+}
+
+/// Clears transient [`CustomInteraction::Released`] state by resetting to [`CustomInteraction::None`]. Runs only
+/// when [`CustomInteraction`] has changed. Is intended to be run in a later update stage such as [`PostUpdate`].
+fn clear_released_interaction_system(mut query: Query<(Entity, &mut CustomInteraction), Changed<CustomInteraction>>) {
+  for (entity, mut interaction) in query.iter_mut() {
+    if *interaction == CustomInteraction::Released {
+      *interaction = CustomInteraction::None;
+      interaction.set_changed();
+      trace!("Interaction for {entity} set to [{:?}]", *interaction);
+    }
+  }
 }

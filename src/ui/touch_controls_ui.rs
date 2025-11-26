@@ -6,7 +6,8 @@ use crate::prelude::{
 };
 use crate::shared::InputAction;
 use crate::ui::{
-  set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press, set_interaction_on_release,
+  set_interaction_on_cancel, set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press,
+  set_interaction_on_release,
 };
 use avian2d::math::Scalar;
 use bevy::color::palettes::tailwind;
@@ -130,10 +131,10 @@ fn spawn_touch_controls_ui(
             .observe(set_interaction_on_hover_exit)
             .observe(set_interaction_on_press)
             .observe(set_interaction_on_release)
-            .observe(start_movement_by_pressing)
-            .observe(start_movement_by_hovering_over)
-            .observe(stop_player_movement_by_moving_outside_button_bounds)
-            .observe(stop_player_movement_by_releasing);
+            .observe(set_interaction_on_cancel)
+            .observe(stop_player_movement_on_release)
+            .observe(start_movement_on_hover_over)
+            .observe(stop_player_movement_on_hover_out);
 
           parent
             .spawn((
@@ -147,6 +148,7 @@ fn spawn_touch_controls_ui(
             .observe(set_interaction_on_hover_exit)
             .observe(set_interaction_on_press)
             .observe(set_interaction_on_release)
+            .observe(set_interaction_on_cancel)
             .observe(tap_player_action);
 
           parent
@@ -166,10 +168,10 @@ fn spawn_touch_controls_ui(
             .observe(set_interaction_on_hover_exit)
             .observe(set_interaction_on_press)
             .observe(set_interaction_on_release)
-            .observe(start_movement_by_pressing)
-            .observe(start_movement_by_hovering_over)
-            .observe(stop_player_movement_by_moving_outside_button_bounds)
-            .observe(stop_player_movement_by_releasing);
+            .observe(set_interaction_on_cancel)
+            .observe(stop_player_movement_on_release)
+            .observe(start_movement_on_hover_over)
+            .observe(stop_player_movement_on_hover_out);
         });
     });
   }
@@ -196,19 +198,10 @@ fn tap_player_action(
   }
 }
 
-/// Starts movement for a player when they press a movement button.
-fn start_movement_by_pressing(
-  action: On<Pointer<Press>>,
-  mut tracker: ResMut<ActiveMovementTracker>,
-  touch_control_query: Query<&TouchControl>,
-  mut input_action_writer: MessageWriter<InputAction>,
-) {
-  start_player_movement(action, &mut tracker, touch_control_query, &mut input_action_writer);
-}
-
 /// Starts movement for a player when they hover over a movement button. This is to support clicking just outside the
-/// button and then moving your finger onto the button to start movement.
-fn start_movement_by_hovering_over(
+/// button and then moving your finger onto the button to start movement. Since this is about touch, we don't care that
+/// the user isn't technically "pressing" the button yet.
+fn start_movement_on_hover_over(
   action: On<Pointer<Over>>,
   mut tracker: ResMut<ActiveMovementTracker>,
   touch_control_query: Query<&TouchControl>,
@@ -232,15 +225,12 @@ fn start_player_movement<T: 'static + Clone + Debug + Reflect>(
 }
 
 /// Stops movement for a player when they release a movement button.
-fn stop_player_movement_by_releasing(action: On<Pointer<Release>>, mut tracker: ResMut<ActiveMovementTracker>) {
+fn stop_player_movement_on_release(action: On<Pointer<Release>>, mut tracker: ResMut<ActiveMovementTracker>) {
   remove_player_from_movement_tracker(action, &mut tracker);
 }
 
 /// Stops movement for a player when they move their pointer/finger outside the button bounds.
-fn stop_player_movement_by_moving_outside_button_bounds(
-  action: On<Pointer<Out>>,
-  mut tracker: ResMut<ActiveMovementTracker>,
-) {
+fn stop_player_movement_on_hover_out(action: On<Pointer<Out>>, mut tracker: ResMut<ActiveMovementTracker>) {
   remove_player_from_movement_tracker(action, &mut tracker);
 }
 
