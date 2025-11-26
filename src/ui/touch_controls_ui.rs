@@ -4,7 +4,7 @@ use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, CustomInteraction, PlayerId, Settings, TouchControlButton,
   TouchControlsToggledMessage,
 };
-use crate::shared::InputAction;
+use crate::shared::{InputAction, RegisteredPlayers};
 use crate::ui::{
   set_interaction_on_cancel, set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press,
   set_interaction_on_release,
@@ -21,7 +21,11 @@ impl Plugin for TouchControlsUiPlugin {
   fn build(&self, app: &mut App) {
     app
       .init_resource::<ActiveMovementTracker>()
-      .add_systems(Startup, spawn_touch_controls_ui_system)
+      .add_systems(OnEnter(AppState::Registering), spawn_touch_controls_system)
+      .add_systems(
+        OnExit(AppState::Registering),
+        despawn_unregistered_player_controls_system,
+      )
       .add_systems(
         Update,
         player_movement_input_action_emitter_system.run_if(in_state(AppState::Playing)),
@@ -39,6 +43,10 @@ const VERTICAL_TOUCH_CONTROL_OFFSET: i32 = -25;
 /// be children of this.
 #[derive(Component)]
 struct TouchControlsUiRoot;
+
+/// A marker component for the touch controls container for a specific player.
+#[derive(Component)]
+struct PlayerTouchControls;
 
 /// A component for touch control buttons identifying their function. Used to map button interactions to input actions.
 #[derive(Component, Clone, Copy, Debug)]
@@ -72,7 +80,7 @@ struct ActiveMovementTracker {
 }
 
 /// A system that spawns the touch controls UI if enabled in settings. Intended to be called on startup.
-fn spawn_touch_controls_ui_system(
+fn spawn_touch_controls_system(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
   settings: Res<Settings>,
@@ -112,6 +120,8 @@ fn spawn_touch_controls_ui(
         .spawn((
           Name::new("Controls for Player ".to_string() + &config.id.to_string()),
           controller_positioning_node(config),
+          PlayerTouchControls,
+          config.id,
         ))
         .with_children(|parent| {
           parent
@@ -125,7 +135,6 @@ fn spawn_touch_controls_ui(
                 top_right: percent(20),
                 bottom_right: percent(20),
               },
-              config.id,
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -142,7 +151,6 @@ fn spawn_touch_controls_ui(
               touch_control_button(Some(config.colour)),
               TouchControl::Action(config.id.into()),
               BorderRadius::all(percent(20)),
-              config.id,
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -162,7 +170,6 @@ fn spawn_touch_controls_ui(
                 top_right: percent(50),
                 bottom_right: percent(50),
               },
-              config.id,
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -245,6 +252,19 @@ fn remove_player_from_movement_tracker<T: 'static + Clone + Debug + Reflect>(
     .map(|(p, _)| *p)
   {
     tracker.players.remove(&player);
+  }
+}
+
+/// A system that despawns any player touch controls for players that have not registered for the current session.
+fn despawn_unregistered_player_controls_system(
+  mut commands: Commands,
+  player_touch_controls_query: Query<(Entity, &PlayerId), With<PlayerTouchControls>>,
+  registered_players: Res<RegisteredPlayers>,
+) {
+  for (entity, player_id) in player_touch_controls_query.iter() {
+    if !registered_players.players.iter().any(|p| p.id == *player_id) {
+      commands.entity(entity).despawn();
+    }
   }
 }
 
