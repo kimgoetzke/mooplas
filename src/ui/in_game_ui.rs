@@ -11,19 +11,17 @@ use crate::ui::{
   ButtonAnimation, default_gradient, set_interaction_on_cancel, set_interaction_on_hover,
   set_interaction_on_hover_exit, set_interaction_on_press, set_interaction_on_release,
 };
-use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, Alpha, AssetServer, Bundle, Changed, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
-  Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection,
-  Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Text, TextBackgroundColor, TextColor, TextFont,
-  TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
+  AlignItems, Alpha, AssetServer, Bundle, Changed, ChildOf, Children, Color, Commands, Component, Entity,
+  FlexDirection, Font, Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter,
+  MonitorSelection, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, SpawnRelated, Text,
+  TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
 };
-use bevy::prelude::{Spawn, SpawnRelated};
 use bevy::text::LineHeight;
 use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, PositionType, UiRect, percent};
 
@@ -149,19 +147,14 @@ fn spawn_lobby_ui(
               ..default()
             })
             .with_children(|parent| {
-              parent
-                .spawn(button(
-                  ToggleTouchControlsButton,
-                  asset_server,
-                  "Touch Controls",
-                  170,
-                  SMALL_FONT,
-                ))
-                .observe(set_interaction_on_hover)
-                .observe(set_interaction_on_hover_exit)
-                .observe(set_interaction_on_press)
-                .observe(set_interaction_on_release)
-                .observe(set_interaction_on_cancel);
+              spawn_button(
+                parent,
+                asset_server,
+                ToggleTouchControlsButton,
+                "Touch Controls",
+                170,
+                SMALL_FONT,
+              );
             });
 
           parent
@@ -174,19 +167,14 @@ fn spawn_lobby_ui(
               ..default()
             },))
             .with_children(|parent| {
-              parent
-                .spawn(button(
-                  ToggleFullscreenButton,
-                  asset_server,
-                  "Fullscreen",
-                  150,
-                  SMALL_FONT,
-                ))
-                .observe(set_interaction_on_hover)
-                .observe(set_interaction_on_hover_exit)
-                .observe(set_interaction_on_press)
-                .observe(set_interaction_on_release)
-                .observe(set_interaction_on_cancel);
+              spawn_button(
+                parent,
+                asset_server,
+                ToggleFullscreenButton,
+                "Fullscreen",
+                150,
+                SMALL_FONT,
+              );
             });
         });
     })
@@ -285,13 +273,7 @@ fn spawn_call_to_action_to_start(
       default_shadow,
     ));
     if is_touch_controlled {
-      parent
-        .spawn(button(ContinueButton, asset_server, "HERE", 170, NORMAL_FONT))
-        .observe(set_interaction_on_hover)
-        .observe(set_interaction_on_hover_exit)
-        .observe(set_interaction_on_press)
-        .observe(set_interaction_on_release)
-        .observe(set_interaction_on_cancel);
+      spawn_button(parent, asset_server, ContinueButton, "HERE", 170, NORMAL_FONT);
     } else {
       parent.spawn((
         Text::new("[Space]"),
@@ -309,44 +291,6 @@ fn spawn_call_to_action_to_start(
       default_shadow,
     ));
   }
-}
-
-fn button(
-  button_type: impl Component,
-  asset_server: &AssetServer,
-  button_text: &str,
-  button_width: i32,
-  font_size: f32,
-) -> impl Bundle {
-  (
-    Node {
-      width: px(button_width),
-      height: px(65),
-      border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
-      justify_content: JustifyContent::Center, // Horizontally center child text
-      align_items: AlignItems::Center,         // Vertically center child text
-      padding: UiRect::all(px(2)),
-      ..default()
-    },
-    RegularButton,
-    CustomInteraction::default(),
-    ButtonAnimation,
-    button_type,
-    BorderRadius::all(px(10)),
-    BorderColor::all(Color::from(tailwind::SLATE_500)),
-    BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
-    default_gradient(0.),
-    children![(
-      Text::new(button_text),
-      TextFont {
-        font: asset_server.load(DEFAULT_FONT),
-        font_size,
-        ..default()
-      },
-      TextColor(Color::srgb(0.9, 0.9, 0.9)),
-      TextShadow::default(),
-    )],
-  )
 }
 
 /// A system that toggles touch controls when the corresponding button is pressed.
@@ -689,13 +633,7 @@ fn spawn_game_over_ui_system(
           ));
 
           if settings.general.enable_touch_controls {
-            parent
-              .spawn(button(ContinueButton, &asset_server, "HERE", 170, NORMAL_FONT))
-              .observe(set_interaction_on_hover)
-              .observe(set_interaction_on_hover_exit)
-              .observe(set_interaction_on_press)
-              .observe(set_interaction_on_release)
-              .observe(set_interaction_on_cancel);
+            spawn_button(parent, &asset_server, ContinueButton, "HERE", 170, NORMAL_FONT);
           } else {
             parent.spawn((
               Text::new("[Space]"),
@@ -715,6 +653,63 @@ fn spawn_game_over_ui_system(
           ));
         });
     });
+}
+
+/// Spawns a [`RegularButton`] with the given parameters. Standard interaction observers are attached.
+fn spawn_button(
+  parent: &mut RelatedSpawnerCommands<ChildOf>,
+  asset_server: &AssetServer,
+  button_type: impl Component,
+  button_text: &str,
+  button_width: i32,
+  font_size: f32,
+) -> Entity {
+  parent
+    .spawn(button(button_type, asset_server, button_text, button_width, font_size))
+    .observe(set_interaction_on_hover)
+    .observe(set_interaction_on_hover_exit)
+    .observe(set_interaction_on_press)
+    .observe(set_interaction_on_release)
+    .observe(set_interaction_on_cancel)
+    .id()
+}
+
+fn button(
+  button_type: impl Component,
+  asset_server: &AssetServer,
+  button_text: &str,
+  button_width: i32,
+  font_size: f32,
+) -> impl Bundle {
+  (
+    Node {
+      width: px(button_width),
+      height: px(65),
+      border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
+      justify_content: JustifyContent::Center, // Horizontally center child text
+      align_items: AlignItems::Center,         // Vertically center child text
+      padding: UiRect::all(px(2)),
+      ..default()
+    },
+    RegularButton,
+    CustomInteraction::default(),
+    ButtonAnimation,
+    button_type,
+    BorderRadius::all(px(10)),
+    BorderColor::all(Color::from(tailwind::SLATE_500)),
+    BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
+    default_gradient(0.),
+    children![(
+      Text::new(button_text),
+      TextFont {
+        font: asset_server.load(DEFAULT_FONT),
+        font_size,
+        ..default()
+      },
+      TextColor(Color::srgb(0.9, 0.9, 0.9)),
+      TextShadow::default(),
+    )],
+  )
 }
 
 fn default_font(font: &Handle<Font>) -> TextFont {
