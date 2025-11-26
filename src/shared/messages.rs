@@ -11,6 +11,7 @@ impl Plugin for SharedMessagesPlugin {
     app
       .add_message::<DebugStateMessage>()
       .add_message::<PlayerRegistrationMessage>()
+      .add_message::<ContinueMessage>()
       .add_message::<TouchControlsToggledMessage>()
       .add_message::<InputAction>();
   }
@@ -50,6 +51,11 @@ pub enum InputAction {
   Action(PlayerId),
 }
 
+/// A [`Message`] indicating that the game should continue (e.g., start or restart). Used when an arbitrary player
+/// input is required.
+#[derive(Message)]
+pub struct ContinueMessage;
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -75,6 +81,8 @@ mod tests {
     assert!(app.world().contains_resource::<Messages<DebugStateMessage>>());
     assert!(app.world().contains_resource::<Messages<PlayerRegistrationMessage>>());
     assert!(app.world().contains_resource::<Messages<TouchControlsToggledMessage>>());
+    assert!(app.world().contains_resource::<Messages<InputAction>>());
+    assert!(app.world().contains_resource::<Messages<ContinueMessage>>());
   }
 
   #[test]

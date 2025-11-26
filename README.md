@@ -1,7 +1,17 @@
 # Mooplas
 
-This repository contains an online multiplayer game inspired by Achtung, die Kurve!, written in Rust using Bevy Engine.
-The goal of the project is to do some basic network programming and improve my Rust skills.
+This repository contains a basic multiplayer game inspired by _Achtung, die Kurve!_, written in Rust using Bevy Engine (
+v0.17). The goal of the project is to do some basic network programming and improve my Rust skills.
+
+> [!NOTE]
+> This project is still in active development. So far, I've only added local multiplayer support. Online multiplayer
+> support is next.
+
+## Demo
+
+![Screenshots 1](./assets/demo/screenshot-1.png)
+![Screenshots 2](./assets/demo/screenshot-2.png)
+![Screenshots 3](./assets/demo/screenshot-3.png)
 
 ## How to develop
 
@@ -20,7 +30,7 @@ available to your IDE and you can run the project from there (vs `cargo build` a
 
 ##### How to deal with RustRover making problems again
 
-RustRover will always fail to sync the project when you open it because it doesn't wait for `direnv`. Just re-sync 
+RustRover will always fail to sync the project when you open it because it doesn't wait for `direnv`. Just re-sync
 immediately after the failure and it will work.
 
 Did RustRover forget where the Rust standard library is again? Run the below and update the path in the settings:

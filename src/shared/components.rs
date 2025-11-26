@@ -17,7 +17,7 @@ pub struct SnakeHead;
 pub struct WrapAroundEntity;
 
 /// A component identifying a player. Used to link player entities together.
-#[derive(Component, Clone, Copy, PartialEq, Eq)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct PlayerId(pub u8);
 
 impl Display for PlayerId {
@@ -117,7 +117,25 @@ impl SnakeSegment {
   }
 }
 
-// rust
+/// A marker component for buttons that are not directly related to touch controls.
+#[derive(Component, Clone)]
+#[require(CustomInteraction)]
+pub struct RegularButton;
+
+/// A marker component for touch control UI buttons.
+#[derive(Component, Clone)]
+#[require(CustomInteraction)]
+pub struct TouchControlButton;
+
+#[derive(Component, Clone, Copy, PartialEq, Eq, Debug, Default)]
+pub enum CustomInteraction {
+  #[default]
+  None,
+  Hovered,
+  Pressed,
+  Released,
+}
+
 #[cfg(test)]
 mod tests {
   use super::*;

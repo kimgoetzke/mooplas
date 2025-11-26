@@ -75,6 +75,19 @@ impl InitialisationTracker {
   }
 }
 
+/// Runs an initialisation step if it has not already been completed. Marks the step as done afterwards.
+fn run_initialisation_step<F>(tracker: &mut InitialisationTracker, step: InitialisationStep, initialisation_logic: F)
+where
+  F: FnOnce(),
+{
+  if tracker.should_skip(step) {
+    debug!("Skipping [{:?}] step...", step);
+    return;
+  }
+  initialisation_logic();
+  tracker.mark_done(step);
+}
+
 /// Resets the tracker with the required [`InitialisationStep`]s.
 ///
 /// New steps must be added here as needed. In addition, the corresponding systems must be added to the initialisation
@@ -101,29 +114,40 @@ fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: Re
   }
 }
 
-// TODO: Create lambda equivalent for tracker boilerplate
-// TODO: Ensure spawn points are not to close to each other
 /// A system that provides random but safe spawn points for players.
 fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut spawn_points: ResMut<SpawnPoints>,
 ) {
-  let this_step = InitialisationStep::GenerateSpawnPoints;
-  if tracker.should_skip(this_step) {
-    debug!("Skipping [{:?}] step...", this_step);
-    return;
-  }
-
-  spawn_points.data.clear();
-  let mut rng = rand::rng();
-  for i in 0..10 {
-    let (x, y) = random_start_position(&mut rng);
-    let rotation = rng.random_range(0.0..=360.);
-    spawn_points.data.push((x, y, rotation));
-    trace!("Generated spawn point [{}] at position: ({}, {})", i + 1, x, y);
-  }
-
-  tracker.mark_done(this_step);
+  run_initialisation_step(&mut tracker, InitialisationStep::GenerateSpawnPoints, || {
+    spawn_points.data.clear();
+    let mut rng = rand::rng();
+    let mut valid_spawn_points: Vec<(f32, f32, f32)> = Vec::new();
+    while valid_spawn_points.len() < 10 {
+      let (x, y) = random_start_position(&mut rng);
+      let rotation = rng.random_range(0.0..=360.);
+      if valid_spawn_points.iter().any(|(other_x, other_y, _)| {
+        let dx = other_x - x;
+        let dy = other_y - y;
+        let distance_squared = dx * dx + dy * dy;
+        distance_squared < (EDGE_MARGIN * EDGE_MARGIN)
+      }) {
+        trace!(
+          "Rejected spawn point at ({}, {}) due to proximity to existing spawn points",
+          x, y
+        );
+        continue;
+      }
+      valid_spawn_points.push((x, y, rotation));
+      trace!(
+        "Generated spawn point [{}] at position: ({}, {})",
+        valid_spawn_points.len(),
+        x,
+        y
+      );
+    }
+    spawn_points.data = valid_spawn_points;
+  });
 }
 
 /// Calculates a random start position for the player that is at least [`EDGE_MARGIN`] pixels away from the screen edges.
@@ -150,39 +174,37 @@ fn initialise_available_player_configurations_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut available_configs: ResMut<AvailablePlayerConfigs>,
 ) {
-  let this_step = InitialisationStep::InitialiseAvailablePlayerConfigs;
-  if tracker.should_skip(this_step) {
-    debug!("Skipping [{:?}] step...", this_step);
-    return;
-  }
-
-  available_configs.configs = vec![
-    AvailablePlayerConfig {
-      id: PlayerId(0),
-      input: PlayerInput::new(PlayerId(0), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
-      colour: Color::from(tailwind::ROSE_500),
+  run_initialisation_step(
+    &mut tracker,
+    InitialisationStep::InitialiseAvailablePlayerConfigs,
+    || {
+      available_configs.configs = vec![
+        AvailablePlayerConfig {
+          id: PlayerId(0),
+          input: PlayerInput::new(PlayerId(0), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
+          colour: Color::from(tailwind::ROSE_500),
+        },
+        AvailablePlayerConfig {
+          id: PlayerId(1),
+          input: PlayerInput::new(PlayerId(1), KeyCode::Digit1, KeyCode::KeyA, KeyCode::KeyQ),
+          colour: Color::from(tailwind::LIME_500),
+        },
+        AvailablePlayerConfig {
+          id: PlayerId(2),
+          input: PlayerInput::new(PlayerId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+          colour: Color::from(tailwind::SKY_500),
+        },
+        AvailablePlayerConfig {
+          id: PlayerId(3),
+          input: PlayerInput::new(PlayerId(3), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyN),
+          colour: Color::from(tailwind::VIOLET_500),
+        },
+        AvailablePlayerConfig {
+          id: PlayerId(4),
+          input: PlayerInput::new(PlayerId(4), KeyCode::End, KeyCode::PageUp, KeyCode::Home),
+          colour: Color::from(tailwind::AMBER_500),
+        },
+      ];
     },
-    AvailablePlayerConfig {
-      id: PlayerId(1),
-      input: PlayerInput::new(PlayerId(1), KeyCode::Digit1, KeyCode::KeyA, KeyCode::KeyQ),
-      colour: Color::from(tailwind::LIME_500),
-    },
-    AvailablePlayerConfig {
-      id: PlayerId(2),
-      input: PlayerInput::new(PlayerId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-      colour: Color::from(tailwind::SKY_500),
-    },
-    AvailablePlayerConfig {
-      id: PlayerId(3),
-      input: PlayerInput::new(PlayerId(3), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyN),
-      colour: Color::from(tailwind::VIOLET_500),
-    },
-    AvailablePlayerConfig {
-      id: PlayerId(4),
-      input: PlayerInput::new(PlayerId(4), KeyCode::End, KeyCode::PageUp, KeyCode::Home),
-      colour: Color::from(tailwind::AMBER_500),
-    },
-  ];
-
-  tracker.mark_done(this_step);
+  );
 }

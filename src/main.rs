@@ -4,11 +4,10 @@ mod controls;
 mod debug;
 mod game_loop;
 mod game_world;
-mod in_game_ui;
 mod initialisation;
 mod player;
 mod shared;
-mod touch_controls_ui;
+mod ui;
 
 mod prelude {
   pub use crate::shared::*;
@@ -25,11 +24,10 @@ use crate::camera::CameraPlugin;
 use crate::controls::ControlsPlugin;
 use crate::game_loop::GameLoopPlugin;
 use crate::game_world::GameWorldPlugin;
-use crate::in_game_ui::InGameUiPlugin;
 use crate::initialisation::InitialisationPlugin;
 use crate::player::PlayerPlugin;
 use crate::prelude::*;
-use crate::touch_controls_ui::TouchControlsUiPlugin;
+use crate::ui::UiPlugin;
 use avian2d::PhysicsPlugins;
 use avian2d::prelude::Gravity;
 use bevy::prelude::*;
@@ -49,9 +47,8 @@ fn main() {
       InitialisationPlugin,
       PlayerPlugin,
       GameLoopPlugin,
-      InGameUiPlugin,
+      UiPlugin,
       ControlsPlugin,
-      TouchControlsUiPlugin,
     ));
 
   #[cfg(feature = "online-multiplayer")]

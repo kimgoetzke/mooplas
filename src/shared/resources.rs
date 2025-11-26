@@ -50,7 +50,7 @@ impl Default for GeneralSettings {
   fn default() -> Self {
     Self {
       display_player_gizmos: false,
-      enable_touch_controls: true,
+      enable_touch_controls: false,
     }
   }
 }

@@ -1,8 +1,8 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AvailablePlayerConfigs, InputAction, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
-  TouchControlsToggledMessage,
+  AvailablePlayerConfigs, ContinueMessage, InputAction, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
+  TouchControlsToggledMessage, has_registered_players,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -11,7 +11,7 @@ use bevy::input::ButtonInput;
 use bevy::log::*;
 use bevy::math::Vec3;
 use bevy::prelude::{
-  IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, MonitorSelection, NextState, Query, Res, ResMut, Time,
+  IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, MonitorSelection, Query, Res, ResMut, Single, Time,
   Transform, Window, With, in_state,
 };
 
@@ -28,7 +28,7 @@ impl Plugin for ControlsPlugin {
       )
       .add_systems(
         Update,
-        start_game_system
+        send_continue_message_on_key_press_system
           .run_if(in_state(AppState::Registering))
           .run_if(has_registered_players),
       )
@@ -38,7 +38,7 @@ impl Plugin for ControlsPlugin {
       )
       .add_systems(
         Update,
-        game_over_to_reinitialising_transition_system.run_if(in_state(AppState::GameOver)),
+        send_continue_message_on_key_press_system.run_if(in_state(AppState::GameOver)),
       );
   }
 }
@@ -58,21 +58,14 @@ fn player_input_action_system(
   }
 }
 
-/// Transitions the game from the registration/lobby state to the running state.
-fn start_game_system(keyboard_input: Res<ButtonInput<KeyCode>>, mut next_app_state: ResMut<NextState<AppState>>) {
+/// Sends a [`ContinueMessage`] when the player presses one of the selected key. Can be used to start the game or
+/// continue after game over.
+fn send_continue_message_on_key_press_system(
+  keyboard_input: Res<ButtonInput<KeyCode>>,
+  mut continue_message: MessageWriter<ContinueMessage>,
+) {
   if keyboard_input.any_pressed([KeyCode::Space, KeyCode::Enter, KeyCode::Escape]) {
-    debug_once!("Waiting for keyboard input to start the game...");
-  } else {
-    return;
-  }
-  next_app_state.set(AppState::Playing);
-}
-
-fn has_registered_players(registered: Option<Res<RegisteredPlayers>>) -> bool {
-  if let Some(registered) = registered {
-    !registered.players.is_empty()
-  } else {
-    false
+    continue_message.write(ContinueMessage);
   }
 }
 
@@ -146,11 +139,10 @@ fn player_action_system(
 fn settings_controls_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   mut settings: ResMut<Settings>,
-  mut windows: Query<&mut Window>,
+  mut window: Single<&mut Window>,
   mut touch_controls_message: MessageWriter<TouchControlsToggledMessage>,
 ) {
   if keyboard_input.just_pressed(KeyCode::F11) {
-    let mut window = windows.single_mut().expect("Failed to get primary window");
     window.mode = match window.mode {
       bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
       _ => bevy::window::WindowMode::Windowed,
@@ -164,15 +156,6 @@ fn settings_controls_system(
       "[F10] Set touch controls to [{:?}]",
       settings.general.enable_touch_controls
     );
-  }
-}
-
-fn game_over_to_reinitialising_transition_system(
-  keyboard_input: Res<ButtonInput<KeyCode>>,
-  mut next_state: ResMut<NextState<AppState>>,
-) {
-  if keyboard_input.just_pressed(KeyCode::Space) {
-    next_state.set(AppState::Initialising);
   }
 }
 

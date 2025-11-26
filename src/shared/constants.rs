@@ -15,9 +15,6 @@ pub(crate) const HIGH_RES_LAYER: RenderLayers = RenderLayers::layer(0);
 /// Render layer for pixel-perfect elements (game world, sprites, etc.).
 pub(crate) const PIXEL_PERFECT_LAYER: RenderLayers = RenderLayers::layer(1);
 
-/// The path to the default font used in the game.
-pub(crate) const DEFAULT_FONT: &str = "fonts/Tiny5.ttf";
-
 // Game world
 // --------------------------------//
 
@@ -31,16 +28,16 @@ pub(crate) const GRID_TILES_Y: f32 = 5.;
 pub(crate) const GRID_MARGIN: f32 = 2.;
 
 /// The margin from the screen edges for spawn points.
-pub(crate) const EDGE_MARGIN: f32 = 50.0;
+pub(crate) const EDGE_MARGIN: f32 = 75.;
 
 // Controls and movement
 // --------------------------------//
 
 /// The movement speed of the player-controlled snake (units per second).
-pub(crate) const MOVEMENT_SPEED: f32 = 60.0;
+pub(crate) const MOVEMENT_SPEED: f32 = 60.;
 
 /// The rotation speed of the player-controlled snake.
-pub(crate) const ROTATION_SPEED: f32 = 120.0;
+pub(crate) const ROTATION_SPEED: f32 = 120.;
 
 // Snake and gameplay constants
 // --------------------------------//
@@ -52,13 +49,13 @@ pub(crate) const WRAPAROUND_MARGIN: f32 = 2.; // Must be divisible by 2
 
 /// The length (in pixel) to which the snake tail needs to grow before certain logic is applied, such as introducing
 /// gaps.
-pub(crate) const SNAKE_TAIL_POSITION_SAMPLE_DISTANCE: f32 = 5.0;
+pub(crate) const SNAKE_TAIL_POSITION_SAMPLE_DISTANCE: f32 = 5.;
 
 /// The maximum continuous length of the snake body before a gap is introduced, measured in "samples".
 pub(crate) const SNAKE_LENGTH_MAX_CONTINUOUS: usize = 100;
 
 /// Half of the width of the snake body mesh. The full width will be double this value.
-pub(crate) const SNAKE_BODY_WIDTH: f32 = 2.0;
+pub(crate) const SNAKE_BODY_WIDTH: f32 = 2.;
 
 /// The size of the gap in the snake body mesh, measured in "samples".
 pub(crate) const SNAKE_GAP_LENGTH: usize = 15;
@@ -70,3 +67,27 @@ pub(crate) const SNAKE_HEAD_SIZE: f32 = 3.5;
 /// This creates a "safe" buffer directly behind the head so that the head does not immediately collide with its own
 /// tail.
 pub(crate) const TAIL_COLLIDER_SKIP_RECENT: usize = 2;
+
+// UI and touch controls
+// --------------------------------//
+
+/// The alpha transparency of touch control buttons in their default (unpressed) state.
+pub(crate) const BUTTON_ALPHA_DEFAULT: f32 = 0.3;
+
+/// The alpha transparency of touch control buttons in their pressed state.
+pub(crate) const BUTTON_ALPHA_PRESSED: f32 = 0.8;
+
+/// The width of the border around any buttons.
+pub(crate) const BUTTON_BORDER_WIDTH: f32 = 3.;
+
+/// The path to the default font used in the game.
+pub(crate) const DEFAULT_FONT: &str = "fonts/Tiny5.ttf";
+
+/// Font size for large text elements.
+pub(crate) const LARGE_FONT: f32 = 60.;
+
+/// Font size for normal text elements.
+pub(crate) const NORMAL_FONT: f32 = 38.;
+
+/// Font size for small text elements.
+pub(crate) const SMALL_FONT: f32 = 20.;
