@@ -201,6 +201,7 @@ fn spawn_lobby_ui(
           width: percent(100.),
           ..default()
         },
+        Pickable::IGNORE,
       ))
       .with_children(|parent| {
         parent.spawn((
