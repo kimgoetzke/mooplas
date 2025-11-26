@@ -9,6 +9,7 @@ use touch_controls_ui::TouchControlsUiPlugin;
 pub mod in_game_ui;
 pub mod touch_controls_ui;
 
+/// A system that manages the user interface elements of the game, including in-game UI and touch controls UI.
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
@@ -208,8 +209,9 @@ fn set_interaction_on_cancel(
     });
 }
 
-/// Clears transient [`CustomInteraction::Released`] state by resetting to [`CustomInteraction::None`]. Runs only
-/// when [`CustomInteraction`] has changed. Is intended to be run in a later update stage such as [`PostUpdate`].
+/// A system to clear the transient [`CustomInteraction::Released`] state by resetting to [`CustomInteraction::None`].
+/// Runs only when [`CustomInteraction`] has changed. Is intended to be run in a later update stage such as
+/// [`PostUpdate`].
 fn clear_released_interaction_system(mut query: Query<(Entity, &mut CustomInteraction), Changed<CustomInteraction>>) {
   for (entity, mut interaction) in query.iter_mut() {
     if *interaction == CustomInteraction::Released {

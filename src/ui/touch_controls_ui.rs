@@ -15,6 +15,8 @@ use bevy::platform::collections::HashMap;
 use bevy::prelude::*;
 use std::fmt::Debug;
 
+/// A plugin that sets up the touch controls UI and related systems, so that players can use touch input to control
+/// their characters.
 pub struct TouchControlsUiPlugin;
 
 impl Plugin for TouchControlsUiPlugin {
