@@ -179,7 +179,6 @@ mod tests {
     let mut app = App::new();
     app
       .add_plugins((
-        LogPlugin::default(),
         MinimalPlugins,
         ControlsPlugin,
         StatesPlugin,

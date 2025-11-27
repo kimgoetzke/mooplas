@@ -208,3 +208,168 @@ fn initialise_available_player_configurations_system(
     },
   );
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::MinimalPlugins;
+  use bevy::app::App;
+  use rand::rng;
+
+  #[test]
+  fn initialisation_tracker_default_and_reset_behaviour() {
+    let mut tracker = InitialisationTracker::default();
+
+    // Verify default state
+    assert!(tracker.is_first_run);
+    assert!(tracker.all_done());
+
+    // Reset with required steps
+    tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    assert!(!tracker.should_skip(InitialisationStep::GenerateSpawnPoints));
+    assert!(tracker.should_skip(InitialisationStep::InitialiseAvailablePlayerConfigs));
+  }
+
+  #[test]
+  fn run_initialisation_step_skips_when_not_required_and_marks_when_required() {
+    let mut tracker = InitialisationTracker::default();
+
+    // When not required the closure should not be executed
+    tracker.reset(vec![]);
+    let mut is_non_required_step_called = false;
+    run_initialisation_step(&mut tracker, InitialisationStep::GenerateSpawnPoints, || {
+      is_non_required_step_called = true;
+    });
+    assert!(
+      !is_non_required_step_called,
+      "Step was executed even though it should have been skipped"
+    );
+
+    // When required the closure should be executed and the step marked done
+    tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    let mut is_required_step_called = false;
+    run_initialisation_step(&mut tracker, InitialisationStep::GenerateSpawnPoints, || {
+      is_required_step_called = true;
+    });
+    assert!(
+      is_required_step_called,
+      "Step was not executed even though it was required"
+    );
+    assert!(tracker.all_done(), "Tracker did not mark the step as done");
+  }
+
+  #[test]
+  fn random_start_position_respects_edge_margin_and_resolution() {
+    let mut rng = rng();
+    let (x, y) = random_start_position(&mut rng);
+    let half_w = RESOLUTION_WIDTH as f32 / 2.0;
+    let half_h = RESOLUTION_HEIGHT as f32 / 2.0;
+    let min_x = -half_w + EDGE_MARGIN;
+    let max_x = half_w - EDGE_MARGIN;
+    let min_y = -half_h + EDGE_MARGIN;
+    let max_y = half_h - EDGE_MARGIN;
+
+    assert!(
+      x >= min_x && x <= max_x,
+      "x out of bounds: {} not in [{}, {}]",
+      x,
+      min_x,
+      max_x
+    );
+    assert!(
+      y >= min_y && y <= max_y,
+      "y out of bounds: {} not in [{}, {}]",
+      y,
+      min_y,
+      max_y
+    );
+  }
+
+  #[test]
+  fn generate_valid_spawn_points_system_populates_spawn_points_with_separated_points() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+
+    // Prepare resources
+    let mut tracker = InitialisationTracker::default();
+    tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    app.insert_resource(tracker);
+    app.insert_resource(SpawnPoints::default());
+
+    // Add system and run one update to execute it
+    app.add_systems(Update, generate_valid_spawn_points_system);
+    app.update();
+
+    // Validate spawn points
+    let spawn_points = app.world().get_resource::<SpawnPoints>().expect("SpawnPoints missing");
+    assert_eq!(spawn_points.data.len(), 10, "Expected 10 spawn points to be generated");
+
+    // Ensure points are at least EDGE_MARGIN apart from each other
+    let min_distance_sq = EDGE_MARGIN * EDGE_MARGIN;
+    for i in 0..spawn_points.data.len() {
+      for j in (i + 1)..spawn_points.data.len() {
+        let (x1, y1, _) = spawn_points.data[i];
+        let (x2, y2, _) = spawn_points.data[j];
+        let dx = x1 - x2;
+        let dy = y1 - y2;
+        let dist_sq = dx * dx + dy * dy;
+        assert!(
+          dist_sq >= min_distance_sq,
+          "Spawn points too close: {} and {} (dist_sq = {})",
+          i,
+          j,
+          dist_sq
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn initialise_available_player_configurations_system_populates_configs() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+
+    // Prepare resources
+    let mut tracker = InitialisationTracker::default();
+    tracker.reset(vec![InitialisationStep::InitialiseAvailablePlayerConfigs]);
+    app.insert_resource(tracker);
+    app.insert_resource(AvailablePlayerConfigs::default());
+
+    // Add system and run one update to execute it
+    app.add_systems(Update, initialise_available_player_configurations_system);
+    app.update();
+
+    // Validate available player configs
+    let available_configs = app
+      .world()
+      .get_resource::<AvailablePlayerConfigs>()
+      .expect("AvailablePlayerConfigs missing");
+    assert_eq!(
+      available_configs.configs.len(),
+      5,
+      "Expected 5 available player configurations"
+    );
+
+    // Validate that player IDs are unique
+    let mut player_ids: Vec<usize> = available_configs.configs.iter().map(|c| c.id.0 as usize).collect();
+    player_ids.sort_unstable();
+    player_ids.dedup();
+    assert_eq!(
+      player_ids.len(),
+      available_configs.configs.len(),
+      "Player ids are not unique"
+    );
+
+    // Validate that each config has a unique colour assigned
+    let mut seen = HashSet::new();
+    for (idx, available_config) in available_configs.configs.iter().enumerate() {
+      let key = (
+        (available_config.colour.to_srgba().red * 10000.) as u32,
+        (available_config.colour.to_srgba().green * 10000.) as u32,
+        (available_config.colour.to_srgba().blue * 10000.) as u32,
+        (available_config.colour.to_srgba().alpha * 10000.) as u32,
+      );
+      assert!(seen.insert(key), "Player colour duplicated at config {}", idx);
+    }
+  }
+}
