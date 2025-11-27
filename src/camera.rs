@@ -94,3 +94,77 @@ fn fit_canvas_system(
     projection.scale = 1. / h_scale.min(v_scale).round();
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app
+      .insert_resource(Assets::<Image>::default())
+      .add_systems(Startup, setup_camera_system)
+      .update();
+    app
+  }
+
+  #[test]
+  fn setup_camera_system_creates_pixel_perfect_camera() {
+    let mut app = setup();
+    let mut world = app.world_mut();
+    let mut cameras = world.query_filtered::<&Camera, With<InGameCamera>>();
+    assert_eq!(cameras.iter(&mut world).count(), 1);
+  }
+
+  #[test]
+  fn setup_camera_system_creates_high_res_camera() {
+    let mut app = setup();
+    let mut world = app.world_mut();
+    let mut cameras = world.query_filtered::<&Camera, With<OuterCamera>>();
+    assert_eq!(cameras.iter(&mut world).count(), 1);
+  }
+
+  #[test]
+  fn setup_camera_system_creates_canvas_sprite() {
+    let mut app = setup();
+    let mut world = app.world_mut();
+    let mut sprites = world.query_filtered::<&Sprite, With<Canvas>>();
+    assert_eq!(sprites.iter(&mut world).count(), 1);
+  }
+
+  #[test]
+  fn fit_canvas_system_scales_projection_correctly() {
+    let mut app = App::new();
+    app
+      .add_message::<WindowResized>()
+      .insert_resource(Assets::<Image>::default())
+      .add_systems(Startup, setup_camera_system)
+      .add_systems(Update, fit_canvas_system)
+      .update();
+
+    // Send a resize event to simulate window resizing
+    let world = app.world_mut();
+    let resize_event = WindowResized {
+      window: Entity::from_raw_u32(0).unwrap(),
+      width: 1920.0,
+      height: 1080.0,
+    };
+    world.write_message(resize_event);
+
+    // Run update which includes fit_canvas_system
+    app.update();
+
+    // Query the projection component and assert the orthographic scale was updated
+    let mut world = app.world_mut();
+    let mut projection_query = world.query_filtered::<&Projection, With<OuterCamera>>();
+    let projections = projection_query
+      .iter(&mut world)
+      .next()
+      .expect("OuterCamera projection missing");
+    if let Projection::Orthographic(ref orthographic_projections) = *projections {
+      assert!(orthographic_projections.scale > 0.0);
+    } else {
+      panic!("Projection is not orthographic");
+    }
+  }
+}

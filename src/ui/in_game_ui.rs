@@ -323,7 +323,7 @@ fn toggle_fullscreen_button_system(
         bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
         _ => bevy::window::WindowMode::Windowed,
       };
-      info!("[F11] Set window mode to [{:?}]", window.mode);
+      info!("[Button] Set window mode to [{:?}]", window.mode);
     }
   }
 }

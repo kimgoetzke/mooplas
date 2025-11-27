@@ -16,17 +16,6 @@ impl Plugin for AppStatePlugin {
   }
 }
 
-fn log_app_state_transitions_system(mut app_state_messages: MessageReader<StateTransitionEvent<AppState>>) {
-  for message in app_state_messages.read() {
-    info!(
-      "Transitioning [{}] from [{}] to [{}]",
-      AppState::name(),
-      name_from(message.exited),
-      name_from(message.entered)
-    );
-  }
-}
-
 fn name_from<T: ToString>(state: Option<T>) -> String {
   match state {
     Some(state_name) => state_name.to_string(),
@@ -58,5 +47,61 @@ impl AppState {
 impl Display for AppState {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", format!("{:?}", self))
+  }
+}
+
+fn log_app_state_transitions_system(mut app_state_messages: MessageReader<StateTransitionEvent<AppState>>) {
+  for message in app_state_messages.read() {
+    info!(
+      "Transitioning [{}] from [{}] to [{}]",
+      AppState::name(),
+      name_from(message.exited),
+      name_from(message.entered)
+    );
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::app::App;
+  use bevy::log::LogPlugin;
+  use bevy::prelude::*;
+  use bevy::state::app::StatesPlugin;
+
+  #[test]
+  fn app_state_plugin_initialises_states() {
+    let mut app = App::new();
+    app.add_plugins((LogPlugin::default(), StatesPlugin));
+    app.add_plugins(AppStatePlugin);
+
+    let state = app.world().get_resource::<State<AppState>>();
+    assert!(state.is_some());
+    assert_eq!(state.unwrap(), &AppState::Initialising);
+  }
+
+  #[test]
+  fn app_state_name_returns_correct_value() {
+    assert_eq!(AppState::name(), "AppState");
+  }
+
+  #[test]
+  fn app_state_display_formats_correctly() {
+    assert_eq!(AppState::Initialising.to_string(), "Initialising");
+    assert_eq!(AppState::Registering.to_string(), "Registering");
+    assert_eq!(AppState::Playing.to_string(), "Playing");
+    assert_eq!(AppState::GameOver.to_string(), "GameOver");
+  }
+
+  #[test]
+  fn name_from_handles_some_state() {
+    let state_name = name_from(Some(AppState::Playing));
+    assert_eq!(state_name, "Playing");
+  }
+
+  #[test]
+  fn name_from_handles_none_state() {
+    let state_name = name_from::<AppState>(None);
+    assert_eq!(state_name, "None");
   }
 }
