@@ -344,4 +344,39 @@ mod tests {
     assert!(has_action, "Expected an Action InputAction to be sent");
     assert!(has_move, "Expected a Move InputAction to be sent");
   }
+
+  #[test]
+  fn settings_controls_system_toggles_touch_controls() {
+    let mut app = setup();
+
+    // Make sure we have a window, so that the system runs
+    app.world_mut().spawn(Window::default());
+
+    // Ensure default settings are as expected
+    let settings = app.world().get_resource::<Settings>().expect("Settings missing");
+    assert!(
+      !settings.general.enable_touch_controls,
+      "Expected touch controls to be disabled by default"
+    );
+
+    // Press F10 to toggle touch controls
+    handle_key_input(&mut app, TestKeyboardInput::Press(KeyCode::F10));
+
+    // Verify that settings have changed
+    let settings = app.world().get_resource::<Settings>().expect("Settings missing");
+    assert!(
+      settings.general.enable_touch_controls,
+      "Expected touch controls to be enabled after pressing F10"
+    );
+
+    // Verify that a toggle message for touch controls was sent
+    let touch_messages = app
+      .world()
+      .get_resource::<Messages<TouchControlsToggledMessage>>()
+      .expect("Messages<TouchControlsToggledMessage> missing");
+    assert!(
+      touch_messages.iter_current_update_messages().next().is_some(),
+      "Expected a TouchControlsToggledMessage to be sent"
+    );
+  }
 }
