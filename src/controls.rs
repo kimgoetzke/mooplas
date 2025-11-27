@@ -162,31 +162,49 @@ fn settings_controls_system(
 #[cfg(test)]
 mod tests {
   use super::*;
-  // use crate::app_states::AppStatePlugin;
-  // use crate::prelude::SharedResourcesPlugin;
-  // use crate::shared::SharedMessagesPlugin;
-  // use bevy::state::app::StatesPlugin;
+  use crate::app_states::AppStatePlugin;
+  use crate::prelude::{AvailablePlayerConfig, RegisteredPlayer, SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::MinimalPlugins;
+  use bevy::prelude::Color;
+  use bevy::prelude::{Messages, Mut, NextState, State};
+  use bevy::state::app::StatesPlugin;
 
-  // enum TestKeyboardInput {
-  //   Press(KeyCode),
-  //   Release(KeyCode),
-  // }
-  //
-  // fn setup() -> App {
-  //   let mut app = App::new();
-  //   app
-  //     .add_plugins((
-  //       MinimalPlugins,
-  //       ControlsPlugin,
-  //       StatesPlugin,
-  //       AppStatePlugin,
-  //       SharedMessagesPlugin,
-  //       SharedResourcesPlugin,
-  //     ))
-  //     .init_resource::<ButtonInput<KeyCode>>();
-  //   app
-  // }
+  #[allow(unused)]
+  enum TestKeyboardInput {
+    Press(KeyCode),
+    Release(KeyCode),
+  }
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app
+      .add_plugins((
+        LogPlugin::default(),
+        MinimalPlugins,
+        ControlsPlugin,
+        StatesPlugin,
+        AppStatePlugin,
+        SharedMessagesPlugin,
+        SharedResourcesPlugin,
+      ))
+      .init_resource::<ButtonInput<KeyCode>>();
+    app
+  }
+
+  fn handle_key_input(app: &mut App, desired_input: TestKeyboardInput) {
+    let mut keyboard_input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+    match desired_input {
+      TestKeyboardInput::Press(key_code) => keyboard_input.press(key_code),
+      TestKeyboardInput::Release(key_code) => keyboard_input.release(key_code),
+    };
+    app.update();
+  }
+
+  fn change_app_state(app: &mut App, state: AppState) {
+    let mut next_state = app.world_mut().resource_mut::<NextState<AppState>>();
+    next_state.set(state);
+    app.update();
+  }
 
   #[test]
   fn shared_messages_plugin_does_not_panic_on_empty_app() {
@@ -195,43 +213,135 @@ mod tests {
     app.add_plugins(ControlsPlugin);
   }
 
-  // TODO: Fix this test or remove it; cannot advance without registering a player
-  // #[test]
-  // fn start_game_system_changes_app_state() {
-  //   let mut app = setup();
-  //
-  //   // Verify initial state
-  //   let state = app.world().resource::<State<AppState>>();
-  //   assert_eq!(state.get(), &AppState::Initialising);
-  //
-  //   // Manually advance state to the state in which the function runs
-  //   change_app_state(&mut app);
-  //
-  //   // Verify state has been advanced
-  //   let state = app.world().resource::<State<AppState>>();
-  //   assert_eq!(state.get(), &AppState::Registering);
-  //
-  //   // Simulate space key press to start the game
-  //   handle_key_input(&mut app, TestKeyboardInput::Press(KeyCode::Space));
-  //   handle_key_input(&mut app, TestKeyboardInput::Release(KeyCode::Space));
-  //
-  //   // Verify state has changed by the system
-  //   let state = app.world().resource::<State<AppState>>();
-  //   assert_eq!(state.get(), &AppState::Registering);
-  // }
-  //
-  // fn change_app_state(app: &mut App) {
-  //   let mut next_state = app.world_mut().resource_mut::<NextState<AppState>>();
-  //   next_state.set(AppState::Registering);
-  //   app.update();
-  // }
-  //
-  // fn handle_key_input(app: &mut App, desired_input: TestKeyboardInput) {
-  //   let mut keyboard_input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
-  //   match desired_input {
-  //     TestKeyboardInput::Press(key_code) => keyboard_input.press(key_code),
-  //     TestKeyboardInput::Release(key_code) => keyboard_input.release(key_code),
-  //   };
-  //   app.update();
-  // }
+  #[test]
+  fn player_input_action_system_sends_input_action_message() {
+    let mut app = setup();
+
+    // Prepare an available player config that reacts to KeyX
+    let mut available_configs = app
+      .world_mut()
+      .get_resource_mut::<AvailablePlayerConfigs>()
+      .expect("AvailablePlayerConfigs resource missing");
+    available_configs.configs.push(AvailablePlayerConfig {
+      id: PlayerId(0),
+      input: PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+      colour: Color::WHITE,
+    });
+    drop(available_configs);
+
+    // Verify initial state
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Initialising);
+
+    // Manually advance state to the state in which the function runs
+    change_app_state(&mut app, AppState::Registering);
+
+    // Verify state has been advanced since this system only runs in Registering state
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Registering);
+
+    // Simulate pressing the action key
+    handle_key_input(&mut app, TestKeyboardInput::Press(KeyCode::KeyX));
+
+    // Read produced messages
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<InputAction>>()
+      .expect("Messages<InputAction> missing");
+
+    // Ensure at least one message was written
+    let has_input_action = messages
+      .iter_current_update_messages()
+      .any(|ia| matches!(ia, InputAction::Action(_)));
+    assert!(has_input_action, "Expected an Action InputAction to be sent");
+  }
+
+  #[test]
+  fn send_continue_message_on_key_press_system_sends_continue_message() {
+    let mut app = setup();
+
+    // Verify initial state
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Initialising);
+
+    // Manually advance state to the state in which the system runs
+    change_app_state(&mut app, AppState::Registering);
+
+    // Verify state has been advanced since this system only runs in this state
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Registering);
+
+    // Register player to fulfill has_registered_players condition
+    let mut registered_players = app
+      .world_mut()
+      .get_resource_mut::<RegisteredPlayers>()
+      .expect("RegisteredPlayers resource missing");
+    registered_players.players.push(RegisteredPlayer {
+      id: PlayerId(0),
+      input: PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+      colour: Color::WHITE,
+      alive: true,
+    });
+    drop(registered_players);
+
+    // Simulate pressing Space which should trigger a ContinueMessage
+    handle_key_input(&mut app, TestKeyboardInput::Press(KeyCode::Space));
+
+    // Ensure at least one continue message was written
+    let mut messages: Mut<Messages<ContinueMessage>> = app
+      .world_mut()
+      .get_resource_mut::<Messages<ContinueMessage>>()
+      .expect("Messages<ContinueMessage> missing");
+    assert!(
+      messages.drain().next().is_some(),
+      "Expected a ContinueMessage to be sent"
+    );
+  }
+
+  #[test]
+  fn player_input_system_sends_move_and_action_messages() {
+    let mut app = setup();
+    let player_input = PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX);
+
+    // Register a player for the input system to process
+    let mut registered_players = app
+      .world_mut()
+      .get_resource_mut::<RegisteredPlayers>()
+      .expect("RegisteredPlayers resource missing");
+    registered_players.players.push(RegisteredPlayer {
+      id: player_input.id,
+      input: player_input.clone(),
+      colour: Color::WHITE,
+      alive: true,
+    });
+    drop(registered_players);
+
+    // Manually advance state to the state in which the system runs
+    change_app_state(&mut app, AppState::Playing);
+
+    // Verify state has been advanced since this system only runs in this state
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Playing);
+
+    // Simulate pressing left, right and action
+    handle_key_input(&mut app, TestKeyboardInput::Press(player_input.left));
+    handle_key_input(&mut app, TestKeyboardInput::Press(player_input.right));
+    handle_key_input(&mut app, TestKeyboardInput::Press(player_input.action));
+
+    // Read produced messages
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<InputAction>>()
+      .expect("Messages<InputAction> missing");
+
+    // Verify that both move and action messages were sent
+    let has_action = messages
+      .iter_current_update_messages()
+      .any(|ia| matches!(ia, InputAction::Action(_)));
+    let has_move = messages
+      .iter_current_update_messages()
+      .any(|ia| matches!(ia, InputAction::Move(_, _)));
+    assert!(has_action, "Expected an Action InputAction to be sent");
+    assert!(has_move, "Expected a Move InputAction to be sent");
+  }
 }
