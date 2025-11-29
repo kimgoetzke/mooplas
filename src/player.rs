@@ -70,7 +70,7 @@ fn spawn_player_system(
   mut spawn_points: ResMut<SpawnPoints>,
   players: Res<RegisteredPlayers>,
 ) {
-  let snake_head_handle = asset_server.load("player.png");
+  let snake_head_handle = asset_server.load("images/player.png");
   for player in players.players.iter() {
     let (x, y, rotation) = spawn_points.data.pop().expect("Can't get spawn point for player");
     let index = player.id.0;
