@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Mooplas</title>
+    <link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<div class="loader"></div>
+<h1>Mooplas</h1>
+<canvas id="mooplas-canvas" width="1280" height="720"></canvas>
+<script type="module">
+    import './restart-audio-context.js';
+    import init from './mooplas.js';
+
+    init().catch((error) => {
+        if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {
+            throw error;
+        }
+    });
+</script>
+<p>Thanks for playing Mooplas!</p>
+</body>
+</html>

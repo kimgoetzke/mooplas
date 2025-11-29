@@ -27,7 +27,10 @@
           version,
           profile,
         }: let
-          rust = pkgs.rust-bin.${version}.latest.${profile}.override {extensions = ["rust-src"];};
+            rust = pkgs.rust-bin.${version}.latest.${profile}.override {
+              extensions = [ "rust-src" ];
+              targets = [ "wasm32-unknown-unknown" ];
+            };
         in {
           name = "rust-" + version + "-" + profile;
           path = "${rust}/lib/rustlib/src/rust/library";
@@ -131,6 +134,7 @@
                   export CARGO_PROFILE_DEV_BUILD_OVERRIDE_DEBUG=true
                   export PATH=$PATH:''${CARGO_HOME:-~/.cargo}/bin
                   export PATH=$PATH:''${RUSTUP_HOME:-~/.rustup}/toolchains/$RUSTC_VERSION-x86_64-unknown-linux-gnu/bin/
+                  export RUSTFLAGS="--cfg=web_sys_unstable_apis" # Enable unstable web-sys APIs for Bevy WebAssembly support
                   echo ""
                   echo "Welcome to your Rust game development environment!" | ${pkgs.lolcat}/bin/lolcat
                   echo "It uses Rust ${version} with $(rustc --version), is Bevy-ready, and includes Audacity for audio editing." | ${pkgs.lolcat}/bin/lolcat

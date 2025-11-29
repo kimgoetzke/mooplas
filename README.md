@@ -47,12 +47,12 @@ Upgrade the flake by running `nix flake update .` in the repository's base direc
 
 #### Prerequisites
 
-1. Run:
+1. Run (already included in the Nix Flake if using Nix):
    ```shell
    rustup target add wasm32-unknown-unknown
    ```
 2. Set `RUSTFLAGS`
-    1. **Linux**:
+    1. **Linux** (already set by the Flake automatically if using Nix):
        ```bash
        export RUSTFLAGS="--cfg=web_sys_unstable_apis"
        ```
@@ -84,11 +84,11 @@ Then you can build the WASM file:
 3. Run `wasm-bindgen` to generate the JS bindings and move all relevant files to the `/www/public` directory:
     1. **Linux**:
        ```shell
-       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/rusteroids.wasm
+       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas.wasm
        ```
     2. **Windows**:
        ```powershell
-       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/rusteroids.wasm
+       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas.wasm
        ```
 
 #### Optimising
