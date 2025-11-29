@@ -9,9 +9,9 @@ v0.17). The goal of the project is to do some basic network programming and impr
 
 ## Demo
 
-![Screenshots 1](./assets/demo/screenshot-1.png)
-![Screenshots 2](./assets/demo/screenshot-2.png)
-![Screenshots 3](./assets/demo/screenshot-3.png)
+![Screenshots 1](assets/ignore/demo/screenshot-1.png)
+![Screenshots 2](assets/ignore/demo/screenshot-2.png)
+![Screenshots 3](assets/ignore/demo/screenshot-3.png)
 
 ## How to develop
 
@@ -43,3 +43,78 @@ find /nix/store -type d -name rust_lib_src
 
 Upgrade the flake by running `nix flake update .` in the repository's base directory.
 
+## How to build WASM for the web
+
+#### Prerequisites
+
+1. Run:
+   ```shell
+   rustup target add wasm32-unknown-unknown
+   ```
+2. Set `RUSTFLAGS`
+    1. **Linux**:
+       ```bash
+       export RUSTFLAGS="--cfg=web_sys_unstable_apis"
+       ```
+    2. **Windows**:
+       ```powershell
+       $env:RUSTFLAGS="--cfg=web_sys_unstable_apis"
+       ```
+3. Make sure you have Node.js with `serve` installed
+
+#### Building
+
+Then you can build the WASM file:
+
+1. Build the WASM file:
+   ```shell
+   cargo build --target wasm32-unknown-unknown --release
+   ```
+2. Clean the `/www/public` directory and copy the game's assets over:
+    - **Linux**:
+      ```shell
+      ./scripts/clean-mooplas-files.sh
+      ./scripts/copy-assets.sh
+      ```
+    - **Windows**:
+       ```powershell
+       ./scripts/clean-wasm-files.ps1
+       ./scripts/copy-assets.ps1
+       ```
+3. Run `wasm-bindgen` to generate the JS bindings and move all relevant files to the `/www/public` directory:
+    1. **Linux**:
+       ```shell
+       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/rusteroids.wasm
+       ```
+    2. **Windows**:
+       ```powershell
+       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/rusteroids.wasm
+       ```
+
+#### Optimising
+
+You can optimise the WASM file (from the
+[Unofficial Bevy Cheat Book](https://bevy-cheatbook.github.io/platforms/wasm/size-opt.html)):
+
+   ```shell
+   # Optimize for size (z profile).
+   wasm-opt -Oz -o output.wasm input.wasm
+   
+   # Optimize for size (s profile).
+   wasm-opt -Os -o output.wasm input.wasm
+   
+   # Optimize for speed.
+   wasm-opt -O3 -o output.wasm input.wasm
+   
+   # Optimize for both size and speed.
+   wasm-opt -O -ol 100 -s 100 -o output.wasm input.wasm
+   ```
+
+#### Running
+
+Finally, to run the game in your browser locally, run the below and paste the URL copied to your clipboard into your
+browser:
+
+```shell
+npx serve ./www/public
+```
