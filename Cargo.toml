@@ -11,8 +11,8 @@ rand = "0.9.2"
 avian2d = "0.4.1"
 
 [features]
-default = ["dev"]
-online-multiplayer = ["bevy_renet"]
+default = ["dev", "online"]
+online = ["bevy_renet"]
 dev = [
   # Improve compile times for dev builds by linking Bevy as a dynamic library
   "bevy/dynamic_linking",

@@ -5,7 +5,7 @@ mod debug;
 mod game_loop;
 mod game_world;
 mod initialisation;
-mod online_multiplayer;
+mod online;
 mod player;
 mod shared;
 mod ui;
@@ -17,8 +17,8 @@ mod prelude {
 #[cfg(feature = "dev")]
 use crate::debug::DebugPlugin;
 
-#[cfg(feature = "online-multiplayer")]
-use crate::online_multiplayer::OnlineMultiplayerPlugin;
+#[cfg(feature = "online")]
+use crate::online::OnlinePlugin;
 
 use crate::app_states::AppStatePlugin;
 use crate::camera::CameraPlugin;
@@ -52,8 +52,8 @@ fn main() {
       ControlsPlugin,
     ));
 
-  #[cfg(feature = "online-multiplayer")]
-  app.add_plugins(OnlineMultiplayerPlugin);
+  #[cfg(feature = "online")]
+  app.add_plugins(OnlinePlugin);
 
   #[cfg(feature = "dev")]
   app.add_plugins(DebugPlugin);
