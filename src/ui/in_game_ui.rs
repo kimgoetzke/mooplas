@@ -14,8 +14,8 @@ use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, AssetServer, Changed, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font,
   Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection,
-  Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, SpawnRelated, Text, TextBackgroundColor,
-  TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
+  Name, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, SpawnRelated, Text,
+  TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
 };
 use bevy::text::LineHeight;
 use bevy::ui::{BackgroundColor, PositionType, percent};
@@ -109,6 +109,7 @@ fn spawn_lobby_ui(
   let root = commands
     .spawn((
       LobbyUiRoot,
+      Name::new("Lobby UI"),
       Node {
         width: percent(100),
         height: percent(100),
@@ -556,6 +557,7 @@ fn spawn_game_over_ui_system(
   commands
     .spawn((
       VictoryUiRoot,
+      Name::new("Victory UI"),
       Node {
         width: percent(100),
         height: percent(100),

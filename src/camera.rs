@@ -79,7 +79,12 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
     PIXEL_PERFECT_LAYER,
   ));
 
-  commands.spawn((Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYER));
+  commands.spawn((
+    Sprite::from_image(image_handle),
+    Name::new("Camera Image Canvas"),
+    Canvas,
+    HIGH_RES_LAYER,
+  ));
 }
 
 // Scales camera projection to fit the window (integer multiples only for pixel-perfect rendering)

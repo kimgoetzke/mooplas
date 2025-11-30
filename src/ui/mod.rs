@@ -250,6 +250,7 @@ fn button(
       padding: UiRect::all(px(2)),
       ..default()
     },
+    Name::new(format!("Button: {}", button_text)),
     RegularButton,
     CustomInteraction::default(),
     ButtonAnimation,
