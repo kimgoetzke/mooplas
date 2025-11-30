@@ -41,24 +41,24 @@ find /nix/store -type d -name rust_lib_src
 
 ##### Using the Nix flake
 
-Upgrade the flake by running `nix flake update .` in the repository's base directory.
+Upgrade the flake by running `nix flake update --flake .` in the repository's base directory.
 
 ## How to build WASM for the web
 
 #### Prerequisites
 
-1. Run (already included in the Nix Flake if using Nix):
+1. Run (already included in the Flake if using Nix):
    ```shell
    rustup target add wasm32-unknown-unknown
    ```
-2. Set `RUSTFLAGS`
-    1. **Linux** (already set by the Flake automatically if using Nix):
+2. Set `RUSTFLAGS` environment variable:
+    1. **Linux**:
        ```bash
-       export RUSTFLAGS="--cfg=web_sys_unstable_apis"
+       export RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg=getrandom_backend=\"wasm_js\""
        ```
     2. **Windows**:
        ```powershell
-       $env:RUSTFLAGS="--cfg=web_sys_unstable_apis"
+       $env:RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg=getrandom_backend=`"wasm_js`""
        ```
 3. Make sure you have Node.js with `serve` installed
 
@@ -68,7 +68,7 @@ Then you can build the WASM file:
 
 1. Build the WASM file:
    ```shell
-   cargo build --target wasm32-unknown-unknown --release
+   RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release
    ```
 2. Clean the `/www/public` directory and copy the game's assets over:
     - **Linux**:
