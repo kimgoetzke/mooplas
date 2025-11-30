@@ -32,6 +32,15 @@ struct OuterCamera;
 
 /// Sets up all cameras.
 fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
+  commands.spawn((
+    Name::new("High-Res Camera"),
+    OuterCamera,
+    Camera2d,
+    Msaa::Off,
+    HIGH_RES_LAYER,
+    IsDefaultUiCamera,
+  ));
+
   let canvas_size = Extent3d {
     width: RESOLUTION_WIDTH,
     height: RESOLUTION_HEIGHT,
@@ -71,13 +80,6 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
   ));
 
   commands.spawn((Sprite::from_image(image_handle), Canvas, HIGH_RES_LAYER));
-  commands.spawn((
-    Name::new("High-Res Camera"),
-    OuterCamera,
-    Camera2d,
-    Msaa::Off,
-    HIGH_RES_LAYER,
-  ));
 }
 
 // Scales camera projection to fit the window (integer multiples only for pixel-perfect rendering)
