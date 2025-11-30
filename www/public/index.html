@@ -6,10 +6,37 @@
     <link rel="stylesheet" href="style.css"/>
 </head>
 <body>
-<div class="loader"></div>
 <h1>Mooplas</h1>
+<div class="loader"></div>
 <canvas id="mooplas-canvas" width="1280" height="720"></canvas>
 <script type="module">
+    // Intercept canvas creation so the generated `mooplas.js` uses the existing #mooplas-canvas instead of appending a new canvas.
+    const existingCanvas = document.getElementById('mooplas-canvas');
+    const originalCreateElement = Document.prototype.createElement;
+    const originalCreateElementNS = Document.prototype.createElementNS;
+
+    function isCanvasTag(tag) {
+        try {
+            return String(tag).toLowerCase() === 'canvas';
+        } catch (e) {
+            console.log("Error in isCanvasTag:", e);
+            return false;
+        }
+    }
+
+    Document.prototype.createElement = function (tagName, options) {
+        if (isCanvasTag(tagName) && existingCanvas) {
+            return existingCanvas;
+        }
+        return originalCreateElement.call(this, tagName, options);
+    };
+
+    Document.prototype.createElementNS = function (namespaceURI, tagName) {
+        if (isCanvasTag(tagName) && existingCanvas) {
+            return existingCanvas;
+        }
+        return originalCreateElementNS.call(this, namespaceURI, tagName);
+    };
     import './restart-audio-context.js';
     import init from './mooplas.js';
 
@@ -17,8 +44,12 @@
         if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {
             throw error;
         }
+    }).finally(() => {
+        // Restore originals to avoid affecting other scripts
+        Document.prototype.createElement = originalCreateElement;
+        Document.prototype.createElementNS = originalCreateElementNS;
     });
 </script>
-<p>Thanks for playing Mooplas!</p>
+<p>It is highly recommended to play this game in fullscreen.</p>
 </body>
 </html>
