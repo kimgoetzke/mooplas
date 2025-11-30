@@ -16,7 +16,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_systems(OnExit(AppState::Registering), spawn_player_system)
+      .add_systems(OnExit(AppState::Registering), spawn_players_system)
       .add_systems(
         Update,
         ((
@@ -64,7 +64,7 @@ enum CollisionLayer {
 }
 
 /// Spawns the player(s).
-fn spawn_player_system(
+fn spawn_players_system(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
   mut spawn_points: ResMut<SpawnPoints>,

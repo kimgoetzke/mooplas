@@ -10,6 +10,7 @@ impl Plugin for SharedMessagesPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<DebugStateMessage>()
+      .add_message::<ToggleMenuMessage>()
       .add_message::<PlayerRegistrationMessage>()
       .add_message::<ContinueMessage>()
       .add_message::<TouchControlsToggledMessage>()
@@ -42,6 +43,27 @@ impl TouchControlsToggledMessage {
   pub fn new(enabled: bool) -> Self {
     Self { enabled }
   }
+}
+
+/// A [`Message`] indicating that the spawn menu should be opened.
+#[derive(Message)]
+pub struct ToggleMenuMessage {
+  pub active: MenuName,
+}
+
+impl ToggleMenuMessage {
+  pub fn set(active: MenuName) -> Self {
+    Self { active }
+  }
+}
+
+/// The name identifying a menu. Used by the [`ToggleMenuMessage`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MenuName {
+  MainMenu,
+  PlayOnlineMenu,
+  HostGameMenu,
+  JoinGameMenu,
 }
 
 /// A [`Message`] written for an input action by a player.
@@ -79,6 +101,7 @@ mod tests {
   fn shared_messages_plugin_registers_debug_state_message() {
     let app = setup();
     assert!(app.world().contains_resource::<Messages<DebugStateMessage>>());
+    assert!(app.world().contains_resource::<Messages<ToggleMenuMessage>>());
     assert!(app.world().contains_resource::<Messages<PlayerRegistrationMessage>>());
     assert!(app.world().contains_resource::<Messages<TouchControlsToggledMessage>>());
     assert!(app.world().contains_resource::<Messages<InputAction>>());

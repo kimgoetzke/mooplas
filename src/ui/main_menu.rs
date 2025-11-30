@@ -1,13 +1,15 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
+use crate::prelude::{MenuName, ToggleMenuMessage};
 use crate::shared::CustomInteraction;
 use crate::ui::spawn_button;
 use bevy::color::palettes::tailwind;
 use bevy::log::*;
 use bevy::prelude::{
   AlignItems, App, AssetServer, Changed, Color, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
-  JustifyContent, Name, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Sprite, Text,
-  TextColor, TextFont, TextShadow, Transform, Update, Val, Vec2, With, default, in_state, percent, px,
+  JustifyContent, MessageReader, MessageWriter, Name, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query,
+  Res, ResMut, Sprite, Text, TextColor, TextFont, TextShadow, Transform, Update, Vec2, With, default, in_state,
+  percent, px,
 };
 
 /// Plugin that provides and manages the main menu UI.
@@ -19,7 +21,7 @@ impl Plugin for MainMenuPlugin {
       .add_systems(OnEnter(AppState::Preparing), spawn_main_menu_system)
       .add_systems(
         Update,
-        handle_main_menu_buttons_system.run_if(in_state(AppState::Preparing)),
+        (handle_button_interactions_system, handle_toggle_menu_message).run_if(in_state(AppState::Preparing)),
       )
       .add_systems(OnExit(AppState::Preparing), despawn_main_menu_system);
   }
@@ -43,6 +45,10 @@ struct ExitButton;
 
 /// System to spawn the main menu UI including the background image.
 fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>) {
+  spawn_main_menu(&mut commands, &asset_server);
+}
+
+fn spawn_main_menu(commands: &mut Commands, asset_server: &AssetServer) {
   let font = asset_server.load(DEFAULT_FONT);
   let heading_font = font.clone();
   let background_image = asset_server.load("images/background_menu_main.png");
@@ -110,7 +116,10 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
             })
             .with_children(|parent| {
               spawn_button(parent, &asset_server, PlayLocalButton, "Play Local", 300, NORMAL_FONT);
+
+              #[cfg(feature = "online")]
               spawn_button(parent, &asset_server, PlayOnlineButton, "Play Online", 300, NORMAL_FONT);
+
               spawn_button(parent, &asset_server, ExitButton, "Exit", 300, NORMAL_FONT);
             });
         });
@@ -118,11 +127,12 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
 }
 
 /// System to handle all main menu button interactions.
-fn handle_main_menu_buttons_system(
+fn handle_button_interactions_system(
   mut commands: Commands,
   mut exit_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ExitButton>)>,
   mut play_local_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<PlayLocalButton>)>,
   mut play_online_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<PlayOnlineButton>)>,
+  mut toggle_menu_message_writer: MessageWriter<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<MainMenuRoot>>,
   mut next_state: ResMut<NextState<AppState>>,
 ) {
@@ -137,22 +147,40 @@ fn handle_main_menu_buttons_system(
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Play Local\"");
       next_state.set(AppState::Registering);
-      for root in &menu_root_query {
-        commands.entity(root).despawn();
-      }
+      despawn_main_menu(&mut commands, &menu_root_query);
     }
   }
 
   for interaction in &mut play_online_query {
     if *interaction == CustomInteraction::Released {
-      debug!("[Menu] Selected \"Play Online\" -> No-op for now");
+      debug!("[Menu] Selected \"Play Online\"");
+      toggle_menu_message_writer.write(ToggleMenuMessage::set(MenuName::PlayOnlineMenu));
     }
   }
 }
 
 /// Despawns all elements with the [`MainMenuRoot`] component.
 fn despawn_main_menu_system(mut commands: Commands, menu_root_query: Query<Entity, With<MainMenuRoot>>) {
-  for root in &menu_root_query {
+  despawn_main_menu(&mut commands, &menu_root_query);
+}
+
+/// System to handle toggling the main menu based on received messages.
+fn handle_toggle_menu_message(
+  mut commands: Commands,
+  mut messages: MessageReader<ToggleMenuMessage>,
+  menu_root_query: Query<Entity, With<MainMenuRoot>>,
+  asset_server: Res<AssetServer>,
+) {
+  for message in messages.read() {
+    match message.active {
+      MenuName::MainMenu => spawn_main_menu(&mut commands, &asset_server),
+      _ => despawn_main_menu(&mut commands, &menu_root_query),
+    }
+  }
+}
+
+fn despawn_main_menu(commands: &mut Commands, menu_root_query: &Query<Entity, With<MainMenuRoot>>) {
+  for root in menu_root_query {
     commands.entity(root).despawn();
   }
 }

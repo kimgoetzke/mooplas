@@ -2,6 +2,7 @@ use crate::prelude::constants::*;
 use crate::prelude::{RegularButton, TouchControlButton};
 use crate::shared::{CustomInteraction, Settings};
 use crate::ui::main_menu::MainMenuPlugin;
+use crate::ui::play_online_menu::PlayOnlineMenuPlugin;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
@@ -10,6 +11,7 @@ use touch_controls_ui::TouchControlsUiPlugin;
 
 pub mod in_game_ui;
 mod main_menu;
+mod play_online_menu;
 pub mod touch_controls_ui;
 
 /// A system that manages the user interface elements of the game, including in-game UI and touch controls UI.
@@ -18,7 +20,12 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((MainMenuPlugin, InGameUiPlugin, TouchControlsUiPlugin))
+      .add_plugins((
+        MainMenuPlugin,
+        PlayOnlineMenuPlugin,
+        InGameUiPlugin,
+        TouchControlsUiPlugin,
+      ))
       .add_systems(
         Update,
         touch_control_button_reactive_design_system.run_if(has_touch_controls_enabled),
