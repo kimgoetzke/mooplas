@@ -10,6 +10,7 @@ use bevy::prelude::{IntoScheduleConfigs, KeyCode, NextState, OnEnter, Res, ResMu
 use rand::Rng;
 use rand::prelude::ThreadRng;
 
+// TODO: Add asset loading, possibly loading screen
 /// A plugin that initialises the game by loading resources and generation data such as spawn points.
 pub struct InitialisationPlugin;
 

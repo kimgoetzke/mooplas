@@ -2,10 +2,13 @@ use crate::app_states::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::shared::CustomInteraction;
 use crate::ui::spawn_button;
-use bevy::app::{App, Plugin};
 use bevy::color::palettes::tailwind;
 use bevy::log::*;
-use bevy::prelude::*;
+use bevy::prelude::{
+  AlignItems, App, AssetServer, Changed, Color, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
+  JustifyContent, Name, NextState, Node, OnEnter, OnExit, Plugin, PositionType, Query, Res, ResMut, Sprite, Text,
+  TextColor, TextFont, TextShadow, Transform, Update, Val, Vec2, With, default, in_state, percent, px,
+};
 
 /// Plugin that provides and manages the main menu UI.
 pub struct MainMenuPlugin;
@@ -63,8 +66,8 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
       Name::new("Main Menu"),
       MainMenuRoot,
       Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
+        width: percent(100),
+        height: percent(100),
         position_type: PositionType::Relative,
         flex_direction: FlexDirection::Column,
         justify_content: JustifyContent::Center,
@@ -75,12 +78,12 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
     .with_children(|parent| {
       parent
         .spawn(Node {
-          width: Val::Percent(100.0),
-          height: Val::Percent(100.0),
+          width: percent(100.0),
+          height: percent(100.0),
           flex_direction: FlexDirection::Column,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
-          row_gap: Val::Px(20.),
+          row_gap: px(20),
           ..default()
         })
         .with_children(|parent| {
@@ -89,7 +92,7 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
             Text::new("Mooplas"),
             TextFont {
               font: heading_font.clone(),
-              font_size: 110.,
+              font_size: 120.,
               ..default()
             },
             TextColor(Color::from(tailwind::AMBER_300)),
@@ -102,7 +105,7 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
               flex_direction: FlexDirection::Column,
               justify_content: JustifyContent::Center,
               align_items: AlignItems::Center,
-              row_gap: Val::Px(20.),
+              row_gap: px(20.),
               ..default()
             })
             .with_children(|parent| {
