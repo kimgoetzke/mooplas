@@ -26,7 +26,9 @@ fn create_world_system(
   let half_world_x = RESOLUTION_WIDTH as f32 / 2.;
   let half_world_y = RESOLUTION_HEIGHT as f32 / 2.;
   let half_margin = GRID_MARGIN / 2.;
-  let parent = commands.spawn((Name::new("Game World"), Transform::default())).id();
+  let parent = commands
+    .spawn((Name::new("Game World"), Transform::default(), Visibility::default()))
+    .id();
 
   for i in 0..GRID_TILES_X as i32 {
     for j in (0..GRID_TILES_Y as i32).rev() {
