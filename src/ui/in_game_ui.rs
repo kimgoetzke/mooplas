@@ -1,29 +1,24 @@
 use crate::app_states::AppState;
-use crate::prelude::constants::{
-  BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT,
-};
+use crate::prelude::constants::{DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT};
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, RegularButton, Settings,
-  TouchControlsToggledMessage, WinnerInfo,
+  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
+  WinnerInfo,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
-use crate::ui::{
-  ButtonAnimation, default_gradient, set_interaction_on_cancel, set_interaction_on_hover,
-  set_interaction_on_hover_exit, set_interaction_on_press, set_interaction_on_release,
-};
+use crate::ui::spawn_button;
 use bevy::color::palettes::tailwind;
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
 use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, Alpha, AssetServer, Bundle, Changed, ChildOf, Children, Color, Commands, Component, Entity,
-  FlexDirection, Font, Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter,
-  MonitorSelection, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, SpawnRelated, Text,
-  TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
+  AlignItems, Alpha, AssetServer, Changed, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font,
+  Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection,
+  Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, SpawnRelated, Text, TextBackgroundColor,
+  TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
 };
 use bevy::text::LineHeight;
-use bevy::ui::{BackgroundColor, BorderColor, BorderRadius, PositionType, UiRect, percent};
+use bevy::ui::{BackgroundColor, PositionType, percent};
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;
@@ -654,63 +649,6 @@ fn spawn_game_over_ui_system(
           ));
         });
     });
-}
-
-/// Spawns a [`RegularButton`] with the given parameters. Standard interaction observers are attached.
-fn spawn_button(
-  parent: &mut RelatedSpawnerCommands<ChildOf>,
-  asset_server: &AssetServer,
-  button_type: impl Component,
-  button_text: &str,
-  button_width: i32,
-  font_size: f32,
-) -> Entity {
-  parent
-    .spawn(button(button_type, asset_server, button_text, button_width, font_size))
-    .observe(set_interaction_on_hover)
-    .observe(set_interaction_on_hover_exit)
-    .observe(set_interaction_on_press)
-    .observe(set_interaction_on_release)
-    .observe(set_interaction_on_cancel)
-    .id()
-}
-
-fn button(
-  button_type: impl Component,
-  asset_server: &AssetServer,
-  button_text: &str,
-  button_width: i32,
-  font_size: f32,
-) -> impl Bundle {
-  (
-    Node {
-      width: px(button_width),
-      height: px(65),
-      border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
-      justify_content: JustifyContent::Center, // Horizontally center child text
-      align_items: AlignItems::Center,         // Vertically center child text
-      padding: UiRect::all(px(2)),
-      ..default()
-    },
-    RegularButton,
-    CustomInteraction::default(),
-    ButtonAnimation,
-    button_type,
-    BorderRadius::all(px(10)),
-    BorderColor::all(Color::from(tailwind::SLATE_500)),
-    BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
-    default_gradient(0.),
-    children![(
-      Text::new(button_text),
-      TextFont {
-        font: asset_server.load(DEFAULT_FONT),
-        font_size,
-        ..default()
-      },
-      TextColor(Color::srgb(0.9, 0.9, 0.9)),
-      TextShadow::default(),
-    )],
-  )
 }
 
 fn default_font(font: &Handle<Font>) -> TextFont {

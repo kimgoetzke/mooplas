@@ -110,7 +110,7 @@ fn reset_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
 fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: ResMut<NextState<AppState>>) {
   if tracker.all_done() {
     debug!("✅  Initialisation completed");
-    next_state.set(AppState::Registering);
+    next_state.set(AppState::Preparing);
   }
 }
 

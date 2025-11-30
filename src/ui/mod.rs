@@ -1,12 +1,15 @@
 use crate::prelude::constants::*;
 use crate::prelude::{RegularButton, TouchControlButton};
 use crate::shared::{CustomInteraction, Settings};
+use crate::ui::main_menu::MainMenuPlugin;
 use bevy::color::palettes::tailwind;
+use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::*;
 use in_game_ui::InGameUiPlugin;
 use touch_controls_ui::TouchControlsUiPlugin;
 
 pub mod in_game_ui;
+mod main_menu;
 pub mod touch_controls_ui;
 
 /// A system that manages the user interface elements of the game, including in-game UI and touch controls UI.
@@ -15,7 +18,7 @@ pub struct UiPlugin;
 impl Plugin for UiPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((InGameUiPlugin, TouchControlsUiPlugin))
+      .add_plugins((MainMenuPlugin, InGameUiPlugin, TouchControlsUiPlugin))
       .add_systems(
         Update,
         touch_control_button_reactive_design_system.run_if(has_touch_controls_enabled),
@@ -119,17 +122,6 @@ fn animate_button_system(
   }
 }
 
-fn default_gradient(transparency: f32) -> BorderGradient {
-  BorderGradient::from(LinearGradient {
-    stops: vec![
-      tailwind::YELLOW_400.with_alpha(transparency).into(),
-      tailwind::YELLOW_50.with_alpha(transparency).into(),
-      tailwind::YELLOW_400.with_alpha(transparency).into(),
-    ],
-    ..default()
-  })
-}
-
 //noinspection DuplicatedCode
 fn set_interaction_on_hover(action: On<Pointer<Over>>, mut interaction_query: Query<(Entity, &mut CustomInteraction)>) {
   interaction_query
@@ -220,4 +212,72 @@ fn clear_released_interaction_system(mut query: Query<(Entity, &mut CustomIntera
       trace!("Interaction for {entity} set to [{:?}]", *interaction);
     }
   }
+}
+
+/// Spawns a [`RegularButton`] with the given parameters. Standard interaction observers are attached.
+fn spawn_button(
+  parent: &mut RelatedSpawnerCommands<ChildOf>,
+  asset_server: &AssetServer,
+  button_type: impl Component,
+  button_text: &str,
+  button_width: i32,
+  font_size: f32,
+) -> Entity {
+  parent
+    .spawn(button(button_type, asset_server, button_text, button_width, font_size))
+    .observe(set_interaction_on_hover)
+    .observe(set_interaction_on_hover_exit)
+    .observe(set_interaction_on_press)
+    .observe(set_interaction_on_release)
+    .observe(set_interaction_on_cancel)
+    .id()
+}
+
+fn button(
+  button_type: impl Component,
+  asset_server: &AssetServer,
+  button_text: &str,
+  button_width: i32,
+  font_size: f32,
+) -> impl Bundle {
+  (
+    Node {
+      width: px(button_width),
+      height: px(65),
+      border: UiRect::all(px(BUTTON_BORDER_WIDTH)),
+      justify_content: JustifyContent::Center, // Horizontally center child text
+      align_items: AlignItems::Center,         // Vertically center child text
+      padding: UiRect::all(px(2)),
+      ..default()
+    },
+    RegularButton,
+    CustomInteraction::default(),
+    ButtonAnimation,
+    button_type,
+    BorderRadius::all(px(10)),
+    BorderColor::all(Color::from(tailwind::SLATE_500)),
+    BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
+    default_gradient(0.),
+    children![(
+      Text::new(button_text),
+      TextFont {
+        font: asset_server.load(DEFAULT_FONT),
+        font_size,
+        ..default()
+      },
+      TextColor(Color::srgb(0.9, 0.9, 0.9)),
+      TextShadow::default(),
+    )],
+  )
+}
+
+fn default_gradient(transparency: f32) -> BorderGradient {
+  BorderGradient::from(LinearGradient {
+    stops: vec![
+      tailwind::YELLOW_400.with_alpha(transparency).into(),
+      tailwind::YELLOW_50.with_alpha(transparency).into(),
+      tailwind::YELLOW_400.with_alpha(transparency).into(),
+    ],
+    ..default()
+  })
 }

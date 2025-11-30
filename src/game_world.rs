@@ -1,3 +1,4 @@
+use crate::app_states::AppState;
 use crate::prelude::constants::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
@@ -8,7 +9,7 @@ pub struct GameWorldPlugin;
 
 impl Plugin for GameWorldPlugin {
   fn build(&self, app: &mut App) {
-    app.add_systems(Startup, create_world_system);
+    app.add_systems(OnEnter(AppState::Registering), create_world_system);
   }
 }
 

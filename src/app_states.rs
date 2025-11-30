@@ -30,11 +30,13 @@ pub enum AppState {
   /// registering state.
   #[default]
   Initialising,
+  /// The state used for menus. Time may be paused.
+  Preparing,
   /// The state where players can register to join the game.
   Registering,
   /// The main gameplay state.
   Playing,
-  /// The state after a game has finished.
+  /// The state after a game has finished. Time may be paused.
   GameOver,
 }
 
