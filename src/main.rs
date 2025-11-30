@@ -13,7 +13,7 @@ mod prelude {
   pub use crate::shared::*;
 }
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "dev")]
 use crate::debug::DebugPlugin;
 
 #[cfg(feature = "online-multiplayer")]
@@ -54,7 +54,7 @@ fn main() {
   #[cfg(feature = "online-multiplayer")]
   app.add_plugins(RenetServerPlugin);
 
-  #[cfg(debug_assertions)]
+  #[cfg(feature = "dev")]
   app.add_plugins(DebugPlugin);
 
   app.run();

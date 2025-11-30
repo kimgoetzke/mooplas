@@ -4,14 +4,25 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bevy = { version = "0.17.2", features = ["wayland"] }
-bevy-inspector-egui = { version = "0.35.0" }
+bevy = { version = "0.17.3", features = ["wayland"] }
+bevy-inspector-egui = { version = "0.35.0", optional = true }
 bevy_renet = { version = "3.0.0", optional = true }
 rand = "0.9.2"
 avian2d = "0.4.1"
 
 [features]
+default = ["dev"]
 online-multiplayer = ["bevy_renet"]
+dev = [
+  # Improve compile times for dev builds by linking Bevy as a dynamic library
+  "bevy/dynamic_linking",
+  "bevy/bevy_dev_tools",
+  "bevy/bevy_ui_debug",
+  # Improve error messages coming from Bevy
+  "bevy/track_location",
+  # Enable the Bevy inspector for debugging
+  "bevy-inspector-egui"
+]
 
 [profile.dev]
 opt-level = 1

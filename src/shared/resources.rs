@@ -1,7 +1,9 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Reflect, ReflectResource, Resource};
+#[cfg(feature = "dev")]
 use bevy_inspector_egui::InspectorOptions;
+#[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
@@ -37,8 +39,20 @@ impl Default for Settings {
 }
 
 /// A resource that holds general settings, a child of the [`Settings`] resource. Intended for developer use only.
+#[cfg(feature = "dev")]
 #[derive(Resource, Reflect, InspectorOptions, Clone, Copy)]
 #[reflect(Resource, InspectorOptions)]
+pub struct GeneralSettings {
+  /// Whether to display player gizmos that help debugging.
+  pub display_player_gizmos: bool,
+  /// Whether to enable (i.e. display) touch controls
+  pub enable_touch_controls: bool,
+}
+
+/// A resource that holds general settings, a child of the [`Settings`] resource. Intended for developer use only.
+#[cfg(not(feature = "dev"))]
+#[derive(Resource, Reflect, Clone, Copy)]
+#[reflect(Resource)]
 pub struct GeneralSettings {
   /// Whether to display player gizmos that help debugging.
   pub display_player_gizmos: bool,

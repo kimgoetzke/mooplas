@@ -1,4 +1,4 @@
-#![cfg(debug_assertions)]
+#![cfg(feature = "dev")]
 
 mod controls;
 mod gizmos;
