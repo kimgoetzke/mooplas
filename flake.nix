@@ -57,6 +57,7 @@
             pkgs.cargo-flamegraph
             pkgs.clippy
             pkgs.wasm-bindgen-cli_0_2_100
+            pkgs.nodejs
           ];
         };
 
