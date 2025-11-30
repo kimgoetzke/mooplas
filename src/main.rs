@@ -5,6 +5,7 @@ mod debug;
 mod game_loop;
 mod game_world;
 mod initialisation;
+mod online_multiplayer;
 mod player;
 mod shared;
 mod ui;
@@ -17,7 +18,7 @@ mod prelude {
 use crate::debug::DebugPlugin;
 
 #[cfg(feature = "online-multiplayer")]
-use bevy_renet::RenetServerPlugin;
+use crate::online_multiplayer::OnlineMultiplayerPlugin;
 
 use crate::app_states::AppStatePlugin;
 use crate::camera::CameraPlugin;
@@ -52,7 +53,7 @@ fn main() {
     ));
 
   #[cfg(feature = "online-multiplayer")]
-  app.add_plugins(RenetServerPlugin);
+  app.add_plugins(OnlineMultiplayerPlugin);
 
   #[cfg(feature = "dev")]
   app.add_plugins(DebugPlugin);
