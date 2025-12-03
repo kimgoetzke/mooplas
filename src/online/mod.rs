@@ -1,29 +1,24 @@
 #![cfg(feature = "online")]
 
+mod client;
 mod interface;
 mod lib;
+mod server;
 
 use crate::app_states::AppState;
+use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
-use crate::online::lib::{
-  Lobby, NetworkRole, NetworkingResourcesPlugin, OnlinePlayer, SerialisableInputAction, ServerMessages,
-};
-use crate::prelude::{InputAction, MenuName, PlayerId, PlayerRegistrationMessage, ToggleMenuMessage};
-use crate::shared::RegisteredPlayers;
-use crate::shared::constants::MOVEMENT_SPEED;
+use crate::online::lib::NetworkingResourcesPlugin;
+use crate::online::server::ServerPlugin;
+use crate::prelude::{MenuName, NetworkRole, ToggleMenuMessage};
 use bevy::app::Update;
 use bevy::log::*;
-use bevy::platform::collections::HashMap;
-use bevy::prelude::{
-  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, Plugin, Query, Res, ResMut, Time, Transform,
-  in_state, resource_exists,
-};
+use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, Plugin, ResMut, in_state};
 use bevy_renet::netcode::{
-  ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport, NetcodeServerPlugin, NetcodeServerTransport,
-  NetcodeTransportError, ServerAuthentication, ServerConfig,
+  ClientAuthentication, NetcodeClientTransport, NetcodeServerTransport, NetcodeTransportError, ServerAuthentication,
+  ServerConfig,
 };
-use bevy_renet::renet::{ClientId, ConnectionConfig, DefaultChannel, RenetClient, RenetServer, ServerEvent};
-use bevy_renet::{RenetClientPlugin, RenetServerPlugin, client_connected};
+use bevy_renet::renet::{ConnectionConfig, RenetClient, RenetServer};
 use std::net::UdpSocket;
 use std::time::SystemTime;
 
@@ -33,24 +28,8 @@ pub struct OnlinePlugin;
 impl Plugin for OnlinePlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((RenetServerPlugin, NetcodeServerPlugin))
-      .add_plugins((RenetClientPlugin, NetcodeClientPlugin))
+      .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
-      .add_systems(
-        Update,
-        (handle_serialisable_input_message, client_sync_players_system)
-          .chain()
-          .run_if(client_connected),
-      )
-      .add_systems(
-        Update,
-        (
-          server_update_system,
-          server_sync_players_system,
-          // server_move_players_system,
-        )
-          .run_if(resource_exists::<RenetServer>),
-      )
       .add_systems(Update, panic_on_error_system)
       .add_plugins((InterfacePlugin, NetworkingResourcesPlugin));
     info!("Online multiplayer is enabled");
@@ -127,135 +106,6 @@ fn create_new_renet_server_resources() -> (RenetServer, NetcodeServerTransport) 
   let server = RenetServer::new(ConnectionConfig::default());
 
   (server, transport)
-}
-
-fn server_sync_players_system(mut server: ResMut<RenetServer>, query: Query<(&Transform, &OnlinePlayer)>) {
-  let mut lobby: HashMap<ClientId, [f32; 3]> = HashMap::new();
-  for (transform, player) in query.iter() {
-    lobby.insert(player.id, transform.translation.into());
-  }
-
-  let sync_message = bincode::serialize(&lobby).expect("Failed to serialize sync message");
-  server.broadcast_message(DefaultChannel::Unreliable, sync_message);
-}
-
-fn server_update_system(
-  mut server_events: MessageReader<ServerEvent>,
-  mut commands: Commands,
-  mut lobby: ResMut<Lobby>,
-  mut server: ResMut<RenetServer>,
-) {
-  debug_once!("Server update system running");
-  for event in server_events.read() {
-    // match event {
-    //   ServerEvent::ClientConnected { client_id } => {
-    //     println!("Player {} connected.", client_id);
-    //     // Spawn player cube
-    //     let player_entity = commands
-    //       .spawn((
-    //         Mesh3d(meshes.add(Cuboid::from_size(Vec3::splat(1.0)))),
-    //         MeshMaterial3d(materials.add(Color::srgb(0.8, 0.7, 0.6))),
-    //         Transform::from_xyz(0.0, 0.5, 0.0),
-    //       ))
-    //       .insert(PlayerInput::default())
-    //       .insert(Player { id: *client_id })
-    //       .id();
-    //
-    //     // We could send an InitState with all the players id and positions for the client
-    //     // but this is easier to do.
-    //     for &player_id in lobby.players.keys() {
-    //       let message = bincode::serialize(&ServerMessages::PlayerConnected { id: player_id }).unwrap();
-    //       server.send_message(*client_id, DefaultChannel::ReliableOrdered, message);
-    //     }
-    //
-    //     lobby.players.insert(*client_id, player_entity);
-    //
-    //     let message = bincode::serialize(&ServerMessages::PlayerConnected { id: *client_id }).unwrap();
-    //     server.broadcast_message(DefaultChannel::ReliableOrdered, message);
-    //   }
-    //   ServerEvent::ClientDisconnected { client_id, reason } => {
-    //     println!("Player {} disconnected: {}", client_id, reason);
-    //     if let Some(player_entity) = lobby.players.remove(client_id) {
-    //       commands.entity(player_entity).despawn();
-    //     }
-    //
-    //     let message = bincode::serialize(&ServerMessages::PlayerDisconnected { id: *client_id }).unwrap();
-    //     server.broadcast_message(DefaultChannel::ReliableOrdered, message);
-    //   }
-    // }
-  }
-
-  // for client_id in server.clients_id() {
-  //   while let Some(message) = server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
-  //     let player_input: PlayerInput = bincode::deserialize(&message).unwrap();
-  //     if let Some(player_entity) = lobby.players.get(&client_id) {
-  //       commands.entity(*player_entity).insert(player_input);
-  //     }
-  //   }
-  // }
-}
-
-// fn server_move_players_system(mut query: Query<(&mut Transform, &PlayerInput)>, time: Res<Time>) {
-//   for (mut transform, input) in query.iter_mut() {
-//     let x = (input.right as i8 - input.left as i8) as f32;
-//     let y = (input.down as i8 - input.up as i8) as f32;
-//     transform.translation.x += x * MOVEMENT_SPEED * time.delta().as_secs_f32();
-//     transform.translation.y += y * MOVEMENT_SPEED * time.delta().as_secs_f32();
-//   }
-// }
-
-fn handle_serialisable_input_message(
-  mut messages: MessageReader<SerialisableInputAction>,
-  mut client: ResMut<RenetClient>,
-) {
-  for message in messages.read() {
-    debug!("Sending input action: {:?}", message);
-    let input_message = bincode::serialize(&message).unwrap();
-    client.send_message(DefaultChannel::ReliableOrdered, input_message);
-  }
-}
-
-fn client_sync_players_system(
-  mut commands: Commands,
-  mut client: ResMut<RenetClient>,
-  mut messages: MessageWriter<PlayerRegistrationMessage>,
-  registered_players: ResMut<RegisteredPlayers>,
-) {
-  debug_once!("Client sync players system running");
-  while let Some(message) = client.receive_message(DefaultChannel::ReliableOrdered) {
-    let server_message = bincode::deserialize(&message).expect("Failed to deserialize server message");
-    match server_message {
-      ServerMessages::PlayerConnected { client_id, player_id } => {
-        info!("[Player {}] with client ID [{}] connected", player_id, client_id);
-        messages.write(PlayerRegistrationMessage {
-          player_id: PlayerId(player_id),
-          has_registered: true,
-          is_anyone_registered: true,
-        });
-      }
-      ServerMessages::PlayerDisconnected { client_id, player_id } => {
-        info!("[Player {}] with client ID [{}] connected", player_id, client_id);
-        messages.write(PlayerRegistrationMessage {
-          player_id: PlayerId(player_id),
-          has_registered: false,
-          is_anyone_registered: registered_players.players.len() != 0,
-        });
-      }
-    }
-  }
-
-  // while let Some(message) = client.receive_message(DefaultChannel::Unreliable) {
-  //   let players: HashMap<ClientId, [f32; 3]> = bincode::deserialize(&message).unwrap();
-  //   for (player_id, translation) in players.iter() {
-  //     if let Some(player_entity) = lobby.players.get(player_id) {
-  //       let transform = Transform {
-  //         translation: (*translation).into(),
-  //         ..Default::default()
-  //       };
-  //       commands.entity(*player_entity).insert(transform);
-  //     }
-  //   }
-  // }
 }
 
 #[allow(clippy::never_loop)]

@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, PlayerId, PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers,
-  SnakeHead, WinnerInfo, has_registered_players,
+  AvailablePlayerConfigs, ContinueMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayer,
+  RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
 };
 use crate::shared::{InputAction, Player};
 use avian2d::prelude::Collisions;
@@ -17,13 +17,14 @@ impl Plugin for GameLoopPlugin {
     app
       .add_systems(
         Update,
-        player_registration_system.run_if(in_state(AppState::Registering)),
+        handle_continue_message
+          .run_if(in_state(AppState::Registering))
+          .run_if(has_registered_players)
+          .run_if(|role: Res<NetworkRole>| role.is_server() || role.is_none()),
       )
       .add_systems(
         Update,
-        handle_continue_message
-          .run_if(in_state(AppState::Registering))
-          .run_if(has_registered_players),
+        player_registration_system.run_if(in_state(AppState::Registering)),
       )
       .add_systems(
         Update,
@@ -53,6 +54,7 @@ fn player_registration_system(
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
+  network_role: Res<NetworkRole>,
 ) {
   for input_action in input_action_messages.read() {
     if let InputAction::Action(player_id) = input_action {
@@ -68,7 +70,7 @@ fn player_registration_system(
       {
         // Unregister
         registered_players.players.remove(position);
-        debug!("Player [{}] has unregistered", available_config.id.0);
+        debug!("[Player {}] has unregistered", available_config.id.0);
         false
       } else {
         // Register
@@ -78,7 +80,7 @@ fn player_registration_system(
           colour: available_config.colour,
           alive: true,
         });
-        debug!("Player [{}] has registered", available_config.id.0);
+        debug!("[Player {}] has registered", available_config.id.0);
         true
       };
 
@@ -86,6 +88,7 @@ fn player_registration_system(
         player_id: available_config.id,
         has_registered: is_now_registered,
         is_anyone_registered: !registered_players.players.is_empty(),
+        network_audience: (*network_role).into(),
       });
     }
   }
@@ -270,6 +273,7 @@ mod tests {
     assert!(registered_players.players.is_empty());
   }
 
+  #[cfg(not(feature = "online"))]
   #[test]
   fn handle_continue_message_transitions_to_playing() {
     let mut app = setup();

@@ -1,0 +1,63 @@
+use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
+use crate::shared::NetworkAudience;
+use bevy::log::{error, info, warn};
+use bevy::prelude::{MessageWriter, Res, ResMut};
+
+pub(crate) fn register_player_locally(
+  registered_players: &mut ResMut<RegisteredPlayers>,
+  available_configs: &Res<AvailablePlayerConfigs>,
+  player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
+  player_id: PlayerId,
+  network_audience: Option<NetworkAudience>,
+) {
+  let config = available_configs
+    .find_by_id(player_id)
+    .expect("Failed to find player config for registered player");
+  match registered_players.register(config.into()) {
+    Ok(_) => {
+      info!("[{}] registered successfully", player_id);
+      player_registration_message.write(PlayerRegistrationMessage {
+        player_id,
+        has_registered: true,
+        is_anyone_registered: true,
+        network_audience,
+      });
+    }
+    // TODO: Somehow rectify client-server state desync
+    Err(e) => error!("Failed to register [{}]: {}", player_id, e),
+  }
+}
+
+pub(crate) fn unregister_player_locally(
+  registered_players: &mut ResMut<RegisteredPlayers>,
+  messages: &mut MessageWriter<PlayerRegistrationMessage>,
+  player_id: PlayerId,
+  network_audience: Option<NetworkAudience>,
+) {
+  match registered_players.remove_by_id(player_id) {
+    Ok(_) => {
+      info!("[{}] unregistered successfully", player_id);
+      messages.write(PlayerRegistrationMessage {
+        player_id,
+        has_registered: false,
+        is_anyone_registered: registered_players.count() > 0,
+        network_audience,
+      });
+    }
+    // TODO: Somehow rectify client-server state desync
+    Err(e) => warn!("[Player {}] was not registered: {}", player_id, e),
+  }
+}
+
+pub(crate) fn should_message_be_skipped(
+  message: &PlayerRegistrationMessage,
+  audience_to_skip: NetworkAudience,
+) -> bool {
+  if match &message.network_audience {
+    Some(audience) => audience == &audience_to_skip,
+    None => true,
+  } {
+    return true;
+  }
+  false
+}

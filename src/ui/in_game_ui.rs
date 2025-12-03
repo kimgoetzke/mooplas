@@ -1,8 +1,8 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT};
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, RegisteredPlayers, Settings, TouchControlsToggledMessage,
-  WinnerInfo,
+  AvailablePlayerConfig, AvailablePlayerConfigs, NetworkRole, PlayerId, RegisteredPlayers, Settings,
+  TouchControlsToggledMessage, WinnerInfo,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
 use crate::ui::spawn_button;
@@ -34,9 +34,14 @@ impl Plugin for InGameUiPlugin {
           handle_touch_controls_toggled_message,
           toggle_touch_controls_button_system,
           toggle_fullscreen_button_system,
-          continue_button_system,
         )
           .run_if(in_state(AppState::Registering)),
+      )
+      .add_systems(
+        Update,
+        continue_button_system
+          .run_if(in_state(AppState::Registering))
+          .run_if(|network_role: Res<NetworkRole>| !network_role.is_client()),
       )
       .add_systems(OnExit(AppState::Registering), despawn_lobby_ui_system)
       .add_systems(OnEnter(AppState::GameOver), spawn_game_over_ui_system)
@@ -84,6 +89,7 @@ fn spawn_lobby_ui_system(
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
   registered_players: Res<RegisteredPlayers>,
+  network_role: Res<NetworkRole>,
 ) {
   spawn_lobby_ui(
     &mut commands,
@@ -91,6 +97,7 @@ fn spawn_lobby_ui_system(
     &asset_server,
     &available_configs,
     &registered_players,
+    &network_role,
   );
 }
 
@@ -100,11 +107,13 @@ fn spawn_lobby_ui(
   asset_server: &Res<AssetServer>,
   available_configs: &Res<AvailablePlayerConfigs>,
   registered_players: &Res<RegisteredPlayers>,
+  network_role: &Res<NetworkRole>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
   let default_font = default_font(&font);
   let default_shadow = default_shadow();
   let is_touch_controlled = settings.general.enable_touch_controls;
+  let is_permitted_action = !network_role.is_client();
 
   let root = commands
     .spawn((
@@ -238,6 +247,7 @@ fn spawn_lobby_ui(
         is_touch_controlled,
         has_any_registered,
         parent,
+        is_permitted_action,
       );
     })
     .id();
@@ -252,10 +262,19 @@ fn spawn_call_to_action_to_start(
   is_touch_controlled: bool,
   has_any_registered: bool,
   parent: &mut RelatedSpawnerCommands<ChildOf>,
+  is_permitted_action: bool,
 ) {
   if !has_any_registered {
     parent.spawn((
       Text::new("More players needed to start..."),
+      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      TextColor(Color::WHITE),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      default_shadow,
+    ));
+  } else if !is_permitted_action {
+    parent.spawn((
+      Text::new("Waiting for game to start..."),
       default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
       TextColor(Color::WHITE),
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
@@ -347,11 +366,13 @@ fn handle_player_registration_message(
   available_configs: Res<AvailablePlayerConfigs>,
   mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
   cta_query: Query<(Entity, &Children), With<LobbyUiCta>>,
+  network_role: Res<NetworkRole>,
 ) {
   for message in player_registration_message.read() {
     let font = asset_server.load(DEFAULT_FONT);
     let config = available_configs.configs.iter().find(|p| p.id == message.player_id);
     let is_touch_controlled = settings.general.enable_touch_controls;
+    let is_permitted_action = network_role.is_client();
 
     // Update entry for player
     match message.has_registered {
@@ -390,6 +411,7 @@ fn handle_player_registration_message(
       &cta_query,
       &asset_server,
       &settings,
+      is_permitted_action,
     );
   }
 }
@@ -488,6 +510,7 @@ fn update_call_to_action_to_start(
   cta_query: &Query<(Entity, &Children), With<LobbyUiCta>>,
   asset_server: &Res<AssetServer>,
   settings: &Res<Settings>,
+  is_permitted_action: bool,
 ) {
   for (entity, children) in cta_query.iter() {
     for child in children.iter() {
@@ -506,6 +529,7 @@ fn update_call_to_action_to_start(
         is_touch_controlled,
         has_any_players,
         parent,
+        is_permitted_action,
       );
     });
   }
@@ -521,6 +545,7 @@ fn handle_touch_controls_toggled_message(
   asset_server: Res<AssetServer>,
   available_configs: Res<AvailablePlayerConfigs>,
   registered_players: Res<RegisteredPlayers>,
+  network_role: Res<NetworkRole>,
 ) {
   for _ in messages.read() {
     for entity in &lobby_ui_root_query {
@@ -532,6 +557,7 @@ fn handle_touch_controls_toggled_message(
       &asset_server,
       &available_configs,
       &registered_players,
+      &network_role,
     );
   }
 }

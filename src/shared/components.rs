@@ -2,6 +2,7 @@ use crate::prelude::constants::SNAKE_LENGTH_MAX_CONTINUOUS;
 use bevy::color::Color;
 use bevy::math::Vec2;
 use bevy::prelude::{Component, Entity};
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
 /// A marker component for the player entity.
@@ -17,7 +18,7 @@ pub struct SnakeHead;
 pub struct WrapAroundEntity;
 
 /// A component identifying a player. Used to link player entities together.
-#[derive(Component, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlayerId(pub u8);
 
 impl Display for PlayerId {

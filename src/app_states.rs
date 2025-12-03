@@ -38,6 +38,8 @@ pub enum AppState {
   Playing,
   /// The state after a game has finished. Time may be paused.
   GameOver,
+  /// A placeholder state for undefined states. Should never occur.
+  Error,
 }
 
 impl AppState {
@@ -49,6 +51,19 @@ impl AppState {
 impl Display for AppState {
   fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     write!(f, "{}", format!("{:?}", self))
+  }
+}
+
+impl From<&String> for AppState {
+  fn from(state_name: &String) -> Self {
+    match state_name.as_str() {
+      "Initialising" => AppState::Initialising,
+      "Preparing" => AppState::Preparing,
+      "Registering" => AppState::Registering,
+      "Playing" => AppState::Playing,
+      "GameOver" => AppState::GameOver,
+      _ => AppState::Error,
+    }
   }
 }
 
@@ -105,5 +120,21 @@ mod tests {
   fn name_from_handles_none_state() {
     let state_name = name_from::<AppState>(None);
     assert_eq!(state_name, "None");
+  }
+
+  #[test]
+  fn from_string_converts_valid_state_names() {
+    assert_eq!(AppState::from(&"Initialising".to_string()), AppState::Initialising);
+    assert_eq!(AppState::from(&"Preparing".to_string()), AppState::Preparing);
+    assert_eq!(AppState::from(&"Registering".to_string()), AppState::Registering);
+    assert_eq!(AppState::from(&"Playing".to_string()), AppState::Playing);
+    assert_eq!(AppState::from(&"GameOver".to_string()), AppState::GameOver);
+  }
+
+  #[test]
+  fn from_string_defaults_to_error_for_invalid_state_names() {
+    assert_eq!(AppState::from(&"InvalidState".to_string()), AppState::Error);
+    assert_eq!(AppState::from(&"".to_string()), AppState::Error);
+    assert_eq!(AppState::from(&"123".to_string()), AppState::Error);
   }
 }

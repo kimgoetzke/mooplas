@@ -1,10 +1,12 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
+use crate::shared::NetworkAudience;
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
+use std::fmt::Display;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
 pub struct SharedResourcesPlugin;
@@ -20,7 +22,8 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<SpawnPoints>()
       .init_resource::<AvailablePlayerConfigs>()
       .init_resource::<RegisteredPlayers>()
-      .init_resource::<WinnerInfo>();
+      .init_resource::<WinnerInfo>()
+      .init_resource::<NetworkRole>();
   }
 }
 
@@ -81,10 +84,67 @@ pub struct AvailablePlayerConfigs {
   pub(crate) configs: Vec<AvailablePlayerConfig>,
 }
 
+impl AvailablePlayerConfigs {
+  /// Finds an available player configuration by its [`PlayerId`].
+  /// Returns `Some(&AvailablePlayerConfig)` if found, `None` otherwise.
+  pub fn find_by_id(&self, player_id: PlayerId) -> Option<&AvailablePlayerConfig> {
+    self.configs.iter().find(|config| config.id == player_id)
+  }
+}
+
 /// A resource that holds information and configuration data about all players that have registered to play a round.
 #[derive(Resource, Default)]
 pub struct RegisteredPlayers {
   pub players: Vec<RegisteredPlayer>,
+}
+
+impl RegisteredPlayers {
+  /// Gets the number of registered players.
+  pub fn count(&self) -> usize {
+    self.players.len()
+  }
+
+  /// Adds a new registered player.
+  /// Returns `Ok` if the player was added, [`ErrorKind::PlayerAlreadyRegistered`] if a player with the same [`PlayerId`] already exists.
+  pub fn register(&mut self, player: RegisteredPlayer) -> Result<(), ErrorKind> {
+    let is_already_registered = self.players.iter().find(|p| p.id == player.id).is_none();
+    if !is_already_registered {
+      Err(ErrorKind::PlayerAlreadyRegistered(player.id))
+    } else {
+      self.players.push(player);
+      Ok(())
+    }
+  }
+
+  /// Unregisters a player by their [`PlayerId`].
+  /// Returns `Ok` if the player was removed, [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists.
+  pub fn remove_by_id(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
+    let original_len = self.players.len();
+    self.players.retain(|p| p.id != player_id);
+    if original_len != self.players.len() {
+      Ok(())
+    } else {
+      Err(ErrorKind::PlayerNeverRegistered(player_id))
+    }
+  }
+}
+
+pub enum ErrorKind {
+  PlayerAlreadyRegistered(PlayerId),
+  PlayerNeverRegistered(PlayerId),
+}
+
+impl Display for ErrorKind {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ErrorKind::PlayerAlreadyRegistered(player_id) => {
+        write!(f, "[Player {}] is already registered", player_id.0)
+      }
+      ErrorKind::PlayerNeverRegistered(player_id) => {
+        write!(f, "[Player {}] was never registered", player_id.0)
+      }
+    }
+  }
 }
 
 /// A resource that holds information about the winner of the last round.
@@ -107,6 +167,41 @@ impl WinnerInfo {
   /// Clears the winner information.
   pub fn clear(&mut self) {
     self.winner = None;
+  }
+}
+
+/// A resource that indicates the current network role of this application instance. Only relevant in online
+/// multiplayer mode.
+#[derive(Resource, Debug, PartialEq, Eq, Clone, Copy, Default)]
+pub(crate) enum NetworkRole {
+  #[default]
+  None,
+  Server,
+  Client,
+}
+
+impl From<NetworkAudience> for NetworkRole {
+  fn from(audience: NetworkAudience) -> Self {
+    match audience {
+      NetworkAudience::Server => NetworkRole::Server,
+      NetworkAudience::Client => NetworkRole::Client,
+    }
+  }
+}
+
+impl NetworkRole {
+  /// Checks if the current role is `Server`.
+  pub fn is_server(&self) -> bool {
+    *self == NetworkRole::Server
+  }
+
+  /// Checks if the current role is `Client`.
+  pub fn is_client(&self) -> bool {
+    *self == NetworkRole::Client
+  }
+
+  pub fn is_none(&self) -> bool {
+    *self == NetworkRole::None
   }
 }
 
@@ -143,5 +238,6 @@ mod tests {
     assert!(world.contains_resource::<AvailablePlayerConfigs>());
     assert!(world.contains_resource::<RegisteredPlayers>());
     assert!(world.contains_resource::<WinnerInfo>());
+    assert!(world.contains_resource::<NetworkRole>());
   }
 }

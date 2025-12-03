@@ -11,19 +11,8 @@ pub struct NetworkingResourcesPlugin;
 
 impl Plugin for NetworkingResourcesPlugin {
   fn build(&self, app: &mut App) {
-    app
-      .init_resource::<Lobby>()
-      .add_message::<SerialisableInputAction>()
-      .init_resource::<NetworkRole>();
+    app.init_resource::<Lobby>().add_message::<SerialisableInputAction>();
   }
-}
-
-#[derive(Resource, Debug, PartialEq, Eq, Clone, Copy, Default)]
-pub(crate) enum NetworkRole {
-  #[default]
-  None,
-  Server,
-  Client,
 }
 
 #[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
@@ -54,11 +43,15 @@ pub(crate) struct OnlinePlayer {
 
 #[derive(Debug, Default, Resource)]
 pub(crate) struct Lobby {
+  pub connected: Vec<ClientId>,
   pub players: HashMap<ClientId, Entity>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Component)]
 pub(crate) enum ServerMessages {
-  PlayerConnected { client_id: ClientId, player_id: u8 },
-  PlayerDisconnected { client_id: ClientId, player_id: u8 },
+  PlayerConnected { client_id: ClientId },
+  PlayerDisconnected { client_id: ClientId },
+  StateChanged { new_state: String },
+  PlayerRegistered { client_id: ClientId, player_id: u8 },
+  PlayerUnregistered { client_id: ClientId, player_id: u8 },
 }

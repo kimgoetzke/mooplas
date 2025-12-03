@@ -1,8 +1,8 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, InputAction, PlayerId, PlayerInput, RegisteredPlayers, Settings, SnakeHead,
-  TouchControlsToggledMessage, has_registered_players,
+  AvailablePlayerConfigs, ContinueMessage, InputAction, NetworkRole, PlayerId, PlayerInput, RegisteredPlayers,
+  Settings, SnakeHead, TouchControlsToggledMessage, has_registered_players,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -30,7 +30,8 @@ impl Plugin for ControlsPlugin {
         Update,
         send_continue_message_on_key_press_system
           .run_if(in_state(AppState::Registering))
-          .run_if(has_registered_players),
+          .run_if(has_registered_players)
+          .run_if(|network_role: Res<NetworkRole>| !network_role.is_client()),
       )
       .add_systems(
         Update,
@@ -38,7 +39,9 @@ impl Plugin for ControlsPlugin {
       )
       .add_systems(
         Update,
-        send_continue_message_on_key_press_system.run_if(in_state(AppState::GameOver)),
+        send_continue_message_on_key_press_system
+          .run_if(in_state(AppState::GameOver))
+          .run_if(|network_role: Res<NetworkRole>| !network_role.is_client()),
       );
   }
 }

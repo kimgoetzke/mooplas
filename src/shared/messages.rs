@@ -1,7 +1,9 @@
+use crate::prelude::NetworkAudience;
 use crate::shared::PlayerId;
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
+use serde::{Deserialize, Serialize};
 
 /// A plugin that registers all shared messages used across multiple plugins and systems.
 pub struct SharedMessagesPlugin;
@@ -26,11 +28,15 @@ pub struct DebugStateMessage {
 }
 
 /// A message that communicates a change to a user's registration status in the lobby.
-#[derive(Message, Debug)]
+#[derive(Message, Debug, Serialize, Deserialize)]
 pub struct PlayerRegistrationMessage {
   pub player_id: PlayerId,
+  /// Whether the player has registered (true) or unregistered (false).
   pub has_registered: bool,
+  /// Whether any player is currently registered, after this change.
   pub is_anyone_registered: bool,
+  /// Whether this message originated from the server or the client. Used to prevent echoing.
+  pub network_audience: Option<NetworkAudience>,
 }
 
 /// A message that communicates a change to the touch controls setting.
@@ -67,7 +73,7 @@ pub enum MenuName {
 }
 
 /// A [`Message`] written for an input action by a player.
-#[derive(Message, Clone, Copy, Debug)]
+#[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum InputAction {
   Move(PlayerId, Scalar),
   Action(PlayerId),
