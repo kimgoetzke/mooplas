@@ -63,11 +63,11 @@ fn client_sync_players_system(
   while let Some(message) = client.receive_message(DefaultChannel::ReliableOrdered) {
     let server_message = bincode::deserialize(&message).expect("Failed to deserialise server message");
     match server_message {
-      ServerMessages::PlayerConnected { client_id } => {
-        info!("A player with client ID [{}] connected", client_id);
+      ServerMessages::ClientConnected { client_id } => {
+        info!("A client with ID [{}] connected", client_id);
       }
-      ServerMessages::PlayerDisconnected { client_id } => {
-        info!("A player with client ID [{}] disconnected", client_id);
+      ServerMessages::ClientDisconnected { client_id } => {
+        info!("A client with ID [{}] disconnected", client_id);
       }
       ServerMessages::PlayerRegistered { client_id, player_id } => {
         info!(

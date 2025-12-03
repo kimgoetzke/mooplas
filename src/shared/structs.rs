@@ -9,6 +9,7 @@ pub struct RegisteredPlayer {
   pub input: PlayerInput,
   pub colour: Color,
   pub alive: bool,
+  pub mutable: bool,
 }
 
 impl From<&AvailablePlayerConfig> for RegisteredPlayer {
@@ -18,6 +19,49 @@ impl From<&AvailablePlayerConfig> for RegisteredPlayer {
       input: config.input.clone(),
       colour: config.colour,
       alive: true,
+      mutable: true,
+    }
+  }
+}
+
+impl RegisteredPlayer {
+  pub fn new_mutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+    Self {
+      id,
+      input,
+      colour,
+      alive: true,
+      mutable: true,
+    }
+  }
+
+  pub fn new_mutable_from(config: &AvailablePlayerConfig) -> Self {
+    Self {
+      id: config.id,
+      input: config.input.clone(),
+      colour: config.colour,
+      alive: true,
+      mutable: true,
+    }
+  }
+
+  pub fn new_immutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+    Self {
+      id,
+      input,
+      colour,
+      alive: true,
+      mutable: false,
+    }
+  }
+
+  pub fn new_immutable_from(config: &AvailablePlayerConfig) -> Self {
+    Self {
+      id: config.id,
+      input: config.input.clone(),
+      colour: config.colour,
+      alive: true,
+      mutable: false,
     }
   }
 }

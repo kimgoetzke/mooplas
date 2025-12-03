@@ -116,12 +116,30 @@ impl RegisteredPlayers {
     }
   }
 
-  /// Unregisters a player by their [`PlayerId`].
-  /// Returns `Ok` if the player was removed, [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists.
-  pub fn remove_by_id(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
-    let original_len = self.players.len();
-    self.players.retain(|p| p.id != player_id);
-    if original_len != self.players.len() {
+  /// Unregisters a player by their [`PlayerId`]. Returns `Ok` if the player was removed,
+  /// [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists,
+  /// or [`ErrorKind::RegistrationNotMutable`] if the player exists but their `mutable` field is `false`.
+  pub fn unregister_mutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
+    if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
+      if !self.players[index].mutable {
+        return Err(ErrorKind::RegistrationNotMutable(player_id));
+      }
+      self.players.remove(index);
+      Ok(())
+    } else {
+      Err(ErrorKind::PlayerNeverRegistered(player_id))
+    }
+  }
+
+  /// Unregisters a player by their [`PlayerId`]. Returns `Ok` if the player was removed,
+  /// [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists,
+  /// or [`ErrorKind::RegistrationNotImmutable`] if the player exists but their `mutable` field is `true`.
+  pub fn unregister_immutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
+    if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
+      if self.players[index].mutable {
+        return Err(ErrorKind::RegistrationNotImmutable(player_id));
+      }
+      self.players.remove(index);
       Ok(())
     } else {
       Err(ErrorKind::PlayerNeverRegistered(player_id))
@@ -132,6 +150,8 @@ impl RegisteredPlayers {
 pub enum ErrorKind {
   PlayerAlreadyRegistered(PlayerId),
   PlayerNeverRegistered(PlayerId),
+  RegistrationNotMutable(PlayerId),
+  RegistrationNotImmutable(PlayerId),
 }
 
 impl Display for ErrorKind {
@@ -142,6 +162,12 @@ impl Display for ErrorKind {
       }
       ErrorKind::PlayerNeverRegistered(player_id) => {
         write!(f, "[Player {}] was never registered", player_id.0)
+      }
+      ErrorKind::RegistrationNotMutable(player_id) => {
+        write!(f, "[Player {}] is not mutably registered", player_id.0)
+      }
+      ErrorKind::RegistrationNotImmutable(player_id) => {
+        write!(f, "[Player {}] is not immutably registered", player_id.0)
       }
     }
   }

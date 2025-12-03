@@ -372,7 +372,7 @@ fn handle_player_registration_message(
     let font = asset_server.load(DEFAULT_FONT);
     let config = available_configs.configs.iter().find(|p| p.id == message.player_id);
     let is_touch_controlled = settings.general.enable_touch_controls;
-    let is_permitted_action = network_role.is_client();
+    let is_permitted_action = !network_role.is_client();
 
     // Update entry for player
     match message.has_registered {

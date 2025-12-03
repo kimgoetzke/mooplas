@@ -1,5 +1,5 @@
 use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
-use crate::shared::NetworkAudience;
+use crate::shared::{NetworkAudience, RegisteredPlayer};
 use bevy::log::{error, info, warn};
 use bevy::prelude::{MessageWriter, Res, ResMut};
 
@@ -13,7 +13,7 @@ pub(crate) fn register_player_locally(
   let config = available_configs
     .find_by_id(player_id)
     .expect("Failed to find player config for registered player");
-  match registered_players.register(config.into()) {
+  match registered_players.register(RegisteredPlayer::new_immutable_from(config)) {
     Ok(_) => {
       info!("[{}] registered successfully", player_id);
       player_registration_message.write(PlayerRegistrationMessage {
@@ -34,7 +34,7 @@ pub(crate) fn unregister_player_locally(
   player_id: PlayerId,
   network_audience: Option<NetworkAudience>,
 ) {
-  match registered_players.remove_by_id(player_id) {
+  match registered_players.unregister_immutable(player_id) {
     Ok(_) => {
       info!("[{}] unregistered successfully", player_id);
       messages.write(PlayerRegistrationMessage {
@@ -45,7 +45,7 @@ pub(crate) fn unregister_player_locally(
       });
     }
     // TODO: Somehow rectify client-server state desync
-    Err(e) => warn!("[Player {}] was not registered: {}", player_id, e),
+    Err(e) => warn!("[{}] was not registered: {}", player_id, e),
   }
 }
 

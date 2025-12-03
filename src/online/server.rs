@@ -66,14 +66,14 @@ fn handle_server_event_messages(
     match message {
       ServerEvent::ClientConnected { client_id } => {
         info!("Client with ID [{}] connected", client_id);
-        let message = bincode::serialize(&ServerMessages::PlayerConnected { client_id: *client_id })
+        let message = bincode::serialize(&ServerMessages::ClientConnected { client_id: *client_id })
           .expect("Failed to serialise client message");
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
         lobby.connected.push(*client_id);
       }
       ServerEvent::ClientDisconnected { client_id, reason } => {
         info!("Client with ID [{}] disconnected: {}", client_id, reason);
-        let message = bincode::serialize(&ServerMessages::PlayerDisconnected { client_id: *client_id })
+        let message = bincode::serialize(&ServerMessages::ClientDisconnected { client_id: *client_id })
           .expect("Failed to serialise client message");
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
         lobby.connected.retain(|&id| id != *client_id);

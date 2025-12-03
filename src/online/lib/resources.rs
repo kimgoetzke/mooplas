@@ -49,8 +49,8 @@ pub(crate) struct Lobby {
 
 #[derive(Debug, Serialize, Deserialize, Component)]
 pub(crate) enum ServerMessages {
-  PlayerConnected { client_id: ClientId },
-  PlayerDisconnected { client_id: ClientId },
+  ClientConnected { client_id: ClientId },
+  ClientDisconnected { client_id: ClientId },
   StateChanged { new_state: String },
   PlayerRegistered { client_id: ClientId, player_id: u8 },
   PlayerUnregistered { client_id: ClientId, player_id: u8 },

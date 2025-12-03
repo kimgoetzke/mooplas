@@ -63,24 +63,32 @@ fn player_registration_system(
         continue;
       };
 
-      let is_now_registered = if let Some(position) = registered_players
+      let is_now_registered = if let Some(registered_player_id) = registered_players
         .players
         .iter()
-        .position(|p| p.id == available_config.id)
+        .find(|registered_player| registered_player.id == available_config.id)
+        .map(|registered_player| registered_player.id)
       {
         // Unregister
-        registered_players.players.remove(position);
-        debug!("[Player {}] has unregistered", available_config.id.0);
+        match registered_players.unregister_mutable(registered_player_id) {
+          Ok(_) => debug!("[Player {}] has unregistered", available_config.id.0),
+          Err(e) => {
+            error!("Failed to unregister [Player {}]: {}", available_config.id.0, e);
+            continue;
+          }
+        }
+
         false
       } else {
         // Register
-        registered_players.players.push(RegisteredPlayer {
-          id: available_config.id,
-          input: available_config.input.clone(),
-          colour: available_config.colour,
-          alive: true,
-        });
-        debug!("[Player {}] has registered", available_config.id.0);
+        match registered_players.register(RegisteredPlayer::new_mutable_from(available_config)) {
+          Ok(_) => debug!("[Player {}] has registered", available_config.id.0),
+          Err(e) => {
+            error!("Failed to register [Player {}]: {}", available_config.id.0, e);
+            continue;
+          }
+        }
+
         true
       };
 
@@ -318,12 +326,14 @@ mod tests {
         input: PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD),
         colour: Color::WHITE,
         alive: false,
+        mutable: true,
       },
       RegisteredPlayer {
         id: PlayerId(1),
         input: PlayerInput::new(PlayerId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
         colour: Color::BLACK,
         alive: true,
+        mutable: true,
       },
     ];
     drop(registered_players);
