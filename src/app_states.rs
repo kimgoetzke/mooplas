@@ -26,12 +26,14 @@ fn name_from<T: ToString>(state: Option<T>) -> String {
 /// The main application states for this application. Drives the overall flow of the game.
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States, Reflect)]
 pub enum AppState {
-  /// The initialisation state which loads shared resources. Runs at application start and after before entering the
-  /// registering state.
+  /// The state in which the application starts, used to load initial resources that do not change throughout the
+  /// application lifetime.
   #[default]
-  Initialising,
+  Loading,
   /// The state used for menus. Time may be paused.
   Preparing,
+  /// A state which runs after a game mode has been selected and initialises resources such as spawn points or
+  Initialising,
   /// The state where players can register to join the game.
   Registering,
   /// The main gameplay state.
@@ -57,8 +59,9 @@ impl Display for AppState {
 impl From<&String> for AppState {
   fn from(state_name: &String) -> Self {
     match state_name.as_str() {
-      "Initialising" => AppState::Initialising,
+      "Loading" => AppState::Loading,
       "Preparing" => AppState::Preparing,
+      "Initialising" => AppState::Initialising,
       "Registering" => AppState::Registering,
       "Playing" => AppState::Playing,
       "GameOver" => AppState::GameOver,
@@ -94,7 +97,7 @@ mod tests {
 
     let state = app.world().get_resource::<State<AppState>>();
     assert!(state.is_some());
-    assert_eq!(state.unwrap(), &AppState::Initialising);
+    assert_eq!(state.unwrap(), &AppState::Loading);
   }
 
   #[test]
@@ -104,6 +107,7 @@ mod tests {
 
   #[test]
   fn app_state_display_formats_correctly() {
+    assert_eq!(AppState::Loading.to_string(), "Loading");
     assert_eq!(AppState::Initialising.to_string(), "Initialising");
     assert_eq!(AppState::Registering.to_string(), "Registering");
     assert_eq!(AppState::Playing.to_string(), "Playing");
@@ -124,6 +128,7 @@ mod tests {
 
   #[test]
   fn from_string_converts_valid_state_names() {
+    assert_eq!(AppState::from(&"Loading".to_string()), AppState::Loading);
     assert_eq!(AppState::from(&"Initialising".to_string()), AppState::Initialising);
     assert_eq!(AppState::from(&"Preparing".to_string()), AppState::Preparing);
     assert_eq!(AppState::from(&"Registering".to_string()), AppState::Registering);

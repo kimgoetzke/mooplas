@@ -173,7 +173,7 @@ fn transition_to_game_over_system(
   mut next: ResMut<NextState<AppState>>,
 ) {
   let alive_players: Vec<&RegisteredPlayer> = registered_players.players.iter().filter(|p| p.alive).collect();
-  match (registered_players.players.len(), alive_players.len()) {
+  match (registered_players.count(), alive_players.len()) {
     (_, 0) => {
       winner.clear();
       next.set(AppState::GameOver);

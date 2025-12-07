@@ -228,7 +228,7 @@ fn spawn_lobby_ui(
   }
 
   // Call to action
-  let has_any_registered = registered_players.players.len() > 0;
+  let has_any_registered = registered_players.count() > 0;
   let cta = commands
     .spawn((
       LobbyUiCta,

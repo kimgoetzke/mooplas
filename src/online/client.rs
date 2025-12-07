@@ -1,6 +1,6 @@
 use crate::app_states::AppState;
 use crate::online::lib::{ServerMessages, utils};
-use crate::prelude::{PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
+use crate::prelude::{PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed};
 use crate::shared::{AvailablePlayerConfigs, InputAction, NetworkAudience};
 use bevy::app::Update;
 use bevy::log::*;
@@ -47,7 +47,7 @@ fn handle_local_player_registration_message(
     if utils::should_message_be_skipped(&message, NetworkAudience::Server) {
       continue;
     }
-    debug!("Sending: {:?}...", message);
+    debug!("Sending to server: Player registration message");
     let registration_message = bincode::serialize(&message).unwrap();
     client.send_message(DefaultChannel::ReliableOrdered, registration_message);
   }
@@ -59,9 +59,11 @@ fn client_sync_players_system(
   available_configs: Res<AvailablePlayerConfigs>,
   mut messages: MessageWriter<PlayerRegistrationMessage>,
   mut next_state: ResMut<NextState<AppState>>,
+  mut seed: ResMut<Seed>,
 ) {
   while let Some(message) = client.receive_message(DefaultChannel::ReliableOrdered) {
     let server_message = bincode::deserialize(&message).expect("Failed to deserialise server message");
+    debug!("Received server message: {:?}", server_message);
     match server_message {
       ServerMessages::ClientConnected { client_id } => {
         info!("A client with ID [{}] connected", client_id);
@@ -69,11 +71,10 @@ fn client_sync_players_system(
       ServerMessages::ClientDisconnected { client_id } => {
         info!("A client with ID [{}] disconnected", client_id);
       }
-      ServerMessages::PlayerRegistered { client_id, player_id } => {
-        info!(
-          "[Player {}] with client ID [{}] attempts to register...",
-          player_id, client_id
-        );
+      ServerMessages::SeedSynchronised { seed: server_seed } => {
+        seed.set(server_seed);
+      }
+      ServerMessages::PlayerRegistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
         utils::register_player_locally(
           &mut registered_players,
@@ -83,11 +84,7 @@ fn client_sync_players_system(
           None,
         );
       }
-      ServerMessages::PlayerUnregistered { client_id, player_id } => {
-        debug!(
-          "[Player {}] with client ID [{}] attempts to unregister...",
-          player_id, client_id
-        );
+      ServerMessages::PlayerUnregistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
         utils::unregister_player_locally(&mut registered_players, &mut messages, player_id, None);
       }

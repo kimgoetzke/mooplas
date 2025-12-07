@@ -35,6 +35,7 @@ impl RegisteredPlayer {
     }
   }
 
+  #[cfg(feature = "online")]
   pub fn new_immutable_from(config: &AvailablePlayerConfig) -> Self {
     Self {
       id: config.id,

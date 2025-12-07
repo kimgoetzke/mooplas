@@ -2,7 +2,7 @@ use crate::app_states::AppState;
 use crate::online::lib::{Lobby, OnlinePlayer, ServerMessages, utils};
 use crate::prelude::{
   AvailablePlayerConfigs, ContinueMessage, NetworkAudience, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
-  has_registered_players,
+  Seed, has_registered_players,
 };
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
@@ -61,18 +61,28 @@ fn handle_server_event_messages(
   mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
+  seed: Res<Seed>,
 ) {
   for message in messages.read() {
     match message {
       ServerEvent::ClientConnected { client_id } => {
         info!("Client with ID [{}] connected", client_id);
-        let message = bincode::serialize(&ServerMessages::ClientConnected { client_id: *client_id })
+
+        // Notify all other clients about the new connection
+        let connected_message = bincode::serialize(&ServerMessages::ClientConnected { client_id: *client_id })
           .expect("Failed to serialise client message");
-        server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
+        server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, connected_message);
         lobby.connected.push(*client_id);
+
+        // Send the current seed to the newly connected client
+        let seed_message = bincode::serialize(&ServerMessages::SeedSynchronised { seed: seed.get() })
+          .expect("Failed to serialise seed message");
+        server.send_message(*client_id, DefaultChannel::ReliableOrdered, seed_message);
       }
       ServerEvent::ClientDisconnected { client_id, reason } => {
         info!("Client with ID [{}] disconnected: {}", client_id, reason);
+
+        // Notify all other clients about the disconnection
         let message = bincode::serialize(&ServerMessages::ClientDisconnected { client_id: *client_id })
           .expect("Failed to serialise client message");
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
@@ -82,9 +92,9 @@ fn handle_server_event_messages(
 
     // TODO: Improve state transition logic
     if lobby.connected.len() > 0 {
-      next_state.set(AppState::Registering);
+      next_state.set(AppState::Initialising);
       let message = bincode::serialize(&ServerMessages::StateChanged {
-        new_state: AppState::Registering.to_string(),
+        new_state: AppState::Initialising.to_string(),
       })
       .expect("Failed to serialise client message");
       server.broadcast_message(DefaultChannel::ReliableOrdered, message);
@@ -202,9 +212,9 @@ fn handle_continue_message(mut continue_messages: MessageReader<ContinueMessage>
   if messages.is_empty() {
     return;
   }
-  let message_for_clients = bincode::serialize(&ServerMessages::StateChanged {
+  let state_changed_message_for_clients = bincode::serialize(&ServerMessages::StateChanged {
     new_state: AppState::Playing.to_string(),
   })
   .expect("Failed to serialise client message");
-  server.broadcast_message(DefaultChannel::ReliableOrdered, message_for_clients);
+  server.broadcast_message(DefaultChannel::ReliableOrdered, state_changed_message_for_clients);
 }

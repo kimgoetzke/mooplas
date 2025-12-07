@@ -233,7 +233,7 @@ mod tests {
 
     // Verify initial state
     let state = app.world().resource::<State<AppState>>();
-    assert_eq!(state.get(), &AppState::Initialising);
+    assert_eq!(state.get(), &AppState::Loading);
 
     // Manually advance state to the state in which the function runs
     change_app_state(&mut app, AppState::Registering);
@@ -264,7 +264,7 @@ mod tests {
 
     // Verify initial state
     let state = app.world().resource::<State<AppState>>();
-    assert_eq!(state.get(), &AppState::Initialising);
+    assert_eq!(state.get(), &AppState::Loading);
 
     // Manually advance state to the state in which the system runs
     change_app_state(&mut app, AppState::Registering);

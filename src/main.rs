@@ -5,6 +5,7 @@ mod debug;
 mod game_loop;
 mod game_world;
 mod initialisation;
+mod loading;
 mod online;
 mod player;
 mod shared;
@@ -26,6 +27,7 @@ use crate::controls::ControlsPlugin;
 use crate::game_loop::GameLoopPlugin;
 use crate::game_world::GameWorldPlugin;
 use crate::initialisation::InitialisationPlugin;
+use crate::loading::LoadingPlugin;
 use crate::player::PlayerPlugin;
 use crate::prelude::*;
 use crate::ui::UiPlugin;
@@ -45,6 +47,7 @@ fn main() {
       GameWorldPlugin,
       SharedResourcesPlugin,
       SharedMessagesPlugin,
+      LoadingPlugin,
       InitialisationPlugin,
       PlayerPlugin,
       GameLoopPlugin,

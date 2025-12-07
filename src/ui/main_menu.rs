@@ -146,7 +146,7 @@ fn handle_button_interactions_system(
   for interaction in &mut play_local_query {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Play Local\"");
-      next_state.set(AppState::Registering);
+      next_state.set(AppState::Initialising);
       despawn_main_menu(&mut commands, &menu_root_query);
     }
   }

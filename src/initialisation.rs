@@ -1,16 +1,15 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
-use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, SpawnPoints};
+use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, Seed, SpawnPoints};
 use bevy::app::{App, Plugin};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::log::*;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::{IntoScheduleConfigs, KeyCode, NextState, OnEnter, Res, ResMut, Resource, Update, in_state};
-use rand::Rng;
-use rand::prelude::ThreadRng;
+use rand::prelude::StdRng;
+use rand::{Rng, SeedableRng};
 
-// TODO: Add asset loading, possibly loading screen
 /// A plugin that initialises the game by loading resources and generation data such as spawn points.
 pub struct InitialisationPlugin;
 
@@ -111,7 +110,7 @@ fn reset_tracker_system(mut tracker: ResMut<InitialisationTracker>) {
 fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: ResMut<NextState<AppState>>) {
   if tracker.all_done() {
     debug!("✅  Initialisation completed");
-    next_state.set(AppState::Preparing);
+    next_state.set(AppState::Registering);
   }
 }
 
@@ -119,10 +118,11 @@ fn check_progress_system(tracker: Res<InitialisationTracker>, mut next_state: Re
 fn generate_valid_spawn_points_system(
   mut tracker: ResMut<InitialisationTracker>,
   mut spawn_points: ResMut<SpawnPoints>,
+  seed: Res<Seed>,
 ) {
   run_initialisation_step(&mut tracker, InitialisationStep::GenerateSpawnPoints, || {
     spawn_points.data.clear();
-    let mut rng = rand::rng();
+    let mut rng = StdRng::seed_from_u64(seed.get());
     let mut valid_spawn_points: Vec<(f32, f32, f32)> = Vec::new();
     while valid_spawn_points.len() < 10 {
       let (x, y) = random_start_position(&mut rng);
@@ -152,7 +152,7 @@ fn generate_valid_spawn_points_system(
 }
 
 /// Calculates a random start position for the player that is at least [`EDGE_MARGIN`] pixels away from the screen edges.
-fn random_start_position(rng: &mut ThreadRng) -> (f32, f32) {
+fn random_start_position(rng: &mut StdRng) -> (f32, f32) {
   let half_w = RESOLUTION_WIDTH as f32 / 2.0;
   let half_h = RESOLUTION_HEIGHT as f32 / 2.0;
   let min_x = -half_w + EDGE_MARGIN;
@@ -215,7 +215,6 @@ mod tests {
   use super::*;
   use bevy::MinimalPlugins;
   use bevy::app::App;
-  use rand::rng;
 
   #[test]
   fn initialisation_tracker_default_and_reset_behaviour() {
@@ -261,7 +260,7 @@ mod tests {
 
   #[test]
   fn random_start_position_respects_edge_margin_and_resolution() {
-    let mut rng = rng();
+    let mut rng = StdRng::seed_from_u64(1);
     let (x, y) = random_start_position(&mut rng);
     let half_w = RESOLUTION_WIDTH as f32 / 2.0;
     let half_h = RESOLUTION_HEIGHT as f32 / 2.0;
@@ -294,8 +293,10 @@ mod tests {
     // Prepare resources
     let mut tracker = InitialisationTracker::default();
     tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
-    app.insert_resource(tracker);
-    app.insert_resource(SpawnPoints::default());
+    app
+      .insert_resource(tracker)
+      .insert_resource(Seed::default())
+      .insert_resource(SpawnPoints::default());
 
     // Add system and run one update to execute it
     app.add_systems(Update, generate_valid_spawn_points_system);

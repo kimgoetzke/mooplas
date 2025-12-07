@@ -1,12 +1,14 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
 use crate::shared::NetworkAudience;
 use bevy::app::{App, Plugin};
+use bevy::log::*;
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use std::fmt::Display;
+use std::time::SystemTime;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
 pub struct SharedResourcesPlugin;
@@ -14,6 +16,7 @@ pub struct SharedResourcesPlugin;
 impl Plugin for SharedResourcesPlugin {
   fn build(&self, app: &mut App) {
     app
+      .init_resource::<Seed>()
       .init_resource::<Settings>()
       .register_type::<Settings>()
       .init_resource::<GeneralSettings>()
@@ -24,6 +27,36 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<RegisteredPlayers>()
       .init_resource::<WinnerInfo>()
       .init_resource::<NetworkRole>();
+  }
+}
+
+/// The seed used for random number generation in the game.
+#[derive(Resource, Reflect, Clone, Copy)]
+pub struct Seed {
+  seed: u64,
+}
+
+impl Default for Seed {
+  fn default() -> Self {
+    Self {
+      seed: SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .expect("Time went backwards")
+        .as_secs(),
+    }
+  }
+}
+
+impl Seed {
+  /// Gets the seed value.
+  pub fn get(&self) -> u64 {
+    self.seed
+  }
+
+  /// Sets the seed value.
+  pub fn set(&mut self, seed: u64) {
+    debug!("Setting seed to [{}]", seed);
+    self.seed = seed;
   }
 }
 
@@ -85,8 +118,8 @@ pub struct AvailablePlayerConfigs {
 }
 
 impl AvailablePlayerConfigs {
-  /// Finds an available player configuration by its [`PlayerId`].
-  /// Returns `Some(&AvailablePlayerConfig)` if found, `None` otherwise.
+  /// Finds an available player configuration by its [`PlayerId`]. Returns [`Option<&AvailablePlayerConfig>`] if found,
+  /// [`None`] otherwise.
   pub fn find_by_id(&self, player_id: PlayerId) -> Option<&AvailablePlayerConfig> {
     self.configs.iter().find(|config| config.id == player_id)
   }
@@ -104,6 +137,7 @@ impl RegisteredPlayers {
     self.players.len()
   }
 
+  // TODO: Add test coverage for below methods
   /// Adds a new registered player.
   /// Returns `Ok` if the player was added, [`ErrorKind::PlayerAlreadyRegistered`] if a player with the same [`PlayerId`] already exists.
   pub fn register(&mut self, player: RegisteredPlayer) -> Result<(), ErrorKind> {
@@ -140,6 +174,7 @@ impl RegisteredPlayers {
   ///
   /// Use this method to unregister players that were also registered as immutable i.e. on other clients
   /// in an online multiplayer game instead of in a local game instance.
+  #[cfg(feature = "online")]
   pub fn unregister_immutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
     if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
       if self.players[index].mutable {
@@ -153,6 +188,7 @@ impl RegisteredPlayers {
   }
 }
 
+#[allow(dead_code)]
 pub enum ErrorKind {
   PlayerAlreadyRegistered(PlayerId),
   PlayerNeverRegistered(PlayerId),
@@ -240,7 +276,9 @@ impl NetworkRole {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use crate::prelude::PlayerInput;
   use bevy::MinimalPlugins;
+  use bevy::prelude::KeyCode;
 
   fn setup() -> App {
     let mut app = App::new();
@@ -271,5 +309,51 @@ mod tests {
     assert!(world.contains_resource::<RegisteredPlayers>());
     assert!(world.contains_resource::<WinnerInfo>());
     assert!(world.contains_resource::<NetworkRole>());
+  }
+
+  #[test]
+  fn find_by_id_returns_correct_config_when_id_exists() {
+    let configs = vec![
+      AvailablePlayerConfig {
+        id: PlayerId(1),
+        input: PlayerInput::new(PlayerId(1), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
+        colour: Default::default(),
+      },
+      AvailablePlayerConfig {
+        id: PlayerId(2),
+        input: PlayerInput::new(PlayerId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+        colour: Default::default(),
+      },
+    ];
+    let available_configs = AvailablePlayerConfigs { configs };
+    let result = available_configs.find_by_id(PlayerId(1));
+    assert!(result.is_some());
+    assert_eq!(result.unwrap().id, PlayerId(1));
+  }
+
+  #[test]
+  fn find_by_id_returns_none_when_id_does_not_exist() {
+    let configs = vec![
+      AvailablePlayerConfig {
+        id: PlayerId(0),
+        input: PlayerInput::new(PlayerId(0), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
+        colour: Default::default(),
+      },
+      AvailablePlayerConfig {
+        id: PlayerId(4),
+        input: PlayerInput::new(PlayerId(4), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+        colour: Default::default(),
+      },
+    ];
+    let available_configs = AvailablePlayerConfigs { configs };
+    let result = available_configs.find_by_id(PlayerId(3));
+    assert!(result.is_none());
+  }
+
+  #[test]
+  fn find_by_id_returns_none_when_configs_are_empty() {
+    let available_configs = AvailablePlayerConfigs { configs: vec![] };
+    let result = available_configs.find_by_id(PlayerId(1));
+    assert!(result.is_none());
   }
 }

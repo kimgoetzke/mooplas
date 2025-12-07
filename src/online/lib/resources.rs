@@ -51,6 +51,7 @@ pub(crate) struct Lobby {
 pub(crate) enum ServerMessages {
   ClientConnected { client_id: ClientId },
   ClientDisconnected { client_id: ClientId },
+  SeedSynchronised { seed: u64 },
   StateChanged { new_state: String },
   PlayerRegistered { client_id: ClientId, player_id: u8 },
   PlayerUnregistered { client_id: ClientId, player_id: u8 },
