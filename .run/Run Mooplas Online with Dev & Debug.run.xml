@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Mooplas Online with Dev &amp; Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command" singleton="false">
+  <configuration default="false" name="Run Mooplas Online with Dev &amp; Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command" activateToolWindowBeforeRun="false" singleton="false">
     <option name="buildProfileId" value="dev" />
     <option name="command" value="run --package mooplas --bin mooplas --no-default-features --features online,dev" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
