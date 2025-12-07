@@ -274,7 +274,7 @@ fn spawn_call_to_action_to_start(
     ));
   } else if !is_permitted_action {
     parent.spawn((
-      Text::new("Waiting for game to start..."),
+      Text::new("Waiting for host to start..."),
       default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
       TextColor(Color::WHITE),
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
@@ -576,9 +576,11 @@ fn spawn_game_over_ui_system(
   winner: Res<WinnerInfo>,
   asset_server: Res<AssetServer>,
   registered_players: Res<RegisteredPlayers>,
+  network_role: Res<NetworkRole>,
 ) {
   let font = asset_server.load(DEFAULT_FONT);
   let default_shadow = default_shadow();
+  let is_permitted_action = !network_role.is_client();
 
   commands
     .spawn((
@@ -648,6 +650,17 @@ fn spawn_game_over_ui_system(
           ..default()
         })
         .with_children(|parent| {
+          if !is_permitted_action {
+            parent.spawn((
+              Text::new("Waiting for host to continue..."),
+              default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+              TextColor(Color::WHITE),
+              TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+              default_shadow,
+            ));
+            return;
+          }
+
           parent.spawn((
             Text::new("Press "),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
