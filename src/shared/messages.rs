@@ -73,7 +73,7 @@ pub enum MenuName {
 }
 
 /// A [`Message`] written for an input action by a player.
-#[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
+#[derive(Message, Clone, Copy, Debug)]
 pub enum InputAction {
   Move(PlayerId, Scalar),
   Action(PlayerId),

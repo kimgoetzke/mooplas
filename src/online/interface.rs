@@ -20,11 +20,11 @@ impl Plugin for InterfacePlugin {
       .world_mut()
       .spawn_batch([
         (
-          Observer::new(IntoSystem::into_system(on_add_chunk_component_trigger)),
+          Observer::new(IntoSystem::into_system(on_add_player_trigger)),
           Name::new("Observer: Add Player"),
         ),
         (
-          Observer::new(IntoSystem::into_system(on_remove_chunk_component_trigger)),
+          Observer::new(IntoSystem::into_system(on_remove_player_trigger)),
           Name::new("Observer: Remove Player"),
         ),
       ]);
@@ -52,7 +52,7 @@ impl PlayerIndex {
   }
 }
 
-fn on_add_chunk_component_trigger(
+fn on_add_player_trigger(
   trigger: On<Add, Player>,
   query: Query<(Entity, &PlayerId), With<Player>>,
   mut index: ResMut<PlayerIndex>,
@@ -62,7 +62,7 @@ fn on_add_chunk_component_trigger(
   debug!("PlayerIndex <- Added [{:?}] with key [{}]", player_id, entity);
 }
 
-fn on_remove_chunk_component_trigger(
+fn on_remove_player_trigger(
   trigger: On<Remove, Player>,
   query: Query<(Entity, &PlayerId), With<Player>>,
   mut index: ResMut<PlayerIndex>,

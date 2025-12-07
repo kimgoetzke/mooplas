@@ -319,7 +319,7 @@ mod tests {
       input: player_input.clone(),
       colour: Color::WHITE,
       alive: true,
-      mutable: false,
+      mutable: true,
     });
     drop(registered_players);
 

@@ -202,7 +202,7 @@ fn game_over_to_initialising_transition_system(
   mut continue_messages: MessageReader<ContinueMessage>,
   mut next_app_state: ResMut<NextState<AppState>>,
 ) {
-  debug_once!("Waiting for message to continue...");
+  debug_once!("Waiting for message or host to continue...");
   let messages = continue_messages.read().collect::<Vec<&ContinueMessage>>();
   if messages.is_empty() {
     return;

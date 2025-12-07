@@ -8,7 +8,7 @@ mod server;
 use crate::app_states::AppState;
 use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
-use crate::online::lib::NetworkingResourcesPlugin;
+use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin};
 use crate::online::server::ServerPlugin;
 use crate::prelude::{MenuName, NetworkRole, ToggleMenuMessage};
 use bevy::app::Update;
@@ -31,7 +31,7 @@ impl Plugin for OnlinePlugin {
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(Update, panic_on_error_system)
-      .add_plugins((InterfacePlugin, NetworkingResourcesPlugin));
+      .add_plugins((InterfacePlugin, NetworkingResourcesPlugin, NetworkingMessagesPlugin));
     info!("Online multiplayer is enabled");
   }
 }

@@ -1,5 +1,7 @@
 use crate::app_states::AppState;
-use crate::online::lib::{ClientMessage, ServerMessage, utils};
+use crate::online::lib::{
+  ClientMessage, InputSequence, NetworkClientId, SerialisableInputAction, ServerMessage, utils,
+};
 use crate::prelude::{PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed};
 use crate::shared::{AvailablePlayerConfigs, InputAction, NetworkAudience};
 use bevy::app::Update;
@@ -9,6 +11,9 @@ use bevy_renet::netcode::NetcodeClientPlugin;
 use bevy_renet::renet::{DefaultChannel, RenetClient};
 use bevy_renet::{RenetClientPlugin, client_connected};
 
+/// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
+/// running in client mode (i.e. someone else is the server). Mutually exclusive with the
+/// [`crate::online::ServerPlugin`].
 pub struct ClientPlugin;
 
 impl Plugin for ClientPlugin {
@@ -42,6 +47,7 @@ fn handle_reliable_server_messages_system(
   mut messages: MessageWriter<PlayerRegistrationMessage>,
   mut next_state: ResMut<NextState<AppState>>,
   mut seed: ResMut<Seed>,
+  mut network_client_id: ResMut<NetworkClientId>,
 ) {
   while let Some(message) = client.receive_message(DefaultChannel::ReliableOrdered) {
     let server_message = bincode::deserialize(&message).expect("Failed to deserialise server message");
@@ -53,8 +59,12 @@ fn handle_reliable_server_messages_system(
       ServerMessage::ClientDisconnected { client_id } => {
         info!("A client with ID [{}] disconnected", client_id);
       }
-      ServerMessage::SeedSynchronised { seed: server_seed } => {
+      ServerMessage::ClientInitialised {
+        seed: server_seed,
+        client_id,
+      } => {
         seed.set(server_seed);
+        network_client_id.set(client_id);
       }
       ServerMessage::PlayerRegistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
@@ -89,7 +99,7 @@ fn handle_local_player_registration_message(
     }
     let registration_message = bincode::serialize(&ClientMessage::PlayerRegistrationMessage(*message))
       .expect("Failed to serialise player registration message");
-    debug!("Sending to server: {:?}", message);
+    debug!("Sending [{:?}] to server", registration_message);
     client.send_message(DefaultChannel::ReliableOrdered, registration_message);
   }
 }
@@ -102,8 +112,8 @@ fn handle_unreliable_messages_from_server_system(
   while let Some(message) = client.receive_message(DefaultChannel::Unreliable) {
     if let Ok(client_message) = bincode::deserialize(&message) {
       match client_message {
-        ClientMessage::InputAction(action) => {
-          input_action_message.write(action);
+        ClientMessage::InputAction(_, action) => {
+          input_action_message.write(action.into());
         }
         _ => {
           warn!(
@@ -118,24 +128,26 @@ fn handle_unreliable_messages_from_server_system(
   }
 }
 
-/// A system that handles local input action messages for mutable players byt sends them to the server in order to sync
+/// A system that handles local input action messages for mutable players by sending them to the server in order to sync
 /// the movements of the local player(s) with the server.
 fn handle_local_input_action_messages(
-  mut messages: MessageReader<InputAction>,
+  mut messages: MessageReader<SerialisableInputAction>,
   registered_players: Res<RegisteredPlayers>,
   mut client: ResMut<RenetClient>,
+  mut sequence: ResMut<InputSequence>,
 ) {
   for message in messages.read() {
     let player_id = match message {
-      InputAction::Action(player_id) => player_id,
-      InputAction::Move(player_id, _) => player_id,
+      SerialisableInputAction::Action(player_id) => player_id,
+      SerialisableInputAction::Move(player_id, _) => player_id,
     };
     if let Some(_) = registered_players
       .players
       .iter()
-      .find(|player| player.id == *player_id && player.mutable)
+      .find(|player| player.id.0 == *player_id && player.mutable)
     {
-      if let Ok(input_message) = bincode::serialize(&ClientMessage::InputAction(*message)) {
+      sequence.current = sequence.current.wrapping_add(1);
+      if let Ok(input_message) = bincode::serialize(&ClientMessage::InputAction(sequence.current, *message)) {
         client.send_message(DefaultChannel::Unreliable, input_message);
       } else {
         warn!("Failed to serialise input action message: {:?}", message);
