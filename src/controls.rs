@@ -283,6 +283,7 @@ mod tests {
       input: PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
       colour: Color::WHITE,
       alive: true,
+      mutable: false,
     });
     drop(registered_players);
 
@@ -315,6 +316,7 @@ mod tests {
       input: player_input.clone(),
       colour: Color::WHITE,
       alive: true,
+      mutable: false,
     });
     drop(registered_players);
 

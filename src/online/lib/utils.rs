@@ -1,6 +1,6 @@
 use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
 use crate::shared::{NetworkAudience, RegisteredPlayer};
-use bevy::log::{error, info, warn};
+use bevy::log::*;
 use bevy::prelude::{MessageWriter, Res, ResMut};
 
 pub(crate) fn register_player_locally(
@@ -23,8 +23,7 @@ pub(crate) fn register_player_locally(
         network_audience,
       });
     }
-    // TODO: Somehow rectify client-server state desync
-    Err(e) => error!("Failed to register [{}]: {}", player_id, e),
+    Err(e) => warn!("Failed to register [{}]: {}", player_id, e),
   }
 }
 
@@ -44,7 +43,6 @@ pub(crate) fn unregister_player_locally(
         network_audience,
       });
     }
-    // TODO: Somehow rectify client-server state desync
     Err(e) => warn!("[{}] was not registered: {}", player_id, e),
   }
 }

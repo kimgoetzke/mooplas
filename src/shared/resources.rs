@@ -117,8 +117,11 @@ impl RegisteredPlayers {
   }
 
   /// Unregisters a player by their [`PlayerId`]. Returns `Ok` if the player was removed,
-  /// [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists,
-  /// or [`ErrorKind::RegistrationNotMutable`] if the player exists but their `mutable` field is `false`.
+  /// [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists, or
+  /// [`ErrorKind::RegistrationNotMutable`] if the player exists but their `mutable` field is `false`.
+  ///
+  /// Use this method to unregister players that were also registered as mutable i.e. in a local game instance instead
+  /// of in an online multiplayer game.
   pub fn unregister_mutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
     if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
       if !self.players[index].mutable {
@@ -132,8 +135,11 @@ impl RegisteredPlayers {
   }
 
   /// Unregisters a player by their [`PlayerId`]. Returns `Ok` if the player was removed,
-  /// [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists,
-  /// or [`ErrorKind::RegistrationNotImmutable`] if the player exists but their `mutable` field is `true`.
+  /// [`ErrorKind::PlayerNeverRegistered`] if no player with the given [`PlayerId`] exists, or
+  /// [`ErrorKind::RegistrationNotImmutable`] if the player exists but their `mutable` field is `true`.
+  ///
+  /// Use this method to unregister players that were also registered as immutable i.e. on other clients
+  /// in an online multiplayer game instead of in a local game instance.
   pub fn unregister_immutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
     if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
       if self.players[index].mutable {

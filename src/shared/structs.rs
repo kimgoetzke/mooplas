@@ -25,16 +25,6 @@ impl From<&AvailablePlayerConfig> for RegisteredPlayer {
 }
 
 impl RegisteredPlayer {
-  pub fn new_mutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
-    Self {
-      id,
-      input,
-      colour,
-      alive: true,
-      mutable: true,
-    }
-  }
-
   pub fn new_mutable_from(config: &AvailablePlayerConfig) -> Self {
     Self {
       id: config.id,
@@ -42,16 +32,6 @@ impl RegisteredPlayer {
       colour: config.colour,
       alive: true,
       mutable: true,
-    }
-  }
-
-  pub fn new_immutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
-    Self {
-      id,
-      input,
-      colour,
-      alive: true,
-      mutable: false,
     }
   }
 
