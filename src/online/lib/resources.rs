@@ -1,10 +1,11 @@
-use crate::prelude::InputAction;
+use crate::prelude::{InputAction, PlayerRegistrationMessage};
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Component, Entity, Message, Resource};
 use bevy_renet::renet::ClientId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
 pub struct NetworkingResourcesPlugin;
@@ -48,11 +49,30 @@ pub(crate) struct Lobby {
 }
 
 #[derive(Debug, Serialize, Deserialize, Component)]
-pub(crate) enum ServerMessages {
+pub(crate) enum ServerMessage {
   ClientConnected { client_id: ClientId },
   ClientDisconnected { client_id: ClientId },
   SeedSynchronised { seed: u64 },
   StateChanged { new_state: String },
   PlayerRegistered { client_id: ClientId, player_id: u8 },
   PlayerUnregistered { client_id: ClientId, player_id: u8 },
+}
+
+#[derive(Serialize, Deserialize)]
+pub(crate) enum ClientMessage {
+  PlayerRegistrationMessage(PlayerRegistrationMessage),
+  InputAction(InputAction),
+}
+
+impl Debug for ClientMessage {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    match self {
+      ClientMessage::PlayerRegistrationMessage(message) => {
+        write!(f, "ClientMessage::PlayerRegistrationMessage for {}", message.player_id)
+      }
+      ClientMessage::InputAction(action) => {
+        write!(f, "ClientMessage::{:?}", action)
+      }
+    }
+  }
 }

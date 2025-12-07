@@ -72,16 +72,19 @@ fn send_continue_message_on_key_press_system(
   }
 }
 
-// Sends `InputAction` events based on keyboard input, but only for registered players.
+/// Sends [`InputAction`] events based on keyboard input, but only for registered players.
 fn player_input_system(
   mut input_action_writer: MessageWriter<InputAction>,
   keyboard_input: Res<ButtonInput<KeyCode>>,
-  registered: Option<Res<RegisteredPlayers>>,
+  registered_players: Option<Res<RegisteredPlayers>>,
 ) {
-  let Some(registered) = registered else {
+  let Some(registered) = registered_players else {
     return;
   };
   for player in &registered.players {
+    if !player.mutable {
+      continue;
+    }
     process_inputs(&mut input_action_writer, &keyboard_input, player.input.clone());
   }
 }

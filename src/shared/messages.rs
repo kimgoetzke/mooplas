@@ -28,7 +28,7 @@ pub struct DebugStateMessage {
 }
 
 /// A message that communicates a change to a user's registration status in the lobby.
-#[derive(Message, Debug, Serialize, Deserialize)]
+#[derive(Message, Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct PlayerRegistrationMessage {
   pub player_id: PlayerId,
   /// Whether the player has registered (true) or unregistered (false).

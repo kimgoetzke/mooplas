@@ -1,15 +1,13 @@
 use crate::app_states::AppState;
-use crate::online::lib::{Lobby, OnlinePlayer, ServerMessages, utils};
+use crate::online::lib::{ClientMessage, Lobby, ServerMessage, utils};
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, NetworkAudience, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
-  Seed, has_registered_players,
+  AvailablePlayerConfigs, ContinueMessage, InputAction, NetworkAudience, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayers, Seed, has_registered_players,
 };
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
-use bevy::platform::collections::HashMap;
 use bevy::prelude::{
-  IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Query, Res, ResMut, Transform, in_state,
-  resource_exists,
+  IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Res, ResMut, in_state, resource_exists,
 };
 use bevy_renet::RenetServerPlugin;
 use bevy_renet::netcode::NetcodeServerPlugin;
@@ -23,12 +21,7 @@ impl Plugin for ServerPlugin {
       .add_plugins((RenetServerPlugin, NetcodeServerPlugin))
       .add_systems(
         Update,
-        (
-          handle_server_event_messages,
-          handle_client_updates_system,
-          server_sync_players_system,
-        )
-          .run_if(resource_exists::<RenetServer>),
+        (handle_server_event_messages, handle_ordered_client_messages_system).run_if(resource_exists::<RenetServer>),
       )
       .add_systems(
         Update,
@@ -39,21 +32,20 @@ impl Plugin for ServerPlugin {
       )
       .add_systems(
         Update,
-        handle_own_updates_system
+        handle_local_player_registration_message
           .run_if(in_state(AppState::Registering))
+          .run_if(resource_exists::<RenetServer>),
+      )
+      .add_systems(
+        Update,
+        (
+          handle_unreliable_client_player_movements_system,
+          handle_local_input_action_messages,
+        )
+          .run_if(in_state(AppState::Playing))
           .run_if(resource_exists::<RenetServer>),
       );
   }
-}
-
-fn server_sync_players_system(mut server: ResMut<RenetServer>, query: Query<(&Transform, &OnlinePlayer)>) {
-  let mut lobby: HashMap<ClientId, [f32; 3]> = HashMap::new();
-  for (transform, player) in query.iter() {
-    lobby.insert(player.id, transform.translation.into());
-  }
-
-  let sync_message = bincode::serialize(&lobby).expect("Failed to serialize sync message");
-  server.broadcast_message(DefaultChannel::Unreliable, sync_message);
 }
 
 fn handle_server_event_messages(
@@ -69,13 +61,13 @@ fn handle_server_event_messages(
         info!("Client with ID [{}] connected", client_id);
 
         // Notify all other clients about the new connection
-        let connected_message = bincode::serialize(&ServerMessages::ClientConnected { client_id: *client_id })
+        let connected_message = bincode::serialize(&ServerMessage::ClientConnected { client_id: *client_id })
           .expect("Failed to serialise client message");
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, connected_message);
         lobby.connected.push(*client_id);
 
         // Send the current seed to the newly connected client
-        let seed_message = bincode::serialize(&ServerMessages::SeedSynchronised { seed: seed.get() })
+        let seed_message = bincode::serialize(&ServerMessage::SeedSynchronised { seed: seed.get() })
           .expect("Failed to serialise seed message");
         server.send_message(*client_id, DefaultChannel::ReliableOrdered, seed_message);
       }
@@ -83,7 +75,7 @@ fn handle_server_event_messages(
         info!("Client with ID [{}] disconnected: {}", client_id, reason);
 
         // Notify all other clients about the disconnection
-        let message = bincode::serialize(&ServerMessages::ClientDisconnected { client_id: *client_id })
+        let message = bincode::serialize(&ServerMessage::ClientDisconnected { client_id: *client_id })
           .expect("Failed to serialise client message");
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
         lobby.connected.retain(|&id| id != *client_id);
@@ -93,7 +85,7 @@ fn handle_server_event_messages(
     // TODO: Improve state transition logic
     if lobby.connected.len() > 0 {
       next_state.set(AppState::Initialising);
-      let message = bincode::serialize(&ServerMessages::StateChanged {
+      let message = bincode::serialize(&ServerMessage::StateChanged {
         new_state: AppState::Initialising.to_string(),
       })
       .expect("Failed to serialise client message");
@@ -102,8 +94,67 @@ fn handle_server_event_messages(
   }
 }
 
-/// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients.
-fn handle_client_updates_system(
+/// Processes any incoming [`DefaultChannel::Unreliable`] messages from clients by applying them locally and
+/// broadcasting them to all other clients.
+fn handle_unreliable_client_player_movements_system(
+  lobby: Res<Lobby>,
+  mut server: ResMut<RenetServer>,
+  mut input_action_message: MessageWriter<InputAction>,
+) {
+  for client_id in lobby.connected.iter() {
+    while let Some(message) = server.receive_message(*client_id, DefaultChannel::Unreliable) {
+      if let Ok(client_message) = bincode::deserialize(&message) {
+        match client_message {
+          ClientMessage::InputAction(action) => {
+            input_action_message.write(action);
+            server.broadcast_message_except(*client_id, DefaultChannel::Unreliable, message);
+          }
+          _ => {
+            warn!(
+              "Received unrecognised client message on [Unreliable] channel from client ID [{}]: {:?}",
+              client_id, client_message
+            );
+          }
+        }
+      } else {
+        warn!(
+          "Failed to deserialise client message on [Unreliable] channel from client ID [{}]",
+          client_id
+        );
+      }
+    }
+  }
+}
+
+/// A system that handles local input action messages for mutable players byt sends them to the server in order to sync
+/// the movements of the local player(s) with the server.
+fn handle_local_input_action_messages(
+  mut messages: MessageReader<InputAction>,
+  registered_players: Res<RegisteredPlayers>,
+  mut server: ResMut<RenetServer>,
+) {
+  for message in messages.read() {
+    let player_id = match message {
+      InputAction::Action(player_id) => player_id,
+      InputAction::Move(player_id, _) => player_id,
+    };
+    if let Some(_) = registered_players
+      .players
+      .iter()
+      .find(|player| player.id == *player_id && player.mutable)
+    {
+      if let Ok(input_message) = bincode::serialize(&ClientMessage::InputAction(*message)) {
+        server.broadcast_message(DefaultChannel::Unreliable, input_message);
+      } else {
+        warn!("Failed to serialise input action message: {:?}", message);
+      }
+    }
+  }
+}
+
+/// Processes any incoming [`DefaultChannel::ReliableOrdered`] messages from clients by applying them locally and
+/// broadcasting them to all other clients.
+fn handle_ordered_client_messages_system(
   lobby: Res<Lobby>,
   mut server: ResMut<RenetServer>,
   mut registered_players: ResMut<RegisteredPlayers>,
@@ -112,23 +163,31 @@ fn handle_client_updates_system(
 ) {
   for client_id in lobby.connected.iter() {
     while let Some(message) = server.receive_message(*client_id, DefaultChannel::ReliableOrdered) {
-      let client_message = bincode::deserialize(&message).expect("Failed to deserialise client message");
-      match client_message {
-        PlayerRegistrationMessage {
-          player_id,
-          has_registered,
-          ..
-        } => {
-          handle_player_registration_message_from_client(
-            &mut server,
-            &mut registered_players,
-            &available_configs,
-            &mut player_registration_message_writer,
-            client_id,
-            player_id,
-            has_registered,
-          );
+      if let Ok(client_message) = bincode::deserialize(&message) {
+        match client_message {
+          ClientMessage::PlayerRegistrationMessage(player_registration_message) => {
+            handle_player_registration_message_from_client(
+              &mut server,
+              &mut registered_players,
+              &available_configs,
+              &mut player_registration_message_writer,
+              client_id,
+              player_registration_message.player_id,
+              player_registration_message.has_registered,
+            );
+          }
+          _ => {
+            warn!(
+              "Received unrecognised client message on [ReliableOrdered] channel from client ID [{}]: {:?}",
+              client_id, client_message
+            );
+          }
         }
+      } else {
+        warn!(
+          "Failed to deserialise client message on [ReliableOrdered] channel from client ID [{}]",
+          client_id
+        );
       }
     }
   }
@@ -146,7 +205,7 @@ fn handle_player_registration_message_from_client(
 ) {
   if has_registered {
     info!("[{}] with client ID [{}] registered", player_id, client_id);
-    let message = bincode::serialize(&ServerMessages::PlayerRegistered {
+    let message = bincode::serialize(&ServerMessage::PlayerRegistered {
       client_id: *client_id,
       player_id: player_id.0,
     })
@@ -161,7 +220,7 @@ fn handle_player_registration_message_from_client(
     );
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
-    let message = bincode::serialize(&ServerMessages::PlayerUnregistered {
+    let message = bincode::serialize(&ServerMessage::PlayerUnregistered {
       client_id: *client_id,
       player_id: player_id.0,
     })
@@ -176,7 +235,12 @@ fn handle_player_registration_message_from_client(
   }
 }
 
-fn handle_own_updates_system(mut messages: MessageReader<PlayerRegistrationMessage>, mut server: ResMut<RenetServer>) {
+/// A system that handles local messages (such as player registration messages) and broadcasts them to all connected
+/// clients.
+fn handle_local_player_registration_message(
+  mut messages: MessageReader<PlayerRegistrationMessage>,
+  mut server: ResMut<RenetServer>,
+) {
   for message in messages.read() {
     if utils::should_message_be_skipped(&message, NetworkAudience::Client) {
       continue;
@@ -186,7 +250,7 @@ fn handle_own_updates_system(mut messages: MessageReader<PlayerRegistrationMessa
         "Informing all clients that [Player {}] registered locally...",
         message.player_id.0
       );
-      let message = bincode::serialize(&ServerMessages::PlayerRegistered {
+      let message = bincode::serialize(&ServerMessage::PlayerRegistered {
         client_id: 0,
         player_id: message.player_id.0,
       })
@@ -197,7 +261,7 @@ fn handle_own_updates_system(mut messages: MessageReader<PlayerRegistrationMessa
         "Informing all clients that [Player {}] unregistered locally...",
         message.player_id.0
       );
-      let message = bincode::serialize(&ServerMessages::PlayerUnregistered {
+      let message = bincode::serialize(&ServerMessage::PlayerUnregistered {
         client_id: 0,
         player_id: message.player_id.0,
       })
@@ -207,14 +271,16 @@ fn handle_own_updates_system(mut messages: MessageReader<PlayerRegistrationMessa
   }
 }
 
+/// Handles local [`ContinueMessage`] messages and broadcasts a state change to all connected clients. Only the server
+/// is permitted to change the game state.
 fn handle_continue_message(mut continue_messages: MessageReader<ContinueMessage>, mut server: ResMut<RenetServer>) {
   let messages = continue_messages.read().collect::<Vec<&ContinueMessage>>();
   if messages.is_empty() {
     return;
   }
-  let state_changed_message_for_clients = bincode::serialize(&ServerMessages::StateChanged {
+  let message = bincode::serialize(&ServerMessage::StateChanged {
     new_state: AppState::Playing.to_string(),
   })
   .expect("Failed to serialise client message");
-  server.broadcast_message(DefaultChannel::ReliableOrdered, state_changed_message_for_clients);
+  server.broadcast_message(DefaultChannel::ReliableOrdered, message);
 }

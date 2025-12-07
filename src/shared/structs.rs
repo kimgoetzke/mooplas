@@ -87,7 +87,7 @@ impl Into<PlayerId> for &AvailablePlayerConfig {
   }
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
 pub enum NetworkAudience {
   Server,
   Client,
