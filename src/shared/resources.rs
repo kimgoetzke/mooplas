@@ -137,7 +137,6 @@ impl RegisteredPlayers {
     self.players.len()
   }
 
-  // TODO: Add test coverage for below methods
   /// Adds a new registered player.
   /// Returns `Ok` if the player was added, [`ErrorKind::PlayerAlreadyRegistered`] if a player with the same [`PlayerId`] already exists.
   pub fn register(&mut self, player: RegisteredPlayer) -> Result<(), ErrorKind> {
@@ -189,6 +188,7 @@ impl RegisteredPlayers {
 }
 
 #[allow(dead_code)]
+#[derive(Debug)]
 pub enum ErrorKind {
   PlayerAlreadyRegistered(PlayerId),
   PlayerNeverRegistered(PlayerId),
@@ -269,12 +269,33 @@ mod tests {
   use super::*;
   use crate::prelude::PlayerInput;
   use bevy::MinimalPlugins;
-  use bevy::prelude::KeyCode;
+  use bevy::prelude::{Color, KeyCode};
 
   fn setup() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, SharedResourcesPlugin));
     app
+  }
+
+  #[test]
+  fn default_seed_is_non_zero() {
+    let seed = Seed::default();
+    assert!(seed.get() > 0);
+  }
+
+  #[test]
+  fn set_updates_seed_value() {
+    let mut seed = Seed::default();
+    let new_seed = 12345;
+    seed.set(new_seed);
+    assert_eq!(seed.get(), new_seed);
+  }
+
+  #[test]
+  fn set_allows_zero_seed() {
+    let mut seed = Seed::default();
+    seed.set(0);
+    assert_eq!(seed.get(), 0);
   }
 
   #[test]
@@ -346,5 +367,138 @@ mod tests {
     let available_configs = AvailablePlayerConfigs { configs: vec![] };
     let result = available_configs.find_by_id(PlayerId(1));
     assert!(result.is_none());
+  }
+
+  #[test]
+  fn register_adds_player_when_not_already_registered() {
+    let mut registered_players = RegisteredPlayers::default();
+    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let result = registered_players.register(player);
+    assert!(result.is_ok());
+    assert_eq!(registered_players.players.len(), 1);
+    assert_eq!(registered_players.players[0].id, PlayerId(1));
+  }
+
+  #[test]
+  fn register_returns_error_when_player_already_registered() {
+    let mut registered_players = RegisteredPlayers::default();
+    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    registered_players
+      .register(player.clone())
+      .expect("Failed to registered player the first time");
+    let result = registered_players.register(player);
+    assert!(result.is_err());
+    if let Err(ErrorKind::PlayerAlreadyRegistered(id)) = result {
+      assert_eq!(id, PlayerId(1));
+    } else {
+      panic!("Expected PlayerAlreadyRegistered error");
+    }
+  }
+
+  #[test]
+  fn unregister_mutable_removes_player_when_registered_and_mutable() {
+    let mut registered_players = RegisteredPlayers::default();
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    registered_players
+      .register(player)
+      .expect("Failed to registered player");
+    let result = registered_players.unregister_mutable(PlayerId(1));
+    assert!(result.is_ok());
+    assert!(registered_players.players.is_empty());
+  }
+
+  #[test]
+  fn unregister_mutable_returns_error_when_player_not_registered() {
+    let mut registered_players = RegisteredPlayers::default();
+    let result = registered_players.unregister_mutable(PlayerId(1));
+    assert!(result.is_err());
+    if let Err(ErrorKind::PlayerNeverRegistered(id)) = result {
+      assert_eq!(id, PlayerId(1));
+    } else {
+      panic!("Expected PlayerNeverRegistered error");
+    }
+  }
+
+  #[test]
+  fn unregister_mutable_returns_error_when_player_is_remote() {
+    let mut registered_players = RegisteredPlayers::default();
+    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    registered_players
+      .register(player)
+      .expect("Failed to registered player");
+    let result = registered_players.unregister_mutable(PlayerId(1));
+    assert!(result.is_err());
+    if let Err(ErrorKind::RegistrationNotMutable(id)) = result {
+      assert_eq!(id, PlayerId(1));
+    } else {
+      panic!("Expected RegistrationNotMutable error");
+    }
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn unregister_immutable_removes_player_when_registered_and_immutable() {
+    let mut registered_players = RegisteredPlayers::default();
+    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    registered_players
+      .register(player)
+      .expect("Failed to registered player");
+    let result = registered_players.unregister_immutable(PlayerId(1));
+    assert!(result.is_ok());
+    assert!(registered_players.players.is_empty());
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn unregister_immutable_returns_error_when_player_not_registered() {
+    let mut registered_players = RegisteredPlayers::default();
+    let result = registered_players.unregister_immutable(PlayerId(1));
+    assert!(result.is_err());
+    if let Err(ErrorKind::PlayerNeverRegistered(id)) = result {
+      assert_eq!(id, PlayerId(1));
+    } else {
+      panic!("Expected PlayerNeverRegistered error");
+    }
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn unregister_immutable_returns_error_when_player_is_local() {
+    let mut registered_players = RegisteredPlayers::default();
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    registered_players
+      .register(player)
+      .expect("Failed to registered player");
+    let result = registered_players.unregister_immutable(PlayerId(1));
+    assert!(result.is_err());
+    if let Err(ErrorKind::RegistrationNotImmutable(id)) = result {
+      assert_eq!(id, PlayerId(1));
+    } else {
+      panic!("Expected RegistrationNotImmutable error");
+    }
+  }
+
+  #[test]
+  fn player_already_registered_error_displays_correct_message() {
+    let error = ErrorKind::PlayerAlreadyRegistered(PlayerId(1));
+    assert_eq!(format!("{}", error), "[Player 1] is already registered");
+  }
+
+  #[test]
+  fn player_never_registered_error_displays_correct_message() {
+    let error = ErrorKind::PlayerNeverRegistered(PlayerId(2));
+    assert_eq!(format!("{}", error), "[Player 2] was never registered");
+  }
+
+  #[test]
+  fn registration_not_mutable_error_displays_correct_message() {
+    let error = ErrorKind::RegistrationNotMutable(PlayerId(3));
+    assert_eq!(format!("{}", error), "[Player 3] is not mutably registered");
+  }
+
+  #[test]
+  fn registration_not_immutable_error_displays_correct_message() {
+    let error = ErrorKind::RegistrationNotImmutable(PlayerId(4));
+    assert_eq!(format!("{}", error), "[Player 4] is not immutably registered");
   }
 }

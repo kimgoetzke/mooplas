@@ -98,6 +98,17 @@ impl Into<PlayerId> for &AvailablePlayerConfig {
 mod tests {
   use super::*;
 
+  impl PlayerInput {
+    pub(crate) fn test(id: u8) -> Self {
+      Self {
+        id: PlayerId(id),
+        left: KeyCode::ArrowLeft,
+        right: KeyCode::ArrowRight,
+        action: KeyCode::Space,
+      }
+    }
+  }
+
   impl RegisteredPlayer {
     pub fn new_immutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
       Self {
