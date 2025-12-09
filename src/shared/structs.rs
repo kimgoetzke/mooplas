@@ -9,7 +9,7 @@ pub struct RegisteredPlayer {
   pub input: PlayerInput,
   pub colour: Color,
   pub alive: bool,
-  pub mutable: bool,
+  mutable: bool,
 }
 
 impl From<&AvailablePlayerConfig> for RegisteredPlayer {
@@ -44,6 +44,14 @@ impl RegisteredPlayer {
       alive: true,
       mutable: false,
     }
+  }
+
+  pub fn is_remote(&self) -> bool {
+    !self.mutable
+  }
+
+  pub fn is_local(&self) -> bool {
+    self.mutable
   }
 }
 
@@ -110,5 +118,42 @@ impl NetworkAudience {
 
   pub fn is_client(&self) -> bool {
     matches!(self, NetworkAudience::Client)
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  impl RegisteredPlayer {
+    pub fn new_immutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+      Self {
+        id,
+        input,
+        colour,
+        alive: true,
+        mutable: false,
+      }
+    }
+
+    pub fn new_mutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+      Self {
+        id,
+        input,
+        colour,
+        alive: true,
+        mutable: true,
+      }
+    }
+
+    pub fn new_mutable_dead(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+      Self {
+        id,
+        input,
+        colour,
+        alive: false,
+        mutable: true,
+      }
+    }
   }
 }

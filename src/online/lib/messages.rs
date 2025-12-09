@@ -1,4 +1,4 @@
-use crate::prelude::{InputAction, PlayerId};
+use crate::prelude::{InputMessage, PlayerId};
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
@@ -8,36 +8,60 @@ pub struct NetworkingMessagesPlugin;
 
 impl Plugin for NetworkingMessagesPlugin {
   fn build(&self, app: &mut App) {
-    app.add_message::<SerialisableInputAction>();
+    app
+      .add_message::<SerialisableInputActionMessage>()
+      .add_message::<PlayerStateUpdateMessage>();
   }
 }
 
 #[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum SerialisableInputAction {
+pub enum SerialisableInputActionMessage {
   Move(u8, Scalar),
   Action(u8),
 }
 
-impl Default for SerialisableInputAction {
+impl Default for SerialisableInputActionMessage {
   fn default() -> Self {
-    SerialisableInputAction::Move(0, 0.0)
+    SerialisableInputActionMessage::Move(0, 0.0)
   }
 }
 
-impl From<&InputAction> for SerialisableInputAction {
-  fn from(value: &InputAction) -> Self {
+impl From<&InputMessage> for SerialisableInputActionMessage {
+  fn from(value: &InputMessage) -> Self {
     match value {
-      InputAction::Move(player_id, direction) => SerialisableInputAction::Move(player_id.0, *direction),
-      InputAction::Action(player_id) => SerialisableInputAction::Action(player_id.0),
+      InputMessage::Move(player_id, direction) => SerialisableInputActionMessage::Move(player_id.0, *direction),
+      InputMessage::Action(player_id) => SerialisableInputActionMessage::Action(player_id.0),
     }
   }
 }
 
-impl Into<InputAction> for SerialisableInputAction {
-  fn into(self) -> InputAction {
+impl Into<InputMessage> for SerialisableInputActionMessage {
+  fn into(self) -> InputMessage {
     match self {
-      SerialisableInputAction::Move(player_id, direction) => InputAction::Move(PlayerId(player_id), direction),
-      SerialisableInputAction::Action(player_id) => InputAction::Action(PlayerId(player_id)),
+      SerialisableInputActionMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
+      SerialisableInputActionMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
+    }
+  }
+}
+
+/// A message containing authoritative state updates for a player from the server. Used for server-to-client state
+/// synchronisation.
+#[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct PlayerStateUpdateMessage {
+  /// The [`PlayerId`] as a u8
+  pub id: u8,
+  /// Position (x, y) of the player's snake head
+  pub position: (f32, f32),
+  /// Rotation in radians around Z axis
+  pub rotation: f32,
+}
+
+impl PlayerStateUpdateMessage {
+  pub fn new(player_id: u8, position: (f32, f32), rotation: f32) -> Self {
+    Self {
+      id: player_id,
+      position,
+      rotation,
     }
   }
 }

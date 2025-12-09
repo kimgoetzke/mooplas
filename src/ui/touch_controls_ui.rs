@@ -4,7 +4,7 @@ use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, CustomInteraction, PlayerId, Settings, TouchControlButton,
   TouchControlsToggledMessage,
 };
-use crate::shared::{InputAction, RegisteredPlayers};
+use crate::shared::{InputMessage, RegisteredPlayers};
 use crate::ui::{
   set_interaction_on_cancel, set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press,
   set_interaction_on_release,
@@ -57,11 +57,11 @@ enum TouchControl {
   Action(PlayerId),
 }
 
-impl Into<InputAction> for &TouchControl {
-  fn into(self) -> InputAction {
+impl Into<InputMessage> for &TouchControl {
+  fn into(self) -> InputMessage {
     match self {
-      TouchControl::Movement(player_id, direction) => InputAction::Move(*player_id, *direction),
-      TouchControl::Action(player_id) => InputAction::Action(*player_id),
+      TouchControl::Movement(player_id, direction) => InputMessage::Move(*player_id, *direction),
+      TouchControl::Action(player_id) => InputMessage::Action(*player_id),
     }
   }
 }
@@ -189,7 +189,7 @@ fn spawn_touch_controls_ui(
 fn tap_player_action(
   click: On<Pointer<Click>>,
   mut touch_control_query: Query<Option<&TouchControl>, With<TouchControlButton>>,
-  mut input_action_writer: MessageWriter<InputAction>,
+  mut input_message: MessageWriter<InputMessage>,
   current_app_state: Res<State<AppState>>,
 ) {
   if let Ok(touch_control_action) = touch_control_query.get_mut(click.entity) {
@@ -202,7 +202,7 @@ fn tap_player_action(
         );
         return;
       }
-      input_action_writer.write(action.into());
+      input_message.write(action.into());
     }
   }
 }
@@ -214,22 +214,22 @@ fn start_movement_on_hover_over(
   action: On<Pointer<Over>>,
   mut tracker: ResMut<ActiveMovementTracker>,
   touch_control_query: Query<&TouchControl>,
-  mut input_action_writer: MessageWriter<InputAction>,
+  mut input_message: MessageWriter<InputMessage>,
 ) {
-  start_player_movement(action, &mut tracker, touch_control_query, &mut input_action_writer);
+  start_player_movement(action, &mut tracker, touch_control_query, &mut input_message);
 }
 
 fn start_player_movement<T: 'static + Clone + Debug + Reflect>(
   action: On<Pointer<T>>,
   tracker: &mut ResMut<ActiveMovementTracker>,
   touch_control_query: Query<&TouchControl>,
-  input_action_writer: &mut MessageWriter<InputAction>,
+  input_message: &mut MessageWriter<InputMessage>,
 ) {
   if let Ok(touch_control) = touch_control_query.get(action.entity) {
     tracker
       .players
       .insert(touch_control.get_player_id(), (action.entity, *touch_control));
-    input_action_writer.write(touch_control.into());
+    input_message.write(touch_control.into());
   }
 }
 
@@ -270,18 +270,18 @@ fn despawn_unregistered_player_controls_system(
   }
 }
 
-/// Per-frame emitter system for [`InputAction::Move`] for every active movement of every player. Reads the current
+/// Per-frame emitter system for [`InputMessage::Move`] for every active movement of every player. Reads the current
 /// active movements from the [`ActiveMovementTracker`] resource and emits corresponding input actions.
 fn player_movement_input_action_emitter_system(
   tracker: Res<ActiveMovementTracker>,
-  mut input_action_writer: MessageWriter<InputAction>,
+  mut input_message: MessageWriter<InputMessage>,
 ) {
   if tracker.players.is_empty() {
     return;
   }
   for (_player, (_entity, touch_control)) in tracker.players.iter() {
     match touch_control {
-      TouchControl::Movement(_, _) => input_action_writer.write(touch_control.into()),
+      TouchControl::Movement(_, _) => input_message.write(touch_control.into()),
       _ => {
         warn!(
           "Unexpected touch control in movement tracker for touch controls: {:?}",

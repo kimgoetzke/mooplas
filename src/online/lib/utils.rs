@@ -15,7 +15,7 @@ pub(crate) fn register_player_locally(
     .expect("Failed to find player config for registered player");
   match registered_players.register(RegisteredPlayer::new_immutable_from(config)) {
     Ok(_) => {
-      info!("[{}] registered successfully", player_id);
+      info!("[{}] has registered (via server)", player_id);
       player_registration_message.write(PlayerRegistrationMessage {
         player_id,
         has_registered: true,
@@ -35,7 +35,7 @@ pub(crate) fn unregister_player_locally(
 ) {
   match registered_players.unregister_immutable(player_id) {
     Ok(_) => {
-      info!("[{}] unregistered successfully", player_id);
+      info!("[{}] has unregistered (via server)", player_id);
       messages.write(PlayerRegistrationMessage {
         player_id,
         has_registered: false,

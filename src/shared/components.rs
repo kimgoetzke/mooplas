@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
 /// A marker component for the player entity.
-#[derive(Component)]
+#[derive(Component, PartialEq, Eq, Hash)]
 pub struct Player;
 
 /// A marker component for the player entity.

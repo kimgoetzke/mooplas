@@ -158,7 +158,7 @@ impl RegisteredPlayers {
   /// of in an online multiplayer game.
   pub fn unregister_mutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
     if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
-      if !self.players[index].mutable {
+      if self.players[index].is_remote() {
         return Err(ErrorKind::RegistrationNotMutable(player_id));
       }
       self.players.remove(index);
@@ -177,7 +177,7 @@ impl RegisteredPlayers {
   #[cfg(feature = "online")]
   pub fn unregister_immutable(&mut self, player_id: PlayerId) -> Result<(), ErrorKind> {
     if let Some(index) = self.players.iter().position(|p| p.id == player_id) {
-      if self.players[index].mutable {
+      if self.players[index].is_local() {
         return Err(ErrorKind::RegistrationNotImmutable(player_id));
       }
       self.players.remove(index);

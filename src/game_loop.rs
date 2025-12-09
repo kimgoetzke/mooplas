@@ -3,7 +3,7 @@ use crate::prelude::{
   AvailablePlayerConfigs, ContinueMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayer,
   RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
 };
-use crate::shared::{InputAction, Player};
+use crate::shared::{InputMessage, Player};
 use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
 use bevy::ecs::entity::Entity;
@@ -28,7 +28,9 @@ impl Plugin for GameLoopPlugin {
       )
       .add_systems(
         Update,
-        (check_snake_collisions_system, transition_to_game_over_system).run_if(in_state(AppState::Playing)),
+        (check_snake_collisions_system, transition_to_game_over_system)
+          .run_if(in_state(AppState::Playing))
+          .run_if(|role: Res<NetworkRole>| role.is_server() || role.is_none()),
       )
       .add_systems(OnEnter(AppState::GameOver), pause_game_system)
       .add_systems(
@@ -50,14 +52,14 @@ fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner:
 
 /// Handles player registration messages to add or remove players from the registered players list.
 fn player_registration_system(
-  mut input_action_messages: MessageReader<InputAction>,
+  mut input_messages: MessageReader<InputMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
   network_role: Res<NetworkRole>,
 ) {
-  for input_action in input_action_messages.read() {
-    if let InputAction::Action(player_id) = input_action {
+  for input_action in input_messages.read() {
+    if let InputMessage::Action(player_id) = input_action {
       let Some(available_config) = available_configs.configs.iter().find(|config| config.id == *player_id) else {
         warn!("Received registration action for unknown player ID [{:?}]", player_id);
         continue;
@@ -252,7 +254,7 @@ mod tests {
     // Send an input action to register the player
     app
       .world_mut()
-      .write_message(InputAction::Action(PlayerId(0)))
+      .write_message(InputMessage::Action(PlayerId(0)))
       .expect("Failed to write InputAction message");
 
     // Add and run the registration system once
@@ -270,7 +272,7 @@ mod tests {
     // Send action again to unregister
     app
       .world_mut()
-      .write_message(InputAction::Action(PlayerId(0)))
+      .write_message(InputMessage::Action(PlayerId(0)))
       .expect("Failed to write InputAction message");
     app.update();
 
@@ -321,20 +323,16 @@ mod tests {
       .get_resource_mut::<RegisteredPlayers>()
       .expect("RegisteredPlayers missing");
     registered_players.players = vec![
-      RegisteredPlayer {
-        id: PlayerId(0),
-        input: PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD),
-        colour: Color::WHITE,
-        alive: false,
-        mutable: true,
-      },
-      RegisteredPlayer {
-        id: PlayerId(1),
-        input: PlayerInput::new(PlayerId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
-        colour: Color::BLACK,
-        alive: true,
-        mutable: true,
-      },
+      RegisteredPlayer::new_mutable_dead(
+        PlayerId(0),
+        PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD),
+        Color::WHITE,
+      ),
+      RegisteredPlayer::new_mutable(
+        PlayerId(1),
+        PlayerInput::new(PlayerId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
+        Color::BLACK,
+      ),
     ];
     drop(registered_players);
 

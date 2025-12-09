@@ -33,21 +33,25 @@ impl Plugin for PlayerPlugin {
 
 /// A bundle that contains the components needed for a basic kinematic character controller.
 #[derive(Bundle)]
-struct Controller {
+struct PhysicsController {
   collider: Collider,
   body: RigidBody,
   ground_caster: ShapeCaster,
   locked_axes: LockedAxes,
 }
 
-impl Controller {
-  fn new(collider: Collider) -> Self {
+impl PhysicsController {
+  fn new(collider: Collider, is_mutable: bool) -> Self {
     let mut caster_shape = collider.clone();
     caster_shape.set_scale(Vector::ONE * 0.99, 10);
 
     Self {
       collider,
-      body: RigidBody::Dynamic,
+      body: if is_mutable {
+        RigidBody::Dynamic
+      } else {
+        RigidBody::Kinematic
+      },
       ground_caster: ShapeCaster::new(caster_shape, Vector::ZERO, 0.0, Dir2::NEG_Y).with_max_distance(10.0),
       locked_axes: LockedAxes::ROTATION_LOCKED,
     }
@@ -94,8 +98,8 @@ fn spawn_players_system(
           custom_size: Some(Vec2::new(12., 12.)),
           ..default()
         },
-        Controller::new(Collider::circle(SNAKE_HEAD_SIZE)),
         Transform::default().with_rotation(Quat::from_rotation_z(rotation)),
+        PhysicsController::new(Collider::circle(SNAKE_HEAD_SIZE), player.is_local()),
         Friction::ZERO.with_combine_rule(CoefficientCombine::Min),
         Restitution::ZERO.with_combine_rule(CoefficientCombine::Min),
         CollisionLayers::new(CollisionLayer::Head, [CollisionLayer::Tail, CollisionLayer::Head]),

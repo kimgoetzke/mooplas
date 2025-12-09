@@ -16,7 +16,7 @@ impl Plugin for SharedMessagesPlugin {
       .add_message::<PlayerRegistrationMessage>()
       .add_message::<ContinueMessage>()
       .add_message::<TouchControlsToggledMessage>()
-      .add_message::<InputAction>();
+      .add_message::<InputMessage>();
   }
 }
 
@@ -74,7 +74,7 @@ pub enum MenuName {
 
 /// A [`Message`] written for an input action by a player.
 #[derive(Message, Clone, Copy, Debug)]
-pub enum InputAction {
+pub enum InputMessage {
   Move(PlayerId, Scalar),
   Action(PlayerId),
 }
@@ -110,7 +110,7 @@ mod tests {
     assert!(app.world().contains_resource::<Messages<ToggleMenuMessage>>());
     assert!(app.world().contains_resource::<Messages<PlayerRegistrationMessage>>());
     assert!(app.world().contains_resource::<Messages<TouchControlsToggledMessage>>());
-    assert!(app.world().contains_resource::<Messages<InputAction>>());
+    assert!(app.world().contains_resource::<Messages<InputMessage>>());
     assert!(app.world().contains_resource::<Messages<ContinueMessage>>());
   }
 

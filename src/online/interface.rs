@@ -1,5 +1,5 @@
-use crate::online::lib::SerialisableInputAction;
-use crate::prelude::{InputAction, PlayerId};
+use crate::online::lib::SerialisableInputActionMessage;
+use crate::prelude::{InputMessage, PlayerId};
 use crate::shared::Player;
 use bevy::log::*;
 use bevy::platform::collections::HashMap;
@@ -16,7 +16,7 @@ impl Plugin for InterfacePlugin {
   fn build(&self, app: &mut App) {
     app
       .init_resource::<PlayerIndex>()
-      .add_systems(Update, handle_input_action_message.run_if(client_connected))
+      .add_systems(Update, handle_input_message.run_if(client_connected))
       .world_mut()
       .spawn_batch([
         (
@@ -31,25 +31,12 @@ impl Plugin for InterfacePlugin {
   }
 }
 
+// TODO: Consider removing this
 /// Contains all players that currently exists in the world. This index is kept up-to-date by observing the [`OnAdd`]
 /// and [`OnRemove`] triggers.
 #[derive(Resource, Default)]
 pub struct PlayerIndex {
   map: HashMap<Entity, PlayerId>,
-}
-
-impl PlayerIndex {
-  pub fn get(&self, entity: &Entity) -> Option<&PlayerId> {
-    if let Some(entity) = self.map.get(entity) {
-      Some(entity)
-    } else {
-      None
-    }
-  }
-
-  pub fn size(&self) -> usize {
-    self.map.len()
-  }
 }
 
 fn on_add_player_trigger(
@@ -59,7 +46,7 @@ fn on_add_player_trigger(
 ) {
   let (entity, player_id) = query.get(trigger.entity).expect("Failed to fetch player from index");
   index.map.insert(entity, *player_id);
-  debug!("PlayerIndex <- Added [{:?}] with key [{}]", player_id, entity);
+  trace!("PlayerIndex <- Added [{:?}] with key [{}]", player_id, entity);
 }
 
 fn on_remove_player_trigger(
@@ -75,14 +62,14 @@ fn on_remove_player_trigger(
       player_id, entity
     );
   }
-  debug!("PlayerIndex -> Removed [{:?}] with key [{}]", player_id, entity);
+  trace!("PlayerIndex -> Removed [{:?}] with key [{}]", player_id, entity);
 }
 
-fn handle_input_action_message(
-  mut messages: MessageReader<InputAction>,
-  mut serialisable_input_action_writer: MessageWriter<SerialisableInputAction>,
+fn handle_input_message(
+  mut messages: MessageReader<InputMessage>,
+  mut serialisable_input_message: MessageWriter<SerialisableInputActionMessage>,
 ) {
   for message in messages.read() {
-    serialisable_input_action_writer.write(message.into());
+    serialisable_input_message.write(message.into());
   }
 }

@@ -115,11 +115,9 @@ fn spawn_main_menu(commands: &mut Commands, asset_server: &AssetServer) {
               ..default()
             })
             .with_children(|parent| {
-              spawn_button(parent, &asset_server, PlayLocalButton, "Play Local", 300, NORMAL_FONT);
-
               #[cfg(feature = "online")]
               spawn_button(parent, &asset_server, PlayOnlineButton, "Play Online", 300, NORMAL_FONT);
-
+              spawn_button(parent, &asset_server, PlayLocalButton, "Play Local", 300, NORMAL_FONT);
               spawn_button(parent, &asset_server, ExitButton, "Exit", 300, NORMAL_FONT);
             });
         });
@@ -132,7 +130,7 @@ fn handle_button_interactions_system(
   mut exit_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ExitButton>)>,
   mut play_local_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<PlayLocalButton>)>,
   mut play_online_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<PlayOnlineButton>)>,
-  mut toggle_menu_message_writer: MessageWriter<ToggleMenuMessage>,
+  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<MainMenuRoot>>,
   mut next_state: ResMut<NextState<AppState>>,
 ) {
@@ -154,7 +152,7 @@ fn handle_button_interactions_system(
   for interaction in &mut play_online_query {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Play Online\"");
-      toggle_menu_message_writer.write(ToggleMenuMessage::set(MenuName::PlayOnlineMenu));
+      toggle_menu_message.write(ToggleMenuMessage::set(MenuName::PlayOnlineMenu));
     }
   }
 }

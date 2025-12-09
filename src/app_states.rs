@@ -32,7 +32,8 @@ pub enum AppState {
   Loading,
   /// The state used for menus. Time may be paused.
   Preparing,
-  /// A state which runs after a game mode has been selected and initialises resources such as spawn points or
+  /// A state which runs after a game mode has been selected and initialises resources such as spawn points.
+  /// Automatically transitions to the next state once complete.
   Initialising,
   /// The state where players can register to join the game.
   Registering,
@@ -47,6 +48,12 @@ pub enum AppState {
 impl AppState {
   pub fn name() -> &'static str {
     "AppState"
+  }
+
+  /// Returns true if the current state is considered to be restricted. This includes states that the application
+  /// automatically transitions to. Used to stop the server in a multiplayer context from causing an inconsistent state.
+  pub fn is_restricted(&self) -> bool {
+    matches!(self, AppState::Initialising)
   }
 }
 

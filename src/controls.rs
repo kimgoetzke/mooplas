@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, InputAction, NetworkRole, PlayerId, PlayerInput, RegisteredPlayers,
+  AvailablePlayerConfigs, ContinueMessage, InputMessage, NetworkRole, PlayerId, PlayerInput, RegisteredPlayers,
   Settings, SnakeHead, TouchControlsToggledMessage, has_registered_players,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
@@ -50,14 +50,14 @@ impl Plugin for ControlsPlugin {
 fn player_input_action_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   available_configs: Res<AvailablePlayerConfigs>,
-  mut input_action_message: MessageWriter<InputAction>,
+  mut input_message: MessageWriter<InputMessage>,
 ) {
   for available_config in &available_configs.configs {
     if !keyboard_input.just_pressed(available_config.input.action) {
       continue;
     }
 
-    input_action_message.write(InputAction::Action(available_config.into()));
+    input_message.write(InputMessage::Action(available_config.into()));
   }
 }
 
@@ -72,9 +72,9 @@ fn send_continue_message_on_key_press_system(
   }
 }
 
-/// Sends [`InputAction`] events based on keyboard input, but only for registered players.
+/// Sends [`InputMessage`] events based on keyboard input, but only for registered players.
 fn player_input_system(
-  mut input_action_writer: MessageWriter<InputAction>,
+  mut input_message: MessageWriter<InputMessage>,
   keyboard_input: Res<ButtonInput<KeyCode>>,
   registered_players: Option<Res<RegisteredPlayers>>,
 ) {
@@ -82,15 +82,15 @@ fn player_input_system(
     return;
   };
   for player in &registered.players {
-    if !player.mutable {
+    if player.is_remote() {
       continue;
     }
-    process_inputs(&mut input_action_writer, &keyboard_input, player.input.clone());
+    process_inputs(&mut input_message, &keyboard_input, player.input.clone());
   }
 }
 
 fn process_inputs(
-  input_action_writer: &mut MessageWriter<InputAction>,
+  input_message: &mut MessageWriter<InputMessage>,
   keyboard_input: &Res<ButtonInput<KeyCode>>,
   player_input: PlayerInput,
 ) {
@@ -99,36 +99,49 @@ fn process_inputs(
   let horizontal_p1 = right as i8 - left as i8;
   let direction = horizontal_p1 as Scalar;
   if direction != 0.0 {
-    input_action_writer.write(InputAction::Move(player_input.id, direction));
+    input_message.write(InputMessage::Move(player_input.id, direction));
   }
   if keyboard_input.just_pressed(player_input.action) {
-    input_action_writer.write(InputAction::Action(player_input.id));
+    input_message.write(InputMessage::Action(player_input.id));
   }
 }
 
-/// Responds to [`InputAction`] events and moves character controllers accordingly.
+/// Responds to [`InputMessage`] events and moves character controllers accordingly. Skips remote (immutable)
+/// players because they are controlled by server state updates.
 fn player_action_system(
   time: Res<Time>,
-  mut input_action_messages: MessageReader<InputAction>,
-  mut controllers: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity, &PlayerId), With<SnakeHead>>,
+  mut input_messages: MessageReader<InputMessage>,
+  mut snake_head_query: Query<(&Transform, &mut LinearVelocity, &mut AngularVelocity, &PlayerId), With<SnakeHead>>,
+  registered_players: Option<Res<RegisteredPlayers>>,
+  network_role: Res<NetworkRole>,
 ) {
   let delta_time = time.delta_secs_f64().adjust_precision();
-  let messages: Vec<&InputAction> = input_action_messages.read().collect();
+  let messages: Vec<&InputMessage> = input_messages.read().collect();
 
-  for (transform, mut linear_velocity, mut angular_velocity, player_id) in &mut controllers {
+  for (transform, mut linear_velocity, mut angular_velocity, player_id) in &mut snake_head_query {
+    // Skip remote (immutable) players on clients
+    if network_role.is_client()
+      && registered_players
+        .as_ref()
+        .and_then(|players| players.players.iter().find(|p| p.id == *player_id))
+        .map_or(false, |player| player.is_remote())
+    {
+      continue;
+    }
+
     let mut has_movement_input = false;
     let direction = (transform.rotation * Vec3::Y).normalize_or_zero();
     let velocity = direction * MOVEMENT_SPEED;
     linear_velocity.x = velocity.x;
     linear_velocity.y = velocity.y;
 
-    for event in messages.iter() {
-      match event {
-        InputAction::Move(id, direction) if id == player_id => {
+    for message in messages.iter() {
+      match message {
+        InputMessage::Move(id, direction) if id == player_id => {
           has_movement_input = true;
           angular_velocity.0 = -*direction * ROTATION_SPEED * delta_time;
         }
-        InputAction::Action(pid) if pid == player_id => {
+        InputMessage::Action(pid) if pid == player_id => {
           debug!("[Not implemented] Action received for: {:?}", player_id);
         }
         _ => {}
@@ -169,7 +182,9 @@ fn settings_controls_system(
 mod tests {
   use super::*;
   use crate::app_states::AppStatePlugin;
-  use crate::prelude::{AvailablePlayerConfig, RegisteredPlayer, SharedMessagesPlugin, SharedResourcesPlugin};
+  use crate::prelude::{
+    AvailablePlayerConfig, PlayerId, RegisteredPlayer, SharedMessagesPlugin, SharedResourcesPlugin,
+  };
   use bevy::MinimalPlugins;
   use bevy::prelude::Color;
   use bevy::prelude::{Messages, Mut, NextState, State};
@@ -219,7 +234,7 @@ mod tests {
   }
 
   #[test]
-  fn player_input_action_system_sends_input_action_message() {
+  fn player_input_action_system_sends_input_message() {
     let mut app = setup();
 
     // Prepare an available player config that reacts to KeyX
@@ -251,13 +266,13 @@ mod tests {
     // Read produced messages
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<InputAction>>()
+      .get_resource_mut::<Messages<InputMessage>>()
       .expect("Messages<InputAction> missing");
 
     // Ensure at least one message was written
     let has_input_action = messages
       .iter_current_update_messages()
-      .any(|ia| matches!(ia, InputAction::Action(_)));
+      .any(|ia| matches!(ia, InputMessage::Action(_)));
     assert!(has_input_action, "Expected an Action InputAction to be sent");
   }
 
@@ -281,13 +296,11 @@ mod tests {
       .world_mut()
       .get_resource_mut::<RegisteredPlayers>()
       .expect("RegisteredPlayers resource missing");
-    registered_players.players.push(RegisteredPlayer {
-      id: PlayerId(0),
-      input: PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-      colour: Color::WHITE,
-      alive: true,
-      mutable: false,
-    });
+    registered_players.players.push(RegisteredPlayer::new_immutable(
+      PlayerId(0),
+      PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+      Color::WHITE,
+    ));
     drop(registered_players);
 
     // Simulate pressing Space which should trigger a ContinueMessage
@@ -314,13 +327,11 @@ mod tests {
       .world_mut()
       .get_resource_mut::<RegisteredPlayers>()
       .expect("RegisteredPlayers resource missing");
-    registered_players.players.push(RegisteredPlayer {
-      id: player_input.id,
-      input: player_input.clone(),
-      colour: Color::WHITE,
-      alive: true,
-      mutable: true,
-    });
+    registered_players.players.push(RegisteredPlayer::new_mutable(
+      player_input.id,
+      player_input.clone(),
+      Color::WHITE,
+    ));
     drop(registered_players);
 
     // Manually advance state to the state in which the system runs
@@ -338,16 +349,16 @@ mod tests {
     // Read produced messages
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<InputAction>>()
+      .get_resource_mut::<Messages<InputMessage>>()
       .expect("Messages<InputAction> missing");
 
     // Verify that both move and action messages were sent
     let has_action = messages
       .iter_current_update_messages()
-      .any(|ia| matches!(ia, InputAction::Action(_)));
+      .any(|ia| matches!(ia, InputMessage::Action(_)));
     let has_move = messages
       .iter_current_update_messages()
-      .any(|ia| matches!(ia, InputAction::Move(_, _)));
+      .any(|ia| matches!(ia, InputMessage::Move(_, _)));
     assert!(has_action, "Expected an Action InputAction to be sent");
     assert!(has_move, "Expected a Move InputAction to be sent");
   }

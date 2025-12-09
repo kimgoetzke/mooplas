@@ -138,26 +138,26 @@ fn handle_button_interactions_system(
   mut host_game_button: Query<&CustomInteraction, (Changed<CustomInteraction>, With<HostGameButton>)>,
   mut join_game_button: Query<&CustomInteraction, (Changed<CustomInteraction>, With<JoinGameButton>)>,
   mut back_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<BackButton>)>,
-  mut toggle_menu_message_writer: MessageWriter<ToggleMenuMessage>,
+  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
 ) {
   for interaction in &mut host_game_button {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Host Game\"");
-      toggle_menu_message_writer.write(ToggleMenuMessage::set(MenuName::HostGameMenu));
+      toggle_menu_message.write(ToggleMenuMessage::set(MenuName::HostGameMenu));
     }
   }
 
   for interaction in &mut join_game_button {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Join Game\"");
-      toggle_menu_message_writer.write(ToggleMenuMessage::set(MenuName::JoinGameMenu));
+      toggle_menu_message.write(ToggleMenuMessage::set(MenuName::JoinGameMenu));
     }
   }
 
   for interaction in &mut back_button_query {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Back\"");
-      toggle_menu_message_writer.write(ToggleMenuMessage::set(MenuName::MainMenu));
+      toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     }
   }
 }
