@@ -85,7 +85,7 @@ fn receive_reliable_server_messages_system(
           next_state.set(AppState::from(&new_state));
         } else {
           debug!(
-            "Ignoring state change to [{}] because the current state [{:?}] is restricted...",
+            "Ignoring state change to [{}] because [{:?}] is restricted...",
             new_state, *current_state
           );
         }
@@ -113,7 +113,7 @@ fn send_local_player_registration_system(
       continue;
     }
     let client_message = ClientMessage::PlayerRegistration(*player_registration_message);
-    debug!("Sending: [{:?}]", player_registration_message);
+    debug!("Sending: [{:?}]", client_message);
     let message = bincode::serialize(&client_message).expect("Failed to serialise player registration message");
     client.send_message(DefaultChannel::ReliableOrdered, message);
   }

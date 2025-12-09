@@ -75,7 +75,7 @@ fn player_registration_system(
         match registered_players.unregister_mutable(registered_player_id) {
           Ok(_) => debug!("[Player {}] has unregistered", available_config.id.0),
           Err(e) => {
-            error!("Failed to unregister [Player {}]: {}", available_config.id.0, e);
+            warn!("Failed to unregister [Player {}]: {}", available_config.id.0, e);
             continue;
           }
         }
@@ -86,7 +86,7 @@ fn player_registration_system(
         match registered_players.register(RegisteredPlayer::new_mutable_from(available_config)) {
           Ok(_) => debug!("[Player {}] has registered", available_config.id.0),
           Err(e) => {
-            error!("Failed to register [Player {}]: {}", available_config.id.0, e);
+            warn!("Failed to register [Player {}]: {}", available_config.id.0, e);
             continue;
           }
         }
