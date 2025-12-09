@@ -3,8 +3,10 @@ use crate::online::lib::{
   ClientMessage, InputSequence, NetworkTransformInterpolation, PlayerStateUpdateMessage,
   SerialisableInputActionMessage, ServerMessage, utils,
 };
-use crate::prelude::{PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, WinnerInfo};
-use crate::shared::{AvailablePlayerConfigs, NetworkAudience};
+use crate::prelude::{
+  NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, WinnerInfo,
+};
+use crate::shared::AvailablePlayerConfigs;
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::math::Quat;
@@ -72,20 +74,13 @@ fn receive_reliable_server_messages_system(
       }
       ServerMessage::PlayerRegistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
-        utils::register_player_locally(
-          &mut registered_players,
-          &available_configs,
-          &mut messages,
-          player_id,
-          None,
-        );
+        utils::register_player_locally(&mut registered_players, &available_configs, &mut messages, player_id);
       }
       ServerMessage::PlayerUnregistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
-        utils::unregister_player_locally(&mut registered_players, &mut messages, player_id, None);
+        utils::unregister_player_locally(&mut registered_players, &mut messages, player_id);
       }
       ServerMessage::StateChanged { new_state, winner_info } => {
-        debug!("Server requested state change to [{}]", new_state);
         if !current_state.is_restricted() {
           next_state.set(AppState::from(&new_state));
         } else {
@@ -113,14 +108,14 @@ fn send_local_player_registration_system(
   mut messages: MessageReader<PlayerRegistrationMessage>,
   mut client: ResMut<RenetClient>,
 ) {
-  for message in messages.read() {
-    if utils::should_message_be_skipped(&message, NetworkAudience::Server) {
+  for player_registration_message in messages.read() {
+    if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
       continue;
     }
-    debug!("Sending [{:?}] to server", message);
-    let registration_message = bincode::serialize(&ClientMessage::PlayerRegistration(*message))
-      .expect("Failed to serialise player registration message");
-    client.send_message(DefaultChannel::ReliableOrdered, registration_message);
+    let client_message = ClientMessage::PlayerRegistration(*player_registration_message);
+    debug!("Sending: [{:?}]", player_registration_message);
+    let message = bincode::serialize(&client_message).expect("Failed to serialise player registration message");
+    client.send_message(DefaultChannel::ReliableOrdered, message);
   }
 }
 

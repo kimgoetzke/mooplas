@@ -1,6 +1,5 @@
-use crate::prelude::{NetworkRole, PlayerId};
+use crate::prelude::PlayerId;
 use bevy::prelude::{Color, KeyCode};
-use serde::{Deserialize, Serialize};
 
 /// Represents a player that has registered to play the game. Used during the game loop.
 #[derive(Clone)]
@@ -92,32 +91,6 @@ impl AvailablePlayerConfig {
 impl Into<PlayerId> for &AvailablePlayerConfig {
   fn into(self) -> PlayerId {
     self.id
-  }
-}
-
-#[derive(Debug, PartialEq, Serialize, Deserialize, Copy, Clone)]
-pub enum NetworkAudience {
-  Server,
-  Client,
-}
-
-impl From<NetworkRole> for Option<NetworkAudience> {
-  fn from(role: NetworkRole) -> Self {
-    match role {
-      NetworkRole::Server => Some(NetworkAudience::Server),
-      NetworkRole::Client => Some(NetworkAudience::Client),
-      NetworkRole::None => None,
-    }
-  }
-}
-
-impl NetworkAudience {
-  pub fn is_server(&self) -> bool {
-    matches!(self, NetworkAudience::Server)
-  }
-
-  pub fn is_client(&self) -> bool {
-    matches!(self, NetworkAudience::Client)
   }
 }
 

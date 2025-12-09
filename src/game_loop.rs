@@ -98,7 +98,7 @@ fn player_registration_system(
         player_id: available_config.id,
         has_registered: is_now_registered,
         is_anyone_registered: !registered_players.players.is_empty(),
-        network_audience: (*network_role).into(),
+        network_role: (*network_role).into(),
       });
     }
   }

@@ -1,4 +1,4 @@
-use crate::prelude::NetworkAudience;
+use crate::prelude::NetworkRole;
 use crate::shared::PlayerId;
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
@@ -36,7 +36,7 @@ pub struct PlayerRegistrationMessage {
   /// Whether any player is currently registered, after this change.
   pub is_anyone_registered: bool,
   /// Whether this message originated from the server or the client. Used to prevent echoing.
-  pub network_audience: Option<NetworkAudience>,
+  pub network_role: Option<NetworkRole>,
 }
 
 /// A message that communicates a change to the touch controls setting.

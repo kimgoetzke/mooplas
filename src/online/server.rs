@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::online::lib::{ClientMessage, Lobby, ServerMessage, utils};
 use crate::prelude::{
-  AvailablePlayerConfigs, InputMessage, NetworkAudience, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
+  AvailablePlayerConfigs, InputMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
   SnakeHead,
 };
 use crate::shared::WinnerInfo;
@@ -89,12 +89,6 @@ fn receive_server_events(
     // TODO: Improve state transition logic
     if lobby.connected.len() > 0 {
       next_state.set(AppState::Initialising);
-      let message = bincode::serialize(&ServerMessage::StateChanged {
-        new_state: AppState::Initialising.to_string(),
-        winner_info: None,
-      })
-      .expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message(DefaultChannel::ReliableOrdered, message);
     }
   }
 }
@@ -219,7 +213,6 @@ fn handle_player_registration_message_from_client(
       &available_configs,
       &mut player_registration_message,
       player_id,
-      None,
     );
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
@@ -229,12 +222,7 @@ fn handle_player_registration_message_from_client(
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
     server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
-    utils::unregister_player_locally(
-      &mut registered_players,
-      &mut player_registration_message,
-      player_id,
-      None,
-    );
+    utils::unregister_player_locally(&mut registered_players, &mut player_registration_message, player_id);
   }
 }
 
@@ -268,7 +256,7 @@ fn broadcast_local_player_registration_system(
   mut server: ResMut<RenetServer>,
 ) {
   for message in messages.read() {
-    if utils::should_message_be_skipped(&message, NetworkAudience::Client) {
+    if utils::should_message_be_skipped(&message, NetworkRole::Client) {
       continue;
     }
     if message.has_registered {

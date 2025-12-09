@@ -1,5 +1,4 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
-use crate::shared::NetworkAudience;
 use bevy::app::{App, Plugin};
 use bevy::log::*;
 use bevy::prelude::{Reflect, ReflectResource, Resource};
@@ -7,6 +6,7 @@ use bevy::prelude::{Reflect, ReflectResource, Resource};
 use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
+use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::time::SystemTime;
 
@@ -240,21 +240,12 @@ impl WinnerInfo {
 
 /// A resource that indicates the current network role of this application instance. Only relevant in online
 /// multiplayer mode.
-#[derive(Resource, Debug, PartialEq, Eq, Clone, Copy, Default)]
+#[derive(Resource, Debug, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize)]
 pub(crate) enum NetworkRole {
   #[default]
   None,
   Server,
   Client,
-}
-
-impl From<NetworkAudience> for NetworkRole {
-  fn from(audience: NetworkAudience) -> Self {
-    match audience {
-      NetworkAudience::Server => NetworkRole::Server,
-      NetworkAudience::Client => NetworkRole::Client,
-    }
-  }
 }
 
 impl NetworkRole {
