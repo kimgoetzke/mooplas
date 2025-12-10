@@ -21,6 +21,7 @@ pub(crate) struct Lobby {
 }
 
 impl Lobby {
+  /// Registers a player for the given client ID.
   pub fn register_player(&mut self, client_id: ClientId, player_id: PlayerId) {
     self
       .registered
@@ -29,6 +30,7 @@ impl Lobby {
       .push(player_id);
   }
 
+  /// Unregisters a player for the given client ID.
   pub fn unregister_player(&mut self, client_id: ClientId, player_id: PlayerId) {
     if let Some(players) = self.registered.get_mut(&client_id) {
       players.retain(|&id| id != player_id);
@@ -38,7 +40,8 @@ impl Lobby {
     }
   }
 
-  pub fn get_registered_players(&self, client_id: &ClientId) -> Vec<PlayerId> {
+  /// Returns a cloned list of registered players for the given client ID.
+  pub fn get_registered_players_cloned(&self, client_id: &ClientId) -> Vec<PlayerId> {
     self.registered.get(client_id).cloned().unwrap_or(Vec::new())
   }
 }
@@ -56,5 +59,62 @@ impl InputSequence {
   pub fn next(&mut self) -> u32 {
     self.current = self.current.wrapping_add(1);
     self.current()
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy_renet::renet::ClientId;
+
+  #[test]
+  fn registers_player_for_client_id() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let player_id = PlayerId(42);
+    lobby.register_player(client_id, player_id);
+    assert_eq!(lobby.registered.get(&client_id), Some(&vec![player_id]));
+  }
+
+  #[test]
+  fn unregisters_player_for_client_id() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let player_id = PlayerId(42);
+    lobby.register_player(client_id, player_id);
+    lobby.unregister_player(client_id, player_id);
+    assert!(lobby.registered.get(&client_id).is_none());
+  }
+
+  #[test]
+  fn unregisters_player_does_not_remove_other_players() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let player_id1 = PlayerId(42);
+    let player_id2 = PlayerId(43);
+    lobby.register_player(client_id, player_id1);
+    lobby.register_player(client_id, player_id2);
+    lobby.unregister_player(client_id, player_id1);
+    assert_eq!(lobby.registered.get(&client_id), Some(&vec![player_id2]));
+  }
+
+  #[test]
+  fn get_registered_players_cloned_returns_empty_vec_for_unknown_client() {
+    let lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let players = lobby.get_registered_players_cloned(&client_id);
+    assert!(players.is_empty());
+  }
+
+  #[test]
+  fn get_registered_players_cloned_returns_all_players_for_client() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let player_id1 = PlayerId(42);
+    let player_id2 = PlayerId(43);
+    lobby.register_player(client_id, player_id1);
+    lobby.register_player(client_id, player_id2);
+    let players = lobby.get_registered_players_cloned(&client_id);
+    assert_eq!(players, vec![player_id1, player_id2]);
   }
 }

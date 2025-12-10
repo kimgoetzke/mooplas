@@ -82,7 +82,7 @@ fn receive_server_events(
         info!("Client with ID [{}] disconnected: {}", client_id, reason);
 
         // Unregister any players associated with this client and notify other clients about it
-        for player_id in lobby.get_registered_players(client_id).iter() {
+        for player_id in lobby.get_registered_players_cloned(client_id).iter() {
           handle_player_registration_message_from_client(
             &mut server,
             &mut registered_players,
