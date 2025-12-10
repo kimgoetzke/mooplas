@@ -15,6 +15,7 @@ impl Plugin for SharedMessagesPlugin {
       .add_message::<ToggleMenuMessage>()
       .add_message::<PlayerRegistrationMessage>()
       .add_message::<ContinueMessage>()
+      .add_message::<ExitLobbyMessage>()
       .add_message::<TouchControlsToggledMessage>()
       .add_message::<InputMessage>();
   }
@@ -84,6 +85,10 @@ pub enum InputMessage {
 #[derive(Message)]
 pub struct ContinueMessage;
 
+/// A [`Message`] indicating that the player wants to exit the lobby.
+#[derive(Message)]
+pub struct ExitLobbyMessage;
+
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -112,6 +117,7 @@ mod tests {
     assert!(app.world().contains_resource::<Messages<TouchControlsToggledMessage>>());
     assert!(app.world().contains_resource::<Messages<InputMessage>>());
     assert!(app.world().contains_resource::<Messages<ContinueMessage>>());
+    assert!(app.world().contains_resource::<Messages<ExitLobbyMessage>>());
   }
 
   #[test]

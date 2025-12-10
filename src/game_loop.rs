@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayer,
-  RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
+  AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, NetworkRole, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
 };
 use crate::shared::{InputMessage, Player};
 use avian2d::prelude::Collisions;
@@ -24,7 +24,7 @@ impl Plugin for GameLoopPlugin {
       )
       .add_systems(
         Update,
-        player_registration_system.run_if(in_state(AppState::Registering)),
+        (handle_exit_lobby_message, player_registration_system).run_if(in_state(AppState::Registering)),
       )
       .add_systems(
         Update,
@@ -44,10 +44,26 @@ impl Plugin for GameLoopPlugin {
   }
 }
 
-/// Resets the registered players and winner information when entering the lobby/registering state.
-fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner: ResMut<WinnerInfo>) {
-  registered.players.clear();
-  winner.clear();
+/// Transitions the game from the registration/lobby state to the running state.
+fn handle_continue_message(
+  mut messages: MessageReader<ContinueMessage>,
+  mut next_app_state: ResMut<NextState<AppState>>,
+) {
+  if messages.read().collect::<Vec<&ContinueMessage>>().is_empty() {
+    return;
+  }
+  next_app_state.set(AppState::Playing);
+}
+
+/// Handles exit lobby messages by transitioning back to the menu.
+fn handle_exit_lobby_message(
+  mut messages: MessageReader<ExitLobbyMessage>,
+  mut next_app_state: ResMut<NextState<AppState>>,
+) {
+  if messages.read().collect::<Vec<&ExitLobbyMessage>>().is_empty() {
+    return;
+  }
+  next_app_state.set(AppState::Preparing);
 }
 
 /// Handles player registration messages to add or remove players from the registered players list.
@@ -104,18 +120,6 @@ fn player_registration_system(
   }
 }
 
-/// Transitions the game from the registration/lobby state to the running state.
-fn handle_continue_message(
-  mut continue_messages: MessageReader<ContinueMessage>,
-  mut next_app_state: ResMut<NextState<AppState>>,
-) {
-  let messages = continue_messages.read().collect::<Vec<&ContinueMessage>>();
-  if messages.is_empty() {
-    return;
-  }
-  next_app_state.set(AppState::Playing);
-}
-
 /// Checks for collisions involving snake heads and marks players as dead if they collide.
 fn check_snake_collisions_system(
   mut registered_players: ResMut<RegisteredPlayers>,
@@ -168,6 +172,11 @@ fn check_snake_collisions_system(
   }
 }
 
+/// Pauses the game time when called. Intended to be called when entering the game over state.
+fn pause_game_system(mut time: ResMut<Time<Virtual>>) {
+  time.pause();
+}
+
 /// Transitions to the next game state if there are no alive players or only one alive player remaining.
 fn transition_to_game_over_system(
   registered_players: ResMut<RegisteredPlayers>,
@@ -188,11 +197,6 @@ fn transition_to_game_over_system(
     }
     _ => {}
   }
-}
-
-/// Pauses the game time when called. Intended to be called when entering the game over state.
-fn pause_game_system(mut time: ResMut<Time<Virtual>>) {
-  time.pause();
 }
 
 /// Unpauses the game time when called. Intended to be called when exiting the game over state.
@@ -217,6 +221,12 @@ fn despawn_players_system(mut commands: Commands, players_query: Query<Entity, W
   for entity in &players_query {
     commands.entity(entity).despawn();
   }
+}
+
+/// Resets the registered players and winner information when entering the lobby/registering state.
+fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner: ResMut<WinnerInfo>) {
+  registered.players.clear();
+  winner.clear();
 }
 
 #[cfg(test)]

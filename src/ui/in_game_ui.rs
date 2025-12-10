@@ -1,7 +1,7 @@
 use crate::app_states::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT};
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, NetworkRole, PlayerId, RegisteredPlayers, Settings,
+  AvailablePlayerConfig, AvailablePlayerConfigs, ExitLobbyMessage, NetworkRole, PlayerId, RegisteredPlayers, Settings,
   TouchControlsToggledMessage, WinnerInfo,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
@@ -34,6 +34,7 @@ impl Plugin for InGameUiPlugin {
           handle_touch_controls_toggled_message,
           toggle_touch_controls_button_system,
           toggle_fullscreen_button_system,
+          exit_button_system,
         )
           .run_if(in_state(AppState::Registering)),
       )
@@ -77,6 +78,10 @@ struct ToggleTouchControlsButton;
 /// Marker component for the fullscreen toggle button.
 #[derive(Component)]
 struct ToggleFullscreenButton;
+
+/// Marker component for the exit button.
+#[derive(Component)]
+struct ExitButton;
 
 /// Marker component for the touch continue button.
 #[derive(Component)]
@@ -132,7 +137,7 @@ fn spawn_lobby_ui(
     .with_children(|parent| {
       parent
         .spawn(Node {
-          width: px(400),
+          width: px(470),
           height: px(100),
           position_type: PositionType::Absolute,
           align_items: AlignItems::Center,
@@ -144,7 +149,7 @@ fn spawn_lobby_ui(
         .with_children(|parent| {
           parent
             .spawn(Node {
-              width: px(200),
+              width: px(180),
               height: px(100),
               position_type: PositionType::Relative,
               align_items: AlignItems::Center,
@@ -164,7 +169,7 @@ fn spawn_lobby_ui(
 
           parent
             .spawn((Node {
-              width: px(200),
+              width: px(160),
               height: px(100),
               position_type: PositionType::Relative,
               align_items: AlignItems::Center,
@@ -180,6 +185,19 @@ fn spawn_lobby_ui(
                 150,
                 SMALL_FONT,
               );
+            });
+
+          parent
+            .spawn(Node {
+              width: px(110),
+              height: px(100),
+              position_type: PositionType::Relative,
+              align_items: AlignItems::Center,
+              justify_content: JustifyContent::Center,
+              ..default()
+            })
+            .with_children(|parent| {
+              spawn_button(parent, asset_server, ExitButton, "Exit", 100, SMALL_FONT);
             });
         });
     })
@@ -339,6 +357,19 @@ fn toggle_fullscreen_button_system(
         _ => bevy::window::WindowMode::Windowed,
       };
       info!("[Button] Set window mode to [{:?}]", window.mode);
+    }
+  }
+}
+
+/// A system that exists the current game when the exit button is pressed.
+fn exit_button_system(
+  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ExitButton>)>,
+  mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
+) {
+  for interaction in &mut query {
+    if *interaction == CustomInteraction::Released {
+      exit_lobby_message.write(ExitLobbyMessage);
+      info!("[Button] Pressed exit button");
     }
   }
 }
