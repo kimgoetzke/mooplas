@@ -4,7 +4,7 @@ use crate::online::lib::{
   SerialisableInputActionMessage, ServerMessage, utils,
 };
 use crate::prelude::{
-  NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, WinnerInfo,
+  ExitLobbyMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, WinnerInfo,
 };
 use crate::shared::AvailablePlayerConfigs;
 use bevy::app::Update;
@@ -30,7 +30,10 @@ impl Plugin for ClientPlugin {
       .add_systems(Update, receive_reliable_server_messages_system.run_if(client_connected))
       .add_systems(
         Update,
-        send_local_player_registration_system
+        (
+          send_local_player_registration_system,
+          send_local_exit_lobby_message_system,
+        )
           .run_if(in_state(AppState::Registering))
           .run_if(client_connected),
       )
@@ -116,6 +119,16 @@ fn send_local_player_registration_system(
     debug!("Sending: [{:?}]", client_message);
     let message = bincode::serialize(&client_message).expect("Failed to serialise player registration message");
     client.send_message(DefaultChannel::ReliableOrdered, message);
+  }
+}
+
+fn send_local_exit_lobby_message_system(
+  mut messages: MessageReader<ExitLobbyMessage>,
+  mut client: ResMut<RenetClient>,
+) {
+  for _ in messages.read() {
+    debug!("Disconnecting from server...");
+    client.disconnect();
   }
 }
 

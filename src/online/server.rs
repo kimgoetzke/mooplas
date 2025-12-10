@@ -55,6 +55,9 @@ fn receive_server_events(
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
   for message in messages.read() {
     match message {
@@ -78,7 +81,21 @@ fn receive_server_events(
       ServerEvent::ClientDisconnected { client_id, reason } => {
         info!("Client with ID [{}] disconnected: {}", client_id, reason);
 
-        // Notify all other clients about the disconnection
+        // Unregister any players associated with this client and notify other clients about it
+        for player_id in lobby.get_registered_players(client_id).iter() {
+          handle_player_registration_message_from_client(
+            &mut server,
+            &mut registered_players,
+            &available_configs,
+            &mut player_registration_message,
+            client_id,
+            *player_id,
+            false,
+            &mut lobby,
+          );
+        }
+
+        // Notify all other clients about the disconnection itself
         let message = bincode::serialize(&ServerMessage::ClientDisconnected { client_id: *client_id })
           .expect(CLIENT_MESSAGE_SERIALISATION);
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
@@ -152,14 +169,14 @@ fn broadcast_player_states_system(
 /// Processes any incoming [`DefaultChannel::ReliableOrdered`] messages from clients by applying them locally and
 /// broadcasting them to all other clients.
 fn receive_ordered_client_messages_system(
-  lobby: Res<Lobby>,
+  mut lobby: ResMut<Lobby>,
   mut server: ResMut<RenetServer>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
-  for client_id in lobby.connected.iter() {
-    while let Some(message) = server.receive_message(*client_id, DefaultChannel::ReliableOrdered) {
+  for client_id in lobby.connected.clone() {
+    while let Some(message) = server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
       if let Ok(client_message) = bincode::deserialize(&message) {
         match client_message {
           ClientMessage::PlayerRegistration(message) => {
@@ -168,9 +185,10 @@ fn receive_ordered_client_messages_system(
               &mut registered_players,
               &available_configs,
               &mut player_registration_message,
-              client_id,
+              &client_id,
               message.player_id,
               message.has_registered,
+              &mut lobby,
             );
           }
           _ => {
@@ -199,6 +217,7 @@ fn handle_player_registration_message_from_client(
   client_id: &ClientId,
   player_id: PlayerId,
   has_registered: bool,
+  lobby: &mut ResMut<Lobby>,
 ) {
   if has_registered {
     info!("[{}] with client ID [{}] registered", player_id, client_id);
@@ -214,6 +233,7 @@ fn handle_player_registration_message_from_client(
       &mut player_registration_message,
       player_id,
     );
+    lobby.register_player(*client_id, player_id);
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
     let message = bincode::serialize(&ServerMessage::PlayerUnregistered {
@@ -223,6 +243,7 @@ fn handle_player_registration_message_from_client(
     .expect(CLIENT_MESSAGE_SERIALISATION);
     server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
     utils::unregister_player_locally(&mut registered_players, &mut player_registration_message, player_id);
+    lobby.unregister_player(*client_id, player_id);
   }
 }
 

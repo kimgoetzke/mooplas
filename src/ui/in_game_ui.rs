@@ -135,6 +135,7 @@ fn spawn_lobby_ui(
       Pickable::IGNORE,
     ))
     .with_children(|parent| {
+      // TODO: Replace all button text below with icons
       parent
         .spawn(Node {
           width: px(470),
