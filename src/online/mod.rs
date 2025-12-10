@@ -15,8 +15,8 @@ use bevy::app::Update;
 use bevy::log::*;
 use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, Plugin, ResMut, in_state};
 use bevy_renet::netcode::{
-  ClientAuthentication, NetcodeClientTransport, NetcodeServerTransport, NetcodeTransportError, ServerAuthentication,
-  ServerConfig,
+  ClientAuthentication, NetcodeClientTransport, NetcodeError, NetcodeServerTransport, NetcodeTransportError,
+  ServerAuthentication, ServerConfig,
 };
 use bevy_renet::renet::{ConnectionConfig, RenetClient, RenetServer};
 use std::net::UdpSocket;
@@ -111,7 +111,13 @@ fn create_new_renet_server_resources() -> (RenetServer, NetcodeServerTransport) 
 #[allow(clippy::never_loop)]
 fn panic_on_error_system(mut messages: MessageReader<NetcodeTransportError>) {
   for error in messages.read() {
-    error!("Netcode transport error occurred, panicking now...");
+    if matches!(
+      error,
+      NetcodeTransportError::Renet(_) | NetcodeTransportError::Netcode(NetcodeError::Disconnected(_))
+    ) {
+      return;
+    }
+    error!("Netcode transport error occurred: [{}], panicking now...", error);
     panic!("{}", error);
   }
 }

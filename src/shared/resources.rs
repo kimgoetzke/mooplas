@@ -185,6 +185,11 @@ impl RegisteredPlayers {
       Err(ErrorKind::PlayerNeverRegistered(player_id))
     }
   }
+
+  /// Clears all registered players.
+  pub fn clear(&mut self) {
+    self.players.clear();
+  }
 }
 
 #[allow(dead_code)]

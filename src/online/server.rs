@@ -70,6 +70,7 @@ fn receive_server_events(
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, connected_message);
         lobby.connected.push(*client_id);
 
+        // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
         // Send the current seed to the newly connected client
         let seed_message = bincode::serialize(&ServerMessage::ClientInitialised {
           seed: seed.get(),

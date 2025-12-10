@@ -4,9 +4,10 @@ use crate::online::lib::{
   SerialisableInputActionMessage, ServerMessage, utils,
 };
 use crate::prelude::{
-  ExitLobbyMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, WinnerInfo,
+  ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead,
+  WinnerInfo,
 };
-use crate::shared::AvailablePlayerConfigs;
+use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::math::Quat;
@@ -122,13 +123,18 @@ fn send_local_player_registration_system(
   }
 }
 
+/// A system that handles local exit lobby messages by disconnecting from the server and returning to the main menu.
 fn send_local_exit_lobby_message_system(
   mut messages: MessageReader<ExitLobbyMessage>,
   mut client: ResMut<RenetClient>,
+  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
+  mut registered_players: ResMut<RegisteredPlayers>,
 ) {
   for _ in messages.read() {
     debug!("Disconnecting from server...");
     client.disconnect();
+    toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
+    registered_players.clear();
   }
 }
 
