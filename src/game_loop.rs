@@ -23,7 +23,13 @@ impl Plugin for GameLoopPlugin {
       )
       .add_systems(
         Update,
-        (handle_exit_lobby_message, player_registration_system).run_if(in_state(AppState::Registering)),
+        player_registration_system.run_if(in_state(AppState::Registering)),
+      )
+      .add_systems(
+        Update,
+        handle_exit_lobby_message
+          .run_if(in_state(AppState::Registering))
+          .run_if(|role: Res<NetworkRole>| !role.is_server()),
       )
       .add_systems(
         Update,

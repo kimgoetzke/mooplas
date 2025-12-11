@@ -7,12 +7,14 @@ use crate::shared::{ExitLobbyMessage, WinnerInfo};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{
-  IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Query, Res, ResMut, StateTransitionEvent, Transform,
-  With, in_state, resource_exists,
+  Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Query, Res, ResMut, Resource,
+  StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
+use bevy::time::TimerMode;
 use bevy_renet::RenetServerPlugin;
 use bevy_renet::netcode::NetcodeServerPlugin;
 use bevy_renet::renet::{ClientId, DefaultChannel, RenetServer, ServerEvent};
+use std::time::Duration;
 
 /// A plugin that adds server-side online multiplayer capabilities to the game. Only active when the game is running in
 /// server mode. Mutually exclusive with the [`crate::online::ClientPlugin`].
@@ -45,11 +47,21 @@ impl Plugin for ServerPlugin {
         (receive_unreliable_client_inputs_system, broadcast_player_states_system)
           .run_if(in_state(AppState::Playing))
           .run_if(resource_exists::<RenetServer>),
+      )
+      .add_systems(
+        Update,
+        disconnect_all_clients_system
+          .run_if(resource_exists::<ShutdownCountdown>)
+          .run_if(resource_exists::<RenetServer>),
       );
   }
 }
 
 const CLIENT_MESSAGE_SERIALISATION: &'static str = "Failed to serialise client message";
+
+// A resource to schedule the actual disconnect after broadcasting the shutdown message.
+#[derive(Resource)]
+struct ShutdownCountdown(Timer);
 
 fn receive_server_events(
   mut messages: MessageReader<ServerEvent>,
@@ -303,22 +315,44 @@ fn broadcast_local_player_registration_system(
   }
 }
 
-// TODO: Use server.disconnect_all() after a short while or straight away to ensure all clients are disconnected properly
-/// A system that processes local exit lobby messages and broadcasts them to all connected clients.
-/// This will also disconnect all clients from the server.
+/// A system that processes local exit lobby messages and broadcasts the servers intention to shut down to all connected
+/// clients. This will then schedule the actual disconnect after a short delay.
 fn process_and_broadcast_local_exit_lobby_message(
   mut messages: MessageReader<ExitLobbyMessage>,
+  mut commands: Commands,
   mut server: ResMut<RenetServer>,
-  mut lobby: ResMut<Lobby>,
-  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
-  mut registered_players: ResMut<RegisteredPlayers>,
 ) {
   for _ in messages.read() {
-    info!("Disconnecting all clients, then shutting down the server...");
+    info!("Informing all clients about intention to shut down server and scheduling shutdown...");
     let exit_message = bincode::serialize(&ServerMessage::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
     server.broadcast_message(DefaultChannel::ReliableOrdered, exit_message);
+    commands.insert_resource(ShutdownCountdown(Timer::new(
+      Duration::from_millis(500),
+      TimerMode::Once,
+    )));
+  }
+}
+
+/// Runs while [`ShutdownCountdown`] exists. When the timer finishes, all clients are disconnected, all networking
+/// related resources are cleared, and the app state is set to [`AppState::Preparing`].
+fn disconnect_all_clients_system(
+  mut commands: Commands,
+  mut countdown: ResMut<ShutdownCountdown>,
+  time: Res<Time>,
+  mut server: ResMut<RenetServer>,
+  mut lobby: ResMut<Lobby>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
+  mut next_app_state: ResMut<NextState<AppState>>,
+) {
+  countdown.0.tick(time.delta());
+  if countdown.0.just_finished() {
+    info!("Disconnecting all clients now...");
     lobby.clear();
-    toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     registered_players.clear();
+    server.disconnect_all();
+    commands.remove_resource::<ShutdownCountdown>();
+    toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
+    next_app_state.set(AppState::Preparing);
   }
 }
