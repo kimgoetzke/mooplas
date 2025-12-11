@@ -11,6 +11,7 @@ use bevy::color::palettes::tailwind;
 use bevy::math::{Isometry2d, Vec2};
 use bevy::prelude::{Alpha, Gizmos, GlobalTransform, Query, Res, With};
 
+/// A plugin that renders various debug gizmos in the game world to help with development and debugging.
 pub struct GizmosPlugin;
 
 impl Plugin for GizmosPlugin {
