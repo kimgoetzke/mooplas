@@ -44,6 +44,11 @@ impl Lobby {
   pub fn get_registered_players_cloned(&self, client_id: &ClientId) -> Vec<PlayerId> {
     self.registered.get(client_id).cloned().unwrap_or(Vec::new())
   }
+  
+  pub fn clear(&mut self) {
+    self.connected.clear();
+    self.registered.clear();
+  }
 }
 
 #[derive(Resource, Debug, Default)]

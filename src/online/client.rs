@@ -32,7 +32,7 @@ impl Plugin for ClientPlugin {
         Update,
         (
           send_local_player_registration_system,
-          send_local_exit_lobby_message_system,
+          process_and_send_local_exit_lobby_message_system,
         )
           .run_if(in_state(AppState::Registering))
           .run_if(client_connected),
@@ -56,7 +56,8 @@ fn receive_reliable_server_messages_system(
   mut client: ResMut<RenetClient>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
-  mut messages: MessageWriter<PlayerRegistrationMessage>,
+  mut registration_message: MessageWriter<PlayerRegistrationMessage>,
+  mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
   current_state: ResMut<State<AppState>>,
   mut next_state: ResMut<NextState<AppState>>,
   mut winner: ResMut<WinnerInfo>,
@@ -77,11 +78,16 @@ fn receive_reliable_server_messages_system(
       }
       ServerMessage::PlayerRegistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
-        utils::register_player_locally(&mut registered_players, &available_configs, &mut messages, player_id);
+        utils::register_player_locally(
+          &mut registered_players,
+          &available_configs,
+          &mut registration_message,
+          player_id,
+        );
       }
       ServerMessage::PlayerUnregistered { player_id, .. } => {
         let player_id = PlayerId(player_id);
-        utils::unregister_player_locally(&mut registered_players, &mut messages, player_id);
+        utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
       }
       ServerMessage::StateChanged { new_state, winner_info } => {
         if !current_state.is_restricted() {
@@ -95,6 +101,9 @@ fn receive_reliable_server_messages_system(
         if let Some(player_id) = winner_info {
           winner.set(player_id);
         }
+      }
+      ServerMessage::ShutdownServer => {
+        exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
       }
       _ => {
         warn!(
@@ -123,15 +132,17 @@ fn send_local_player_registration_system(
 }
 
 /// A system that handles local exit lobby messages by disconnecting from the server and returning to the main menu.
-fn send_local_exit_lobby_message_system(
+fn process_and_send_local_exit_lobby_message_system(
   mut messages: MessageReader<ExitLobbyMessage>,
   mut client: ResMut<RenetClient>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
 ) {
-  for _ in messages.read() {
-    debug!("Disconnecting from server...");
-    client.disconnect();
+  for message in messages.read() {
+    debug!("Disconnecting from server (by force={})...", message.by_force);
+    if !message.by_force {
+      client.disconnect();
+    }
     toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     registered_players.clear();
   }

@@ -1,9 +1,9 @@
 use crate::online::lib::{ClientMessage, Lobby, ServerMessage, utils};
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, InputMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
-  Seed, SnakeHead,
+  AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
 };
-use crate::shared::WinnerInfo;
+use crate::shared::{ExitLobbyMessage, WinnerInfo};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{
@@ -33,7 +33,10 @@ impl Plugin for ServerPlugin {
       )
       .add_systems(
         Update,
-        broadcast_local_player_registration_system
+        (
+          broadcast_local_player_registration_system,
+          process_and_broadcast_local_exit_lobby_message,
+        )
           .run_if(in_state(AppState::Registering))
           .run_if(resource_exists::<RenetServer>),
       )
@@ -297,5 +300,25 @@ fn broadcast_local_player_registration_system(
       .expect(CLIENT_MESSAGE_SERIALISATION);
       server.broadcast_message(DefaultChannel::ReliableOrdered, message);
     }
+  }
+}
+
+// TODO: Use server.disconnect_all() after a short while or straight away to ensure all clients are disconnected properly
+/// A system that processes local exit lobby messages and broadcasts them to all connected clients.
+/// This will also disconnect all clients from the server.
+fn process_and_broadcast_local_exit_lobby_message(
+  mut messages: MessageReader<ExitLobbyMessage>,
+  mut server: ResMut<RenetServer>,
+  mut lobby: ResMut<Lobby>,
+  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+) {
+  for _ in messages.read() {
+    info!("Disconnecting all clients, then shutting down the server...");
+    let exit_message = bincode::serialize(&ServerMessage::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
+    server.broadcast_message(DefaultChannel::ReliableOrdered, exit_message);
+    lobby.clear();
+    toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
+    registered_players.clear();
   }
 }

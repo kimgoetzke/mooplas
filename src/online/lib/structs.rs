@@ -36,6 +36,7 @@ pub enum ServerMessage {
   UpdatePlayerStates {
     states: Vec<(u8, f32, f32, f32)>,
   },
+  ShutdownServer,
 }
 
 #[derive(Serialize, Deserialize)]

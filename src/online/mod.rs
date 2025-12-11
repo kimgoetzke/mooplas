@@ -29,7 +29,7 @@ impl Plugin for OnlinePlugin {
     app
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
-      .add_systems(Update, panic_on_error_system)
+      .add_systems(Update, handle_netcode_transport_errors)
       .add_plugins((InterfacePlugin, NetworkingResourcesPlugin, NetworkingMessagesPlugin));
     info!("Online multiplayer is enabled");
   }
@@ -71,6 +71,7 @@ fn handle_toggle_menu_message(
   }
 }
 
+// TODO: Replace with real, secure client implementation
 fn create_new_renet_client_resources() -> (RenetClient, NetcodeClientTransport) {
   let server_addr = "127.0.0.1:5000".parse().unwrap();
   let socket = UdpSocket::bind("127.0.0.1:0").unwrap();
@@ -89,6 +90,7 @@ fn create_new_renet_client_resources() -> (RenetClient, NetcodeClientTransport) 
   (client, transport)
 }
 
+// TODO: Replace with real, secure server implementation
 fn create_new_renet_server_resources() -> (RenetServer, NetcodeServerTransport) {
   let public_addr = "127.0.0.1:5000".parse().unwrap();
   let socket = UdpSocket::bind(public_addr).unwrap();
@@ -108,7 +110,7 @@ fn create_new_renet_server_resources() -> (RenetServer, NetcodeServerTransport) 
 }
 
 #[allow(clippy::never_loop)]
-fn panic_on_error_system(mut messages: MessageReader<NetcodeTransportError>) {
+fn handle_netcode_transport_errors(mut messages: MessageReader<NetcodeTransportError>) {
   for error in messages.read() {
     if matches!(
       error,

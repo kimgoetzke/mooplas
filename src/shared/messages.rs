@@ -87,7 +87,20 @@ pub struct ContinueMessage;
 
 /// A [`Message`] indicating that the player wants to exit the lobby.
 #[derive(Message)]
-pub struct ExitLobbyMessage;
+pub struct ExitLobbyMessage {
+  /// Whether the exit is being forced (true) by server or voluntary (false).
+  pub(crate) by_force: bool,
+}
+
+impl ExitLobbyMessage {
+  pub fn default() -> Self {
+    Self { by_force: false }
+  }
+
+  pub fn forced_by_server() -> Self {
+    Self { by_force: true }
+  }
+}
 
 #[cfg(test)]
 mod tests {

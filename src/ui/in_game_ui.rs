@@ -369,7 +369,7 @@ fn exit_button_system(
 ) {
   for interaction in &mut query {
     if *interaction == CustomInteraction::Released {
-      exit_lobby_message.write(ExitLobbyMessage);
+      exit_lobby_message.write(ExitLobbyMessage::default());
       info!("[Button] Pressed exit button");
     }
   }
