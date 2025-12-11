@@ -15,7 +15,7 @@ pub struct PlayerPlugin;
 impl Plugin for PlayerPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_systems(OnExit(AppState::Registering), spawn_players_system)
+      .add_systems(OnEnter(AppState::Playing), spawn_players_system)
       .add_systems(
         Update,
         ((
