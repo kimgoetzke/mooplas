@@ -12,8 +12,8 @@ mod shared;
 mod ui;
 
 mod prelude {
-  pub use crate::shared::*;
   pub use crate::app_state::AppState;
+  pub use crate::shared::*;
 }
 
 #[cfg(feature = "dev")]
