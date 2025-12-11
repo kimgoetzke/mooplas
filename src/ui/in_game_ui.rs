@@ -1,4 +1,4 @@
-use crate::app_states::AppState;
+use crate::app_state::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT};
 use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, ExitLobbyMessage, NetworkRole, PlayerId, RegisteredPlayers, Settings,

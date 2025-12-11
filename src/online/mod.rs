@@ -5,12 +5,11 @@ mod interface;
 mod lib;
 mod server;
 
-use crate::app_states::AppState;
 use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
 use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin};
 use crate::online::server::ServerPlugin;
-use crate::prelude::{MenuName, NetworkRole, ToggleMenuMessage};
+use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage};
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, Plugin, ResMut, in_state};

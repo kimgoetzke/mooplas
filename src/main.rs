@@ -1,4 +1,4 @@
-mod app_states;
+mod app_state;
 mod camera;
 mod controls;
 mod debug;
@@ -13,6 +13,7 @@ mod ui;
 
 mod prelude {
   pub use crate::shared::*;
+  pub use crate::app_state::AppState;
 }
 
 #[cfg(feature = "dev")]
@@ -21,7 +22,7 @@ use crate::debug::DebugPlugin;
 #[cfg(feature = "online")]
 use crate::online::OnlinePlugin;
 
-use crate::app_states::AppStatePlugin;
+use crate::app_state::AppStatePlugin;
 use crate::camera::CameraPlugin;
 use crate::controls::ControlsPlugin;
 use crate::game_loop::GameLoopPlugin;

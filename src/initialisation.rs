@@ -1,6 +1,7 @@
-use crate::app_states::AppState;
 use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
-use crate::prelude::{AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, Seed, SpawnPoints};
+use crate::prelude::{
+  AppState, AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, Seed, SpawnPoints,
+};
 use bevy::app::{App, Plugin};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;

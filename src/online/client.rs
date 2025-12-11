@@ -1,11 +1,10 @@
-use crate::app_states::AppState;
 use crate::online::lib::{
   ClientMessage, InputSequence, NetworkTransformInterpolation, PlayerStateUpdateMessage,
   SerialisableInputActionMessage, ServerMessage, utils,
 };
 use crate::prelude::{
-  ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead,
-  WinnerInfo,
+  AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
+  SnakeHead, WinnerInfo,
 };
 use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
 use bevy::app::Update;

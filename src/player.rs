@@ -1,7 +1,6 @@
-use crate::app_states::AppState;
 use crate::prelude::constants::*;
 use crate::prelude::{
-  Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeSegment, SnakeTail, SpawnPoints, WrapAroundEntity,
+  AppState, Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeSegment, SnakeTail, SpawnPoints, WrapAroundEntity,
 };
 use avian2d::math::Vector;
 use avian2d::prelude::*;

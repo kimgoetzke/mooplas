@@ -1,8 +1,7 @@
-use crate::app_states::AppState;
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, InputMessage, NetworkRole, PlayerId, PlayerInput, RegisteredPlayers,
-  Settings, SnakeHead, TouchControlsToggledMessage, has_registered_players,
+  AppState, AvailablePlayerConfigs, ContinueMessage, InputMessage, NetworkRole, PlayerId, PlayerInput,
+  RegisteredPlayers, Settings, SnakeHead, TouchControlsToggledMessage, has_registered_players,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -181,7 +180,7 @@ fn settings_controls_system(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::app_states::AppStatePlugin;
+  use crate::app_state::AppStatePlugin;
   use crate::prelude::{
     AvailablePlayerConfig, PlayerId, RegisteredPlayer, SharedMessagesPlugin, SharedResourcesPlugin,
   };

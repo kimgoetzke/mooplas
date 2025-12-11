@@ -1,8 +1,7 @@
-use crate::app_states::AppState;
 use crate::online::lib::{ClientMessage, Lobby, ServerMessage, utils};
 use crate::prelude::{
-  AvailablePlayerConfigs, InputMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
-  SnakeHead,
+  AppState, AvailablePlayerConfigs, InputMessage, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
+  Seed, SnakeHead,
 };
 use crate::shared::WinnerInfo;
 use bevy::app::{App, Plugin, Update};

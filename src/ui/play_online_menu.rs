@@ -1,4 +1,4 @@
-use crate::app_states::AppState;
+use crate::app_state::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::prelude::{CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;

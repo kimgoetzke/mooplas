@@ -1,4 +1,4 @@
-use crate::app_states::AppState;
+use crate::prelude::AppState;
 use bevy::prelude::{App, NextState, Plugin, ResMut, Startup};
 
 /// A plugin responsible for loading shared assets and transitioning to the next app state. This plugin is intended to

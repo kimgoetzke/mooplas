@@ -1,4 +1,4 @@
-use crate::app_states::AppState;
+use crate::prelude::AppState;
 use crate::prelude::constants::*;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;

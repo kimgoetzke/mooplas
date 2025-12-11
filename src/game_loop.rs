@@ -1,7 +1,6 @@
-use crate::app_states::AppState;
 use crate::prelude::{
-  AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, NetworkRole, PlayerId, PlayerRegistrationMessage,
-  RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
+  AppState, AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, NetworkRole, PlayerId,
+  PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
 };
 use crate::shared::{InputMessage, Player};
 use avian2d::prelude::Collisions;
@@ -239,7 +238,7 @@ mod tests {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     // Add logging and state machinery so systems that require NextState<AppState> work in tests
-    app.add_plugins((StatesPlugin, crate::app_states::AppStatePlugin));
+    app.add_plugins((StatesPlugin, crate::app_state::AppStatePlugin));
     // Add shared messages and resources as they are required by the game loop systems
     app.add_plugins((SharedMessagesPlugin, SharedResourcesPlugin));
     app
