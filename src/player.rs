@@ -414,7 +414,6 @@ fn wraparound_system(
 
     // If snake head was moved, find the corresponding snake tail and stop it from growing
     if was_wrapped {
-      debug!("xxx | Wrapped snake head around screen edges | xxx");
       let parent_entity = parent.get();
       if let Ok(children) = children_query.get(parent_entity) {
         for child in children.iter() {
