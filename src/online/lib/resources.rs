@@ -10,7 +10,7 @@ pub struct NetworkingResourcesPlugin;
 
 impl Plugin for NetworkingResourcesPlugin {
   fn build(&self, app: &mut App) {
-    app.init_resource::<Lobby>().init_resource::<InputSequence>();
+    app.init_resource::<Lobby>();
   }
 }
 
@@ -48,22 +48,6 @@ impl Lobby {
   pub fn clear(&mut self) {
     self.connected.clear();
     self.registered.clear();
-  }
-}
-
-#[derive(Resource, Debug, Default)]
-pub(crate) struct InputSequence {
-  current: u32,
-}
-
-impl InputSequence {
-  pub fn current(&self) -> u32 {
-    self.current
-  }
-
-  pub fn next(&mut self) -> u32 {
-    self.current = self.current.wrapping_add(1);
-    self.current()
   }
 }
 

@@ -136,7 +136,7 @@ fn receive_unreliable_client_inputs_system(
     while let Some(message) = server.receive_message(*client_id, DefaultChannel::Unreliable) {
       if let Ok(client_message) = bincode::deserialize(&message) {
         match client_message {
-          ClientMessage::Input(_, action) => {
+          ClientMessage::Input(action) => {
             // TODO: Validate input action here
             input_message.write(action.into());
           }

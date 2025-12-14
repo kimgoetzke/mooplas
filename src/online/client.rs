@@ -1,6 +1,6 @@
 use crate::online::lib::{
-  ClientMessage, InputSequence, NetworkTransformInterpolation, PlayerStateUpdateMessage,
-  SerialisableInputActionMessage, ServerMessage, utils,
+  ClientMessage, NetworkTransformInterpolation, PlayerStateUpdateMessage, SerialisableInputActionMessage,
+  ServerMessage, utils,
 };
 use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
@@ -155,7 +155,6 @@ fn send_local_input_messages(
   mut messages: MessageReader<SerialisableInputActionMessage>,
   registered_players: Res<RegisteredPlayers>,
   mut client: ResMut<RenetClient>,
-  mut sequence: ResMut<InputSequence>,
 ) {
   for message in messages.read() {
     let player_id = match message {
@@ -167,7 +166,7 @@ fn send_local_input_messages(
       .iter()
       .find(|player| player.id.0 == *player_id && player.is_local())
     {
-      if let Ok(input_message) = bincode::serialize(&ClientMessage::Input(sequence.next(), *message)) {
+      if let Ok(input_message) = bincode::serialize(&ClientMessage::Input(*message)) {
         client.send_message(DefaultChannel::Unreliable, input_message);
       } else {
         warn!("Failed to serialise input action message: {:?}", message);

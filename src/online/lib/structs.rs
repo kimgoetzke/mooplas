@@ -35,7 +35,7 @@ pub enum ServerMessage {
 #[derive(Serialize, Deserialize)]
 pub enum ClientMessage {
   PlayerRegistration(PlayerRegistrationMessage),
-  Input(u32, SerialisableInputActionMessage),
+  Input(SerialisableInputActionMessage),
 }
 
 impl Debug for ClientMessage {
@@ -44,8 +44,8 @@ impl Debug for ClientMessage {
       ClientMessage::PlayerRegistration(message) => {
         write!(f, "ClientMessage::PlayerRegistration for {}", message.player_id)
       }
-      ClientMessage::Input(sequence, action) => {
-        write!(f, "ClientMessage::{:?} (#{})", action, sequence)
+      ClientMessage::Input(action) => {
+        write!(f, "ClientMessage::{:?}", action)
       }
     }
   }
