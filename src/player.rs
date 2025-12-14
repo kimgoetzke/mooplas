@@ -25,6 +25,7 @@ impl Plugin for PlayerPlugin {
           update_active_segment_mesh_system,
           disable_eliminated_players_system,
         )
+          .run_if(in_state(AppState::Playing))
           .chain(),),
       );
   }
