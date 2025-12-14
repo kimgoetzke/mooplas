@@ -221,11 +221,11 @@ fn apply_state_interpolation_system(
   mut snake_head_query: Query<(&mut Transform, &mut NetworkTransformInterpolation, &PlayerId), With<SnakeHead>>,
 ) {
   // Update targets based on incoming server messages
-  for state_update in player_state_messages.read() {
+  for message in player_state_messages.read() {
     for (_, mut interpolation, player_id) in snake_head_query.iter_mut() {
-      if player_id.0 == state_update.id {
-        let target_position = bevy::math::Vec2::new(state_update.position.0, state_update.position.1);
-        let target_rotation = Quat::from_rotation_z(state_update.rotation);
+      if player_id.0 == message.id {
+        let target_position = bevy::math::Vec2::new(message.position.0, message.position.1);
+        let target_rotation = Quat::from_rotation_z(message.rotation);
         interpolation.update_target(target_position, target_rotation);
       }
     }
@@ -233,8 +233,8 @@ fn apply_state_interpolation_system(
 
   // Interpolate all remote players towards their targets
   let delta = time.delta_secs();
-  let domain_width = RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
-  let domain_height = RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
+  let domain_width = RESOLUTION_WIDTH as f32 + 2. * WRAPAROUND_MARGIN;
+  let domain_height = RESOLUTION_HEIGHT as f32 + 2. * WRAPAROUND_MARGIN;
 
   for (mut transform, interpolation, _) in snake_head_query.iter_mut() {
     let current_position = transform.translation.truncate();
@@ -243,8 +243,8 @@ fn apply_state_interpolation_system(
     // If the difference between current and target X position is big enough to indicate wraparound,
     // adjust the target position to keep going and let the wraparound happen in the wraparound system
     let dx = target_position.x - current_position.x;
-    if dx.abs() > domain_width / 2.0 {
-      if dx > 0.0 {
+    if dx.abs() > domain_width / 2. {
+      if dx > 0. {
         target_position.x -= domain_width;
       } else {
         target_position.x += domain_width;
@@ -254,21 +254,115 @@ fn apply_state_interpolation_system(
     // If the difference between current and target Y position is big enough to indicate wraparound,
     // adjust the target position to keep going and let the wraparound happen in the wraparound system
     let dy = target_position.y - current_position.y;
-    if dy.abs() > domain_height / 2.0 {
-      if dy > 0.0 {
+    if dy.abs() > domain_height / 2. {
+      if dy > 0. {
         target_position.y -= domain_height;
       } else {
         target_position.y += domain_height;
       }
     }
 
-    let new_position = current_position.lerp(target_position, interpolation.interpolation_speed * delta * 60.0);
+    let new_position = current_position.lerp(target_position, interpolation.interpolation_speed * delta * 60.);
     transform.translation.x = new_position.x;
     transform.translation.y = new_position.y;
     let new_rotation = transform.rotation.slerp(
       interpolation.target_rotation,
-      interpolation.interpolation_speed * delta * 60.0,
+      interpolation.interpolation_speed * delta * 60.,
     );
     transform.rotation = new_rotation;
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::online::lib::NetworkingMessagesPlugin;
+  use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
+  use bevy::math::Vec3;
+  use bevy::prelude::*;
+  use std::time::Duration;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    // Add shared messages and resources as they are required by the game loop systems
+    app.add_plugins((SharedMessagesPlugin, SharedResourcesPlugin, NetworkingMessagesPlugin));
+    app
+  }
+
+  fn advance_time_by(app: &mut App, duration: Duration) {
+    let mut time = app.world_mut().get_resource_mut::<Time>().unwrap();
+    info!("Time before manual update: {:?}", time.elapsed());
+    time.advance_by(duration);
+    app.update();
+    let time = app.world_mut().get_resource_mut::<Time>().unwrap();
+    info!("Time after manual update: {:?}", time.elapsed());
+  }
+
+  #[test]
+  fn apply_state_interpolation_system_applies_interpolation_within_screen_bounds() {
+    let mut app = setup();
+
+    // Spawn an entity that the system will operate on
+    let entity = app
+      .world_mut()
+      .spawn((
+        Transform::from_translation(Vec3::new(100.0, 100.0, 0.0)),
+        NetworkTransformInterpolation::new(2.),
+        PlayerId(1),
+        SnakeHead,
+      ))
+      .id();
+
+    // Add the system to be tested and the message to be processed inside the system
+    app.add_systems(Update, apply_state_interpolation_system);
+    app
+      .world_mut()
+      .write_message(PlayerStateUpdateMessage::new(1, (110., 110.), 0.))
+      .expect("Failed to write PlayerStateUpdateMessage message");
+    app.update();
+
+    // Advance the time a little
+    advance_time_by(&mut app, Duration::from_millis(100));
+
+    // Inspect the transform after interpolation and ensure it has moved towards the target
+    let translation = app.world_mut().get::<Transform>(entity).unwrap().translation;
+    assert!(translation.x > 100., "X position did not advance during interpolation");
+    assert!(translation.y > 100., "Y position did not advance during interpolation");
+  }
+
+  #[test]
+  fn apply_state_interpolation_system_ignores_post_wraparound_position() {
+    let mut app = setup();
+
+    // Spawn an entity that the system will operate on
+    let entity = app
+      .world_mut()
+      .spawn((
+        Transform::from_translation(Vec3::new(RESOLUTION_WIDTH as f32, 100., 0.)),
+        NetworkTransformInterpolation::new(2.),
+        PlayerId(1),
+        SnakeHead,
+      ))
+      .id();
+
+    // Add the system to be tested and the message to be processed inside the system
+    app.add_systems(Update, apply_state_interpolation_system);
+    app
+      .world_mut()
+      .write_message(PlayerStateUpdateMessage::new(1, (0., 100.), 0.))
+      .expect("Failed to write PlayerStateUpdateMessage message");
+    app.update();
+
+    // Advance the time a little
+    advance_time_by(&mut app, Duration::from_millis(100));
+
+    let translation = app.world_mut().get::<Transform>(entity).unwrap().translation;
+    assert_eq!(translation.y, 100.);
+    assert_ne!(translation.x, 0.);
+    assert!(
+      translation.x > RESOLUTION_WIDTH as f32,
+      "X position did not advance beyond during interpolation"
+    );
   }
 }
