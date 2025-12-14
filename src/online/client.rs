@@ -357,7 +357,13 @@ mod tests {
     advance_time_by(&mut app, Duration::from_millis(100));
 
     let translation = app.world_mut().get::<Transform>(entity).unwrap().translation;
-    assert_eq!(translation.y, 100.);
+    let epsilon = 1e-4_f32; // Tolerance for floating point rounding
+    assert!(
+      (translation.y - 100.0).abs() <= epsilon,
+      "Y position differs by more than {}: {}",
+      epsilon,
+      translation.y
+    );
     assert_ne!(translation.x, 0.);
     assert!(
       translation.x > RESOLUTION_WIDTH as f32,
