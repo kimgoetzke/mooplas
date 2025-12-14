@@ -6,6 +6,7 @@ use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
   SnakeHead, WinnerInfo,
 };
+use crate::shared::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH, WRAPAROUND_MARGIN};
 use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
 use bevy::app::Update;
 use bevy::log::*;
@@ -212,7 +213,6 @@ fn add_interpolation_component_system(
   }
 }
 
-// TODO: Deal with snake tails that are wrapped around the screen somewhere
 /// Applies interpolation to remote players based on received state updates. Updates the interpolation target when new
 /// states arrive, then interpolates towards them.
 fn apply_state_interpolation_system(
@@ -220,7 +220,7 @@ fn apply_state_interpolation_system(
   mut player_state_messages: MessageReader<PlayerStateUpdateMessage>,
   mut snake_head_query: Query<(&mut Transform, &mut NetworkTransformInterpolation, &PlayerId), With<SnakeHead>>,
 ) {
-  // Update targets based on incoming messages
+  // Update targets based on incoming server messages
   for state_update in player_state_messages.read() {
     for (_, mut interpolation, player_id) in snake_head_query.iter_mut() {
       if player_id.0 == state_update.id {
@@ -233,9 +233,35 @@ fn apply_state_interpolation_system(
 
   // Interpolate all remote players towards their targets
   let delta = time.delta_secs();
+  let domain_width = RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
+  let domain_height = RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
+
   for (mut transform, interpolation, _) in snake_head_query.iter_mut() {
     let current_position = transform.translation.truncate();
-    let target_position = interpolation.target_position;
+    let mut target_position = interpolation.target_position;
+
+    // If the difference between current and target X position is big enough to indicate wraparound,
+    // adjust the target position to keep going and let the wraparound happen in the wraparound system
+    let dx = target_position.x - current_position.x;
+    if dx.abs() > domain_width / 2.0 {
+      if dx > 0.0 {
+        target_position.x -= domain_width;
+      } else {
+        target_position.x += domain_width;
+      }
+    }
+
+    // If the difference between current and target Y position is big enough to indicate wraparound,
+    // adjust the target position to keep going and let the wraparound happen in the wraparound system
+    let dy = target_position.y - current_position.y;
+    if dy.abs() > domain_height / 2.0 {
+      if dy > 0.0 {
+        target_position.y -= domain_height;
+      } else {
+        target_position.y += domain_height;
+      }
+    }
+
     let new_position = current_position.lerp(target_position, interpolation.interpolation_speed * delta * 60.0);
     transform.translation.x = new_position.x;
     transform.translation.y = new_position.y;

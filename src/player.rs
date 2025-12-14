@@ -389,28 +389,32 @@ fn wraparound_system(
   children_query: Query<&Children>,
 ) {
   let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
+  let domain_width = RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
+  let domain_height = RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
+
   for (mut transform, global_transform, parent) in snake_head_query.iter_mut() {
     let global_translation = global_transform.translation();
     let mut was_wrapped = false;
 
     // Move snake head to opposite side if it goes out of bounds and set flag
     if global_translation.x > (extents.x + WRAPAROUND_MARGIN) {
-      transform.translation.x -= RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
+      transform.translation.x -= domain_width;
       was_wrapped = true;
     } else if global_translation.x < (-extents.x - WRAPAROUND_MARGIN) {
-      transform.translation.x += RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
+      transform.translation.x += domain_width;
       was_wrapped = true;
     }
     if global_translation.y > (extents.y + WRAPAROUND_MARGIN) {
-      transform.translation.y -= RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
+      transform.translation.y -= domain_height;
       was_wrapped = true;
     } else if global_translation.y < (-extents.y - WRAPAROUND_MARGIN) {
-      transform.translation.y += RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
+      transform.translation.y += domain_height;
       was_wrapped = true;
     }
 
     // If snake head was moved, find the corresponding snake tail and stop it from growing
     if was_wrapped {
+      debug!("xxx | Wrapped snake head around screen edges | xxx");
       let parent_entity = parent.get();
       if let Ok(children) = children_query.get(parent_entity) {
         for child in children.iter() {
