@@ -9,33 +9,26 @@ use std::fmt::Debug;
 
 #[derive(Debug, Serialize, Deserialize, Component)]
 pub enum ServerMessage {
-  ClientConnected {
-    client_id: ClientId,
-  },
-  ClientDisconnected {
-    client_id: ClientId,
-  },
-  ClientInitialised {
-    seed: u64,
-    client_id: ClientId,
-  },
+  /// Sent by the server to all clients (except the one that just connected) when a new client has connected.
+  ClientConnected { client_id: ClientId },
+  /// Sent by the server to all clients (except the one that just disconnected) when a client has disconnected.
+  ClientDisconnected { client_id: ClientId },
+  /// Sent to a client when they have successfully initialised their connection to the server. Sent by the server in
+  /// response to a [`bevy_renet::renet::ServerEvent::ClientConnected`] to the client that just connected.
+  ClientInitialised { seed: u64, client_id: ClientId },
   /// Indicates that the app state has changed on the server.
   StateChanged {
     new_state: String,
     winner_info: Option<PlayerId>,
   },
-  PlayerRegistered {
-    client_id: ClientId,
-    player_id: u8,
-  },
-  PlayerUnregistered {
-    client_id: ClientId,
-    player_id: u8,
-  },
+  /// Informs clients that a player has registered in the lobby.
+  PlayerRegistered { client_id: ClientId, player_id: u8 },
+  /// Informs clients that a player has unregistered from the lobby.
+  PlayerUnregistered { client_id: ClientId, player_id: u8 },
   /// Contains authoritative player state updates in a vec of (player_id, x, y, rotation).
-  UpdatePlayerStates {
-    states: Vec<(u8, f32, f32, f32)>,
-  },
+  UpdatePlayerStates { states: Vec<(u8, f32, f32, f32)> },
+  /// Informs the clients that the server is about to shut down. Gives clients time to prepare before being
+  /// disconnected.
   ShutdownServer,
 }
 
