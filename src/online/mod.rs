@@ -37,6 +37,7 @@ impl Plugin for OnlinePlugin {
 
 const PROTOCOL_ID: u64 = 1000;
 
+// TODO: Implement host/client menus and waiting states
 fn handle_toggle_menu_message(
   mut commands: Commands,
   mut messages: MessageReader<ToggleMenuMessage>,
