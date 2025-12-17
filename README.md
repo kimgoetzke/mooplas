@@ -3,14 +3,28 @@
 This repository contains a basic multiplayer game inspired by _Achtung, die Kurve!_, written in Rust using Bevy Engine (
 v0.17). The goal of the project is to do some basic network programming and improve my Rust skills.
 
-> [!NOTE]
-> This project is still in active development. So far, I've only added local multiplayer support. Online multiplayer
-> support is next.
+> [!WARNING]
+> This project is still in active development. Some core features are not yet implemented.
+
+## Features
+
+- Implementation of _Achtung, die Kurve!_ with screen wrap-around
+- Local multiplayer (up to 5 players)
+- Online multiplayer (up to 5 players)
+- Touch controls for mobile devices
 
 ## Demo
 
+Online multiplayer:
+![Demo GIF](assets/ignore/demo/demo.gif)
+
+Lobby (local + multiplayer):
 ![Screenshots 1](assets/ignore/demo/screenshot-1.png)
+
+Lobby with touch controls enabled:
 ![Screenshots 2](assets/ignore/demo/screenshot-2.png)
+
+In-game:
 ![Screenshots 3](assets/ignore/demo/screenshot-3.png)
 
 ## How to develop
