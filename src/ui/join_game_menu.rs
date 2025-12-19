@@ -16,44 +16,39 @@ use bevy::prelude::{
 };
 
 /// A plugin to manage the host game menu UI. Only included with the "online" feature.
-pub struct HostGameMenuPlugin;
+pub struct JoinGameMenuPlugin;
 
-impl Plugin for HostGameMenuPlugin {
+impl Plugin for JoinGameMenuPlugin {
   fn build(&self, app: &mut App) {
     app.add_systems(
       Update,
-      (
-        handle_toggle_menu_message,
-        handle_connection_info_updated_message,
-        handle_button_interactions_system,
-      )
-        .run_if(in_state(AppState::Preparing)),
+      (handle_toggle_menu_message, handle_button_interactions_system).run_if(in_state(AppState::Preparing)),
     );
   }
 }
 
 /// Marker component for the root of the menu. Used for despawning.
 #[derive(Component)]
-struct HostGameMenuRoot;
+struct JoinGameMenuRoot;
+
+/// Marker component for the connect button.
+#[derive(Component)]
+struct ConnectButton;
 
 /// Marker component for the back button.
 #[derive(Component)]
 struct BackButton;
-
-// Marker component for the host address text (used to update it later).
-#[derive(Component)]
-struct HostAddressText;
 
 /// System to handle toggling the play online menu based on received messages.
 fn handle_toggle_menu_message(
   mut commands: Commands,
   asset_server: Res<AssetServer>,
   mut messages: MessageReader<ToggleMenuMessage>,
-  menu_root_query: Query<Entity, With<HostGameMenuRoot>>,
+  menu_root_query: Query<Entity, With<JoinGameMenuRoot>>,
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::HostGameMenu => spawn_menu(&mut commands, &asset_server),
+      MenuName::JoinGameMenu => spawn_menu(&mut commands, &asset_server),
       _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
@@ -65,11 +60,11 @@ fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
   let background_image = asset_server.load("images/background_menu_main.png");
 
   // Background
-  spawn_background(commands, HostGameMenuRoot, background_image.clone());
+  spawn_background(commands, JoinGameMenuRoot, background_image.clone());
 
   // Host game UI
   commands
-    .spawn(menu_base_node(HostGameMenuRoot, "Host Game Menu".to_string()))
+    .spawn(menu_base_node(JoinGameMenuRoot, "Join Game Menu".to_string()))
     .with_children(|parent| {
       parent
         .spawn(Node {
@@ -105,7 +100,7 @@ fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
             })
             .with_children(|parent| {
               parent.spawn((
-                Text::new("Your friends can now join by connecting to:"),
+                Text::new("Enter the host address below:"),
                 TextFont {
                   font: heading_font.clone(),
                   font_size: SMALL_FONT,
@@ -115,53 +110,33 @@ fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
                 TextShadow::default(),
               ));
 
-              parent.spawn((
-                Text::new("(Waiting for address...)"),
-                TextFont {
-                  font: heading_font.clone(),
-                  font_size: NORMAL_FONT,
-                  ..default()
-                },
-                TEXT_COLOUR,
-                TextShadow::default(),
-                HostAddressText,
-              ));
-              // TODO: Add a way to copy the HostAddressText text to clipboard
+              // TODO: Add input field for host address here
 
-              parent.spawn((
-                Text::new("Waiting for at least one player to join..."),
-                TextFont {
-                  font: heading_font.clone(),
-                  font_size: SMALL_FONT,
-                  ..default()
-                },
-                TEXT_COLOUR,
-                TextShadow::default(),
-              ));
-
+              spawn_button(parent, &asset_server, ConnectButton, "Connect", 300, NORMAL_FONT);
               spawn_button(parent, &asset_server, BackButton, "Back", 300, NORMAL_FONT);
             });
         });
     });
 }
 
-fn handle_connection_info_updated_message(
-  mut query: Query<&mut Text, With<HostAddressText>>,
-  mut messages: MessageReader<ConnectionInfoMessage>,
-) {
-  for message in messages.read() {
-    for mut text in query.iter_mut() {
-      if !text.is_empty() {
-        text.0 = message.server_address.clone();
-      }
-    }
-  }
-}
-
+// TODO: Refactor this system to read the input field value when the connect button is pressed and send the message
+//  with the provided server address and port.
 fn handle_button_interactions_system(
+  mut connect_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ConnectButton>)>,
   mut back_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<BackButton>)>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
+  mut connection_info_message: MessageWriter<ConnectionInfoMessage>,
 ) {
+  for interaction in &mut connect_button_query {
+    if *interaction == CustomInteraction::Released {
+      debug!("[Menu] Selected \"Connect\"");
+      connection_info_message.write(ConnectionInfoMessage {
+        server_address: "".to_string(),
+        server_port: 0,
+      });
+    }
+  }
+
   for interaction in &mut back_button_query {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Back\"");

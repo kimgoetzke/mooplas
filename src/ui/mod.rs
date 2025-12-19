@@ -2,6 +2,7 @@ use crate::prelude::constants::*;
 use crate::prelude::{RegularButton, TouchControlButton};
 use crate::shared::{CustomInteraction, Settings};
 use crate::ui::host_game_menu::HostGameMenuPlugin;
+use crate::ui::join_game_menu::JoinGameMenuPlugin;
 use crate::ui::main_menu::MainMenuPlugin;
 use crate::ui::play_online_menu::PlayOnlineMenuPlugin;
 use bevy::color::palettes::tailwind;
@@ -11,6 +12,7 @@ use touch_controls_ui::TouchControlsUiPlugin;
 
 mod host_game_menu;
 pub mod in_game_ui;
+mod join_game_menu;
 mod main_menu;
 mod play_online_menu;
 mod shared;
@@ -36,7 +38,7 @@ impl Plugin for UiPlugin {
       .add_systems(PostUpdate, clear_released_interaction_system);
 
     #[cfg(feature = "online")]
-    app.add_plugins(HostGameMenuPlugin);
+    app.add_plugins((HostGameMenuPlugin, JoinGameMenuPlugin));
   }
 }
 

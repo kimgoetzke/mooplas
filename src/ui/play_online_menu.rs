@@ -49,13 +49,13 @@ fn handle_toggle_menu_message(
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::PlayOnlineMenu => spawn_play_online_menu(&mut commands, &asset_server),
+      MenuName::PlayOnlineMenu => spawn_menu(&mut commands, &asset_server),
       _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
 }
 
-fn spawn_play_online_menu(commands: &mut Commands, asset_server: &AssetServer) {
+fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
   let font = asset_server.load(DEFAULT_FONT);
   let heading_font = font.clone();
   let background_image = asset_server.load("images/background_menu_main.png");
