@@ -1,10 +1,10 @@
 # Mooplas
 
-This repository contains a basic multiplayer game inspired by _Achtung, die Kurve!_, written in Rust using Bevy Engine (
-v0.17). The goal of the project was to explore network programming when real-time movement is involved.
+This repository contains a basic multiplayer game inspired by _Achtung, die Kurve!_, written in Rust using Bevy Engine
+(v0.17). The goal of the project was to explore network programming when real-time movement is involved.
 
 > [!WARNING]
-> This project is still in active development. Some core features are not yet implemented.
+> This project is still in active development. Some core features have not been implemented yet.
 
 ## Features
 
