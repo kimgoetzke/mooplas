@@ -12,7 +12,7 @@ use bevy::prelude::{
   MessageWriter, Node, Query, Res, Text, TextColor, TextFont, TextShadow, Update, With, default, in_state, px,
 };
 
-/// A plugin to manage the play online menu UI.
+/// A plugin to manage the play online menu UI. Players can choose to host or join an online game from this menu.
 pub struct PlayOnlineMenuPlugin;
 
 impl Plugin for PlayOnlineMenuPlugin {
