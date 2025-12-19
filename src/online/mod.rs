@@ -70,7 +70,7 @@ fn handle_toggle_menu_message(
         let port = DEFAULT_SERVER_PORT;
         match create_new_renet_server_resources(port) {
           Ok((server, transport)) => {
-            info!("Server started on {:?}", transport.addresses());
+            debug!("Server started on {:?}", transport.addresses());
             connection_info_message.write(ConnectionInfoMessage {
               connection_string: transport.addresses()[0].to_string(),
             });
@@ -171,7 +171,7 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
       if let Ok(response_body) = response.body_mut().read_to_string() {
         let ip_string = response_body.trim();
         if let Ok(ip) = ip_string.parse::<std::net::IpAddr>() {
-          info!("Public IP detected (using response from [{}]: {}", service, ip);
+          info!("Public IP detected using [{}]: {}", service, ip);
           return Some(SocketAddr::new(ip, port));
         } else {
           warn!("Invalid IP format received from service [{}]: {}", service, ip_string);

@@ -12,11 +12,11 @@ use bevy::app::{App, Plugin};
 use bevy::asset::AssetServer;
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
-use bevy::log::{debug, warn};
+use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Commands, Component, Entity, FlexDirection,
-  IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, OnExit, Query, Res, Text,
-  TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
+  IntoScheduleConfigs, Justify, JustifyContent, Local, MessageReader, MessageWriter, Name, Node, OnExit, Query, Res,
+  Text, TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
 };
 use bevy::text::LineHeight;
 use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
@@ -166,18 +166,25 @@ fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
 fn handle_connection_info_updated_message(
   mut messages: MessageReader<ConnectionInfoMessage>,
   mut text_input_queue: Query<&mut TextInputQueue>,
+  mut retryable_connection_info_message: Local<Option<(ConnectionInfoMessage, bool)>>,
 ) {
   for message in messages.read() {
-    debug!("Received updated connection info: [{}]", message.connection_string,);
-    let str = message.connection_string.clone();
-    let mut is_update_applies = false;
-    for mut queue in &mut text_input_queue {
-      queue.add_front(TextInputAction::Edit(TextInputEdit::Paste(str.clone())));
-      is_update_applies = true;
+    trace!("Received connection info message: [{}]", message.connection_string,);
+    *retryable_connection_info_message = Some((message.clone(), false));
+  }
+
+  if let Some((message, is_processed)) = &mut *retryable_connection_info_message {
+    if !*is_processed {
+      for mut queue in &mut text_input_queue {
+        queue.add_front(TextInputAction::Edit(TextInputEdit::Paste(
+          message.connection_string.clone(),
+        )));
+        trace!("Successfully updated text input field with connection info");
+        *is_processed = true;
+      }
     }
-    if !is_update_applies {
-      // TODO: Handle this instead of just warning
-      warn!("Failed to apply updated connection info: No text input fields found");
+    if *is_processed {
+      *retryable_connection_info_message = None;
     }
   }
 }
