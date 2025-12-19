@@ -1,22 +1,18 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{DEFAULT_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
+use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, HEADER_FONT, NORMAL_FONT};
 use crate::prelude::{CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
-use crate::ui::spawn_button;
+use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button};
 use bevy::app::{App, Plugin};
 use bevy::asset::AssetServer;
 use bevy::color::Color;
-use bevy::color::palettes::tailwind;
 use bevy::log::debug;
-use bevy::math::Vec2;
 use bevy::prelude::{
   AlignItems, Changed, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs, JustifyContent, MessageReader,
-  MessageWriter, Name, Node, PositionType, Query, Res, Sprite, Text, TextColor, TextFont, TextShadow, Transform,
-  Update, With, default, in_state, percent, px,
+  MessageWriter, Node, Query, Res, Text, TextColor, TextFont, TextShadow, Update, With, default, in_state, percent, px,
 };
 
-// TODO: Refactor this and MainMenuPlugin to reduce code duplication once clearer patterns emerge
-/// A plugin to manage the online multiplayer menu UIs.
+/// A plugin to manage the play online menu UI.
 pub struct PlayOnlineMenuPlugin;
 
 impl Plugin for PlayOnlineMenuPlugin {
@@ -54,7 +50,7 @@ fn handle_toggle_menu_message(
   for message in messages.read() {
     match message.active {
       MenuName::PlayOnlineMenu => spawn_play_online_menu(&mut commands, &asset_server),
-      _ => despawn_play_online_menu(&mut commands, &menu_root_query),
+      _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
 }
@@ -65,33 +61,11 @@ fn spawn_play_online_menu(commands: &mut Commands, asset_server: &AssetServer) {
   let background_image = asset_server.load("images/background_menu_main.png");
 
   // Background
-  commands.spawn((
-    Name::new("Play Online Menu Background"),
-    PlayOnlineMenuRoot,
-    Sprite {
-      image: background_image.clone(),
-      custom_size: Some(Vec2::new(RESOLUTION_WIDTH as f32, RESOLUTION_HEIGHT as f32)),
-      ..default()
-    },
-    Transform::from_xyz(0., 0., -1.),
-    PIXEL_PERFECT_LAYER,
-  ));
+  spawn_background(commands, PlayOnlineMenuRoot, background_image);
 
   // Play online UI
   commands
-    .spawn((
-      Name::new("Play Online Menu"),
-      PlayOnlineMenuRoot,
-      Node {
-        width: percent(100),
-        height: percent(100),
-        position_type: PositionType::Relative,
-        flex_direction: FlexDirection::Column,
-        justify_content: JustifyContent::Center,
-        align_items: AlignItems::Center,
-        ..default()
-      },
-    ))
+    .spawn(menu_base_node(PlayOnlineMenuRoot, "Play Online Menu".to_string()))
     .with_children(|parent| {
       parent
         .spawn(Node {
@@ -109,10 +83,10 @@ fn spawn_play_online_menu(commands: &mut Commands, asset_server: &AssetServer) {
             Text::new("Mooplas"),
             TextFont {
               font: heading_font.clone(),
-              font_size: 120.,
+              font_size: HEADER_FONT,
               ..default()
             },
-            TextColor(Color::from(tailwind::AMBER_300)),
+            TextColor(Color::from(ACCENT_COLOUR)),
             TextShadow::default(),
           ));
 
@@ -159,11 +133,5 @@ fn handle_button_interactions_system(
       debug!("[Menu] Selected \"Back\"");
       toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     }
-  }
-}
-
-fn despawn_play_online_menu(commands: &mut Commands, menu_root_query: &Query<Entity, With<PlayOnlineMenuRoot>>) {
-  for root in menu_root_query {
-    commands.entity(root).despawn();
   }
 }

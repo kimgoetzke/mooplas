@@ -14,6 +14,7 @@ impl Plugin for NetworkingResourcesPlugin {
   }
 }
 
+/// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]
 pub(crate) struct Lobby {
   pub connected: Vec<ClientId>,

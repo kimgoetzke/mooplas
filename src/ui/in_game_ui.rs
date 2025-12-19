@@ -1,12 +1,13 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT};
+use crate::prelude::constants::{
+  ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT, TEXT_COLOUR,
+};
 use crate::prelude::{
   AvailablePlayerConfig, AvailablePlayerConfigs, ExitLobbyMessage, NetworkRole, PlayerId, RegisteredPlayers, Settings,
   TouchControlsToggledMessage, WinnerInfo,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
-use crate::ui::spawn_button;
-use bevy::color::palettes::tailwind;
+use crate::ui::shared::{despawn_menu, spawn_button};
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
@@ -210,7 +211,7 @@ fn spawn_lobby_ui(
       .iter()
       .find(|p| p.id == available_config.id)
       .map(|p| p.colour)
-      .unwrap_or(Color::WHITE);
+      .unwrap_or(DEFAULT_COLOUR);
     let is_registered = registered_players.players.iter().any(|p| p.id == available_config.id);
     let entry = commands
       .spawn((
@@ -287,7 +288,7 @@ fn spawn_call_to_action_to_start(
     parent.spawn((
       Text::new("More players needed to start..."),
       default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-      TextColor(Color::WHITE),
+      TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
     ));
@@ -295,7 +296,7 @@ fn spawn_call_to_action_to_start(
     parent.spawn((
       Text::new("Waiting for host to start..."),
       default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-      TextColor(Color::WHITE),
+      TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
     ));
@@ -303,7 +304,7 @@ fn spawn_call_to_action_to_start(
     parent.spawn((
       Text::new("Press "),
       default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-      TextColor(Color::WHITE),
+      TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
     ));
@@ -313,7 +314,7 @@ fn spawn_call_to_action_to_start(
       parent.spawn((
         Text::new("[Space]"),
         default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-        TextColor(Color::from(tailwind::YELLOW_400)),
+        TextColor(Color::from(ACCENT_COLOUR)),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         default_shadow,
       ));
@@ -321,7 +322,7 @@ fn spawn_call_to_action_to_start(
     parent.spawn((
       Text::new(" to start..."),
       default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
-      TextColor(Color::WHITE),
+      TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
     ));
@@ -479,7 +480,7 @@ fn player_join_prompt(
         Text::new(": Press "),
         default_font.clone(),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        TextColor(Color::WHITE),
+        TEXT_COLOUR,
         default_shadow,
       ),
       if !is_touch_controlled {
@@ -488,7 +489,7 @@ fn player_join_prompt(
           Text::new(format!("[{:?}]", available_config.input.action)),
           default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          TextColor(Color::from(tailwind::YELLOW_400)),
+          TextColor(Color::from(ACCENT_COLOUR)),
           default_shadow,
         )
       } else {
@@ -506,7 +507,7 @@ fn player_join_prompt(
         Text::new(" to join"),
         default_font,
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-        TextColor(Color::WHITE),
+        TEXT_COLOUR,
         default_shadow,
       )
     ],
@@ -530,7 +531,7 @@ fn player_registered_prompt(
       Text::new(": Registered"),
       default_font(font),
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-      TextColor(Color::WHITE),
+      TEXT_COLOUR,
       default_shadow(),
     )],
   )
@@ -637,7 +638,7 @@ fn spawn_game_over_ui_system(
             .iter()
             .find(|p| p.id == id)
             .map(|p| p.colour)
-            .unwrap_or(Color::WHITE);
+            .unwrap_or(DEFAULT_COLOUR);
           parent.spawn((
             Node {
               flex_direction: FlexDirection::Row,
@@ -656,7 +657,7 @@ fn spawn_game_over_ui_system(
               (
                 Text::new(" wins!  "),
                 large_font.clone(),
-                TextColor(Color::WHITE),
+                TEXT_COLOUR,
                 default_shadow,
                 TextBackgroundColor::from(Color::BLACK.with_alpha(0.5)),
               )
@@ -667,7 +668,7 @@ fn spawn_game_over_ui_system(
           parent.spawn((
             Text::new("No winner this round."),
             large_font.clone(),
-            TextColor(Color::WHITE),
+            TEXT_COLOUR,
             default_shadow,
           ));
         }
@@ -686,7 +687,7 @@ fn spawn_game_over_ui_system(
             parent.spawn((
               Text::new("Waiting for host to continue..."),
               default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
-              TextColor(Color::WHITE),
+              TEXT_COLOUR,
               TextLayout::new(Justify::Center, LineBreak::WordBoundary),
               default_shadow,
             ));
@@ -696,7 +697,7 @@ fn spawn_game_over_ui_system(
           parent.spawn((
             Text::new("Press "),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
-            TextColor(Color::WHITE),
+            TEXT_COLOUR,
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
           ));
@@ -707,7 +708,7 @@ fn spawn_game_over_ui_system(
             parent.spawn((
               Text::new("[Space]"),
               default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
-              TextColor(Color::from(tailwind::YELLOW_400)),
+              TextColor(Color::from(ACCENT_COLOUR)),
               TextLayout::new(Justify::Center, LineBreak::WordBoundary),
               default_shadow,
             ));
@@ -716,7 +717,7 @@ fn spawn_game_over_ui_system(
           parent.spawn((
             Text::new(" to continue..."),
             default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
-            TextColor(Color::WHITE),
+            TEXT_COLOUR,
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
           ));
@@ -746,7 +747,5 @@ fn default_shadow() -> TextShadow {
 
 /// Despawns the entire game over UI. Call when exiting the game over state.
 fn despawn_game_over_ui_system(mut commands: Commands, victory_ui_root_query: Query<Entity, With<VictoryUiRoot>>) {
-  for entity in &victory_ui_root_query {
-    commands.entity(entity).despawn();
-  }
+  despawn_menu(&mut commands, &victory_ui_root_query);
 }

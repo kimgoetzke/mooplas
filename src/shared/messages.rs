@@ -18,6 +18,9 @@ impl Plugin for SharedMessagesPlugin {
       .add_message::<ExitLobbyMessage>()
       .add_message::<TouchControlsToggledMessage>()
       .add_message::<InputMessage>();
+
+    #[cfg(feature = "online")]
+    app.add_message::<ConnectionInfoMessage>();
   }
 }
 
@@ -100,6 +103,14 @@ impl ExitLobbyMessage {
   pub fn forced_by_server() -> Self {
     Self { by_force: true }
   }
+}
+
+/// A [`Message`] indicating that the server connection info should be updated, wherever it may be used.
+#[cfg(feature = "online")]
+#[derive(Message)]
+pub struct ConnectionInfoMessage {
+  pub server_address: String,
+  pub server_port: u16,
 }
 
 #[cfg(test)]

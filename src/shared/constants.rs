@@ -1,5 +1,6 @@
 use bevy::camera::visibility::RenderLayers;
-
+use bevy::color::palettes::tailwind;
+use bevy::prelude::{Color, Srgba, TextColor};
 // General and rendering
 // --------------------------------//
 
@@ -83,6 +84,9 @@ pub(crate) const BUTTON_BORDER_WIDTH: f32 = 3.;
 /// The path to the default font used in the game.
 pub(crate) const DEFAULT_FONT: &str = "fonts/Tiny5.ttf";
 
+/// Font size for header elements.
+pub(crate) const HEADER_FONT: f32 = 120.;
+
 /// Font size for large text elements.
 pub(crate) const LARGE_FONT: f32 = 60.;
 
@@ -91,3 +95,12 @@ pub(crate) const NORMAL_FONT: f32 = 38.;
 
 /// Font size for small text elements.
 pub(crate) const SMALL_FONT: f32 = 20.;
+
+/// Accent colour.
+pub(crate) const ACCENT_COLOUR: Srgba = tailwind::AMBER_300;
+
+/// Default colour.
+pub(crate) const DEFAULT_COLOUR: Color = Color::srgb(0.9, 0.9, 0.9);
+
+/// Standard text colour used throughout the UI, uses the default colour.
+pub(crate) const TEXT_COLOUR: TextColor = TextColor(Color::srgb(0.9, 0.9, 0.9));
