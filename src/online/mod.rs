@@ -33,11 +33,11 @@ impl Plugin for OnlinePlugin {
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,
-        handle_connection_info_messages
+        handle_connection_info_message
           .run_if(in_state(AppState::Preparing))
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
       )
-      .add_systems(Update, handle_netcode_transport_error_messages)
+      .add_systems(Update, handle_netcode_transport_error_message)
       .add_plugins((InterfacePlugin, NetworkingResourcesPlugin, NetworkingMessagesPlugin));
     info!("Online multiplayer is enabled");
   }
@@ -91,7 +91,7 @@ fn handle_toggle_menu_message(
   }
 }
 
-fn handle_connection_info_messages(mut messages: MessageReader<ConnectionInfoMessage>, mut commands: Commands) {
+fn handle_connection_info_message(mut messages: MessageReader<ConnectionInfoMessage>, mut commands: Commands) {
   for message in messages.read() {
     debug!(
       "Received [ConnectionInfoMessage] with connection string [{}], attempting to parse now...",
@@ -189,7 +189,7 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
 }
 
 #[allow(clippy::never_loop)]
-fn handle_netcode_transport_error_messages(mut messages: MessageReader<NetcodeTransportError>) {
+fn handle_netcode_transport_error_message(mut messages: MessageReader<NetcodeTransportError>) {
   for error in messages.read() {
     if matches!(
       error,
