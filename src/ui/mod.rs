@@ -7,6 +7,7 @@ use crate::ui::main_menu::MainMenuPlugin;
 use crate::ui::play_online_menu::PlayOnlineMenuPlugin;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
+use bevy_ui_text_input::TextInputPlugin;
 use in_game_ui::InGameUiPlugin;
 use touch_controls_ui::TouchControlsUiPlugin;
 
@@ -38,7 +39,7 @@ impl Plugin for UiPlugin {
       .add_systems(PostUpdate, clear_released_interaction_system);
 
     #[cfg(feature = "online")]
-    app.add_plugins((HostGameMenuPlugin, JoinGameMenuPlugin));
+    app.add_plugins((HostGameMenuPlugin, JoinGameMenuPlugin, TextInputPlugin));
   }
 }
 

@@ -7,7 +7,7 @@ use bevy::log::*;
 use bevy::prelude::{
   AlignItems, App, AssetServer, Changed, Color, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
   JustifyContent, MessageReader, MessageWriter, NextState, Node, OnEnter, OnExit, Plugin, Query, Res, ResMut, Text,
-  TextColor, TextFont, TextShadow, Update, With, default, in_state, percent, px,
+  TextColor, TextFont, TextShadow, Update, With, default, in_state, px,
 };
 
 /// Plugin that provides and manages the main menu UI.
@@ -58,44 +58,32 @@ fn spawn_main_menu(commands: &mut Commands, asset_server: &AssetServer) {
   commands
     .spawn(menu_base_node(MainMenuRoot, "Main Menu".to_string()))
     .with_children(|parent| {
+      // Title
+      parent.spawn((
+        Text::new("Mooplas"),
+        TextFont {
+          font: heading_font.clone(),
+          font_size: HEADER_FONT,
+          ..default()
+        },
+        TextColor(Color::from(ACCENT_COLOUR)),
+        TextShadow::default(),
+      ));
+
+      // Buttons
       parent
         .spawn(Node {
-          width: percent(100.0),
-          height: percent(100.0),
           flex_direction: FlexDirection::Column,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
-          row_gap: px(20),
+          row_gap: px(20.),
           ..default()
         })
         .with_children(|parent| {
-          // Title
-          parent.spawn((
-            Text::new("Mooplas"),
-            TextFont {
-              font: heading_font.clone(),
-              font_size: HEADER_FONT,
-              ..default()
-            },
-            TextColor(Color::from(ACCENT_COLOUR)),
-            TextShadow::default(),
-          ));
-
-          // Buttons
-          parent
-            .spawn(Node {
-              flex_direction: FlexDirection::Column,
-              justify_content: JustifyContent::Center,
-              align_items: AlignItems::Center,
-              row_gap: px(20.),
-              ..default()
-            })
-            .with_children(|parent| {
-              #[cfg(feature = "online")]
-              spawn_button(parent, &asset_server, PlayOnlineButton, "Play Online", 300, NORMAL_FONT);
-              spawn_button(parent, &asset_server, PlayLocalButton, "Play Local", 300, NORMAL_FONT);
-              spawn_button(parent, &asset_server, ExitButton, "Exit", 300, NORMAL_FONT);
-            });
+          #[cfg(feature = "online")]
+          spawn_button(parent, &asset_server, PlayOnlineButton, "Play Online", 300, NORMAL_FONT);
+          spawn_button(parent, &asset_server, PlayLocalButton, "Play Local", 300, NORMAL_FONT);
+          spawn_button(parent, &asset_server, ExitButton, "Exit", 300, NORMAL_FONT);
         });
     });
 }

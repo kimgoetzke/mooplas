@@ -13,7 +13,7 @@ use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage};
 use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
 use bevy::log::*;
-use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, Plugin, ResMut, in_state};
+use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, Plugin, Res, ResMut, in_state};
 use bevy_inspector_egui::egui::TextBuffer;
 use bevy_renet::netcode::{
   ClientAuthentication, NetcodeClientTransport, NetcodeError, NetcodeServerTransport, NetcodeTransportError,
@@ -31,7 +31,13 @@ impl Plugin for OnlinePlugin {
     app
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
-      .add_systems(Update, handle_netcode_transport_errors)
+      .add_systems(
+        Update,
+        handle_connection_info_messages
+          .run_if(in_state(AppState::Preparing))
+          .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
+      )
+      .add_systems(Update, handle_netcode_transport_error_messages)
       .add_plugins((InterfacePlugin, NetworkingResourcesPlugin, NetworkingMessagesPlugin));
     info!("Online multiplayer is enabled");
   }
@@ -66,8 +72,7 @@ fn handle_toggle_menu_message(
           Ok((server, transport)) => {
             info!("Server started on {:?}", transport.addresses());
             connection_info_message.write(ConnectionInfoMessage {
-              server_address: transport.addresses()[0].ip().to_string(),
-              server_port: transport.addresses()[0].port(),
+              connection_string: transport.addresses()[0].to_string(),
             });
             commands.insert_resource(server);
             commands.insert_resource(transport);
@@ -79,34 +84,44 @@ fn handle_toggle_menu_message(
         }
       }
       NetworkRole::Client => {
-        // if let Some(server_address) = connection_info.server_address {
-        //   match create_new_renet_client_resources(server_address) {
-        //     Ok((client, transport)) => {
-        //       info!("Created client to connect to [{}]", server_address);
-        //       commands.insert_resource(client);
-        //       commands.insert_resource(transport);
-        //     }
-        //     Err(e) => {
-        //       error!("Failed to create client: {}", e);
-        //       *network_role = NetworkRole::None;
-        //     }
-        //   }
-        // } else {
-        //   error!("No server address provided for client connection");
-        //   *network_role = NetworkRole::None;
-        // }
+        debug!("Waiting for connection info to create client...");
       }
     }
     debug!("Network role set to [{:?}]", network_role);
   }
 }
 
+fn handle_connection_info_messages(mut messages: MessageReader<ConnectionInfoMessage>, mut commands: Commands) {
+  for message in messages.read() {
+    debug!(
+      "Received [ConnectionInfoMessage] with connection string [{}], attempting to parse now...",
+      message.connection_string,
+    );
+    let server_address: SocketAddr = message
+      .connection_string
+      .parse()
+      .unwrap_or_else(|_| panic!("Invalid server address or port: [{}]", message.connection_string,));
+    match create_new_renet_client_resources(server_address) {
+      Ok((client, transport)) => {
+        info!("Created client with connection to [{}]", server_address);
+        commands.insert_resource(client);
+        commands.insert_resource(transport);
+      }
+      Err(e) => {
+        error!("Failed to create client: {}", e);
+      }
+    }
+  }
+}
+
 // TODO: Add secure authentication
+// TODO: Handle scenario where client is created but handshake doesn't occur
 /// Creates client resources with a specific server address
 fn create_new_renet_client_resources(
   server_address: SocketAddr,
 ) -> Result<(RenetClient, NetcodeClientTransport), Box<dyn std::error::Error>> {
-  let socket = UdpSocket::bind(Ipv6Addr::UNSPECIFIED.to_string())?;
+  let bind_address = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0);
+  let socket = UdpSocket::bind(bind_address)?;
   let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
   let client_id = current_time.as_millis() as u64;
   let authentication = ClientAuthentication::Unsecure {
@@ -124,7 +139,7 @@ fn create_new_renet_client_resources(
 fn create_new_renet_server_resources(
   port: u16,
 ) -> Result<(RenetServer, NetcodeServerTransport), Box<dyn std::error::Error>> {
-  let bind_address: SocketAddr = format!("0.0.0.0:{}", port).parse()?;
+  let bind_address: SocketAddr = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::UNSPECIFIED), port);
   let socket = UdpSocket::bind(bind_address)?;
   let local_address = socket.local_addr()?;
   let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
@@ -136,7 +151,6 @@ fn create_new_renet_server_resources(
     public_addresses: vec![public_address],
     authentication: ServerAuthentication::Unsecure,
   };
-
   let transport = NetcodeServerTransport::new(server_config, socket)?;
   let server = RenetServer::new(ConnectionConfig::default());
 
@@ -170,22 +184,12 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
     }
   }
 
-  warn!("Could not determine public IP, will use local network IP");
-  if let Ok(socket) = UdpSocket::bind(Ipv6Addr::UNSPECIFIED.to_string()) {
-    if socket.connect("8.8.8.8:80").is_ok() {
-      if let Ok(local_address) = socket.local_addr() {
-        let mut address = local_address;
-        address.set_port(port);
-        return Some(address);
-      }
-    }
-  }
-
+  error!("Failed to determine public IP address");
   None
 }
 
 #[allow(clippy::never_loop)]
-fn handle_netcode_transport_errors(mut messages: MessageReader<NetcodeTransportError>) {
+fn handle_netcode_transport_error_messages(mut messages: MessageReader<NetcodeTransportError>) {
   for error in messages.read() {
     if matches!(
       error,

@@ -31,6 +31,7 @@ pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bu
       flex_direction: FlexDirection::Column,
       justify_content: JustifyContent::Center,
       align_items: AlignItems::Center,
+      row_gap: px(20),
       ..default()
     },
   )

@@ -107,10 +107,9 @@ impl ExitLobbyMessage {
 
 /// A [`Message`] indicating that the server connection info should be updated, wherever it may be used.
 #[cfg(feature = "online")]
-#[derive(Message)]
+#[derive(Message, Clone)]
 pub struct ConnectionInfoMessage {
-  pub server_address: String,
-  pub server_port: u16,
+  pub connection_string: String,
 }
 
 #[cfg(test)]
