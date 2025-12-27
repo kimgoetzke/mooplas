@@ -1,12 +1,15 @@
 use crate::prelude::constants::*;
 use crate::prelude::{RegularButton, TouchControlButton};
 use crate::shared::{CustomInteraction, Settings};
+#[cfg(feature = "online")]
 use crate::ui::host_game_menu::HostGameMenuPlugin;
+#[cfg(feature = "online")]
 use crate::ui::join_game_menu::JoinGameMenuPlugin;
 use crate::ui::main_menu::MainMenuPlugin;
 use crate::ui::play_online_menu::PlayOnlineMenuPlugin;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
+#[cfg(feature = "online")]
 use bevy_ui_text_input::TextInputPlugin;
 use in_game_ui::InGameUiPlugin;
 use touch_controls_ui::TouchControlsUiPlugin;
