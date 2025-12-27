@@ -52,6 +52,7 @@ impl AppState {
 
   /// Returns true if the current state is considered to be restricted. This includes states that the application
   /// automatically transitions to. Used to stop the server in a multiplayer context from causing an inconsistent state.
+  #[cfg(feature = "online")]
   pub fn is_restricted(&self) -> bool {
     matches!(self, AppState::Initialising)
   }

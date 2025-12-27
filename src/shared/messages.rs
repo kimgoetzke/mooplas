@@ -92,6 +92,7 @@ pub struct ContinueMessage;
 #[derive(Message)]
 pub struct ExitLobbyMessage {
   /// Whether the exit is being forced (true) by server or voluntary (false).
+  #[allow(unused)]
   pub(crate) by_force: bool,
 }
 
@@ -100,6 +101,7 @@ impl ExitLobbyMessage {
     Self { by_force: false }
   }
 
+  #[cfg(feature = "online")]
   pub fn forced_by_server() -> Self {
     Self { by_force: true }
   }

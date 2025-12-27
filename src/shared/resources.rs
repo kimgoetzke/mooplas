@@ -1,5 +1,6 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
+#[allow(unused_imports)]
 use bevy::log::*;
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 #[cfg(feature = "dev")]
@@ -54,6 +55,7 @@ impl Seed {
   }
 
   /// Sets the seed value.
+  #[cfg(feature = "online")]
   pub fn set(&mut self, seed: u64) {
     debug!("Setting seed to [{}]", seed);
     self.seed = seed;
@@ -120,6 +122,7 @@ pub struct AvailablePlayerConfigs {
 impl AvailablePlayerConfigs {
   /// Finds an available player configuration by its [`PlayerId`]. Returns [`Option<&AvailablePlayerConfig>`] if found,
   /// [`None`] otherwise.
+  #[cfg(feature = "online")]
   pub fn find_by_id(&self, player_id: PlayerId) -> Option<&AvailablePlayerConfig> {
     self.configs.iter().find(|config| config.id == player_id)
   }
@@ -187,6 +190,7 @@ impl RegisteredPlayers {
   }
 
   /// Clears all registered players.
+  #[cfg(feature = "online")]
   pub fn clear(&mut self) {
     self.players.clear();
   }
