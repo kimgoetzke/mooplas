@@ -17,9 +17,9 @@ use touch_controls_ui::TouchControlsUiPlugin;
 mod host_game_menu;
 mod in_game_ui;
 mod join_game_menu;
-mod shared;
 mod main_menu;
 mod play_online_menu;
+mod shared;
 mod touch_controls_ui;
 
 /// A system that manages the user interface elements of the game, including in-game UI and touch controls UI.

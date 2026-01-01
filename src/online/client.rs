@@ -1,6 +1,6 @@
 use crate::online::lib::{
   ClientMessage, NetworkTransformInterpolation, PlayerStateUpdateMessage, SerialisableInputActionMessage,
-  ServerMessage, utils,
+  ServerMessage, decode_from_bytes, encode_to_bytes, utils,
 };
 use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
@@ -65,7 +65,7 @@ fn receive_reliable_server_messages_system(
   mut seed: ResMut<Seed>,
 ) {
   while let Some(message) = client.receive_message(DefaultChannel::ReliableOrdered) {
-    let server_message = bincode::deserialize(&message).expect("Failed to deserialise server message");
+    let server_message = decode_from_bytes(&message).expect("Failed to deserialise server message");
     debug!("Received server message: {:?}", server_message);
     match server_message {
       ServerMessage::ClientConnected { client_id } => {
@@ -127,7 +127,7 @@ fn send_local_player_registration_system(
     }
     let client_message = ClientMessage::PlayerRegistration(*player_registration_message);
     debug!("Sending: [{:?}]", client_message);
-    let message = bincode::serialize(&client_message).expect("Failed to serialise player registration message");
+    let message = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
     client.send_message(DefaultChannel::ReliableOrdered, message);
   }
 }
@@ -166,7 +166,7 @@ fn send_local_input_messages(
       .iter()
       .find(|player| player.id.0 == *player_id && player.is_local())
     {
-      if let Ok(input_message) = bincode::serialize(&ClientMessage::Input(*message)) {
+      if let Ok(input_message) = encode_to_bytes(&ClientMessage::Input(*message)) {
         client.send_message(DefaultChannel::Unreliable, input_message);
       } else {
         warn!("Failed to serialise input action message: {:?}", message);
@@ -181,7 +181,7 @@ fn receive_unreliable_server_messages_system(
   mut player_state_update_message: MessageWriter<PlayerStateUpdateMessage>,
 ) {
   while let Some(message) = client.receive_message(DefaultChannel::Unreliable) {
-    if let Ok(server_message) = bincode::deserialize(&message) {
+    if let Ok(server_message) = decode_from_bytes(&message) {
       match server_message {
         ServerMessage::UpdatePlayerStates { states } => {
           for (player_id, x, y, rotation_z) in states {

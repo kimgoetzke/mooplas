@@ -1,4 +1,4 @@
-use crate::online::lib::{ClientMessage, Lobby, ServerMessage, utils};
+use crate::online::lib::{ClientMessage, Lobby, ServerMessage, decode_from_bytes, encode_to_bytes, utils};
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
   RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
@@ -79,14 +79,14 @@ fn receive_server_events(
         info!("Client with ID [{}] connected", client_id);
 
         // Notify all other clients about the new connection
-        let connected_message = bincode::serialize(&ServerMessage::ClientConnected { client_id: *client_id })
+        let connected_message = encode_to_bytes(&ServerMessage::ClientConnected { client_id: *client_id })
           .expect(CLIENT_MESSAGE_SERIALISATION);
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, connected_message);
         lobby.connected.push(*client_id);
 
         // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
         // Send the current seed to the newly connected client
-        let seed_message = bincode::serialize(&ServerMessage::ClientInitialised {
+        let seed_message = encode_to_bytes(&ServerMessage::ClientInitialised {
           seed: seed.get(),
           client_id: *client_id,
         })
@@ -111,7 +111,7 @@ fn receive_server_events(
         }
 
         // Notify all other clients about the disconnection itself
-        let message = bincode::serialize(&ServerMessage::ClientDisconnected { client_id: *client_id })
+        let message = encode_to_bytes(&ServerMessage::ClientDisconnected { client_id: *client_id })
           .expect(CLIENT_MESSAGE_SERIALISATION);
         server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
         lobby.connected.retain(|&id| id != *client_id);
@@ -134,7 +134,7 @@ fn receive_unreliable_client_inputs_system(
 ) {
   for client_id in lobby.connected.iter() {
     while let Some(message) = server.receive_message(*client_id, DefaultChannel::Unreliable) {
-      if let Ok(client_message) = bincode::deserialize(&message) {
+      if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::Input(action) => {
             // TODO: Validate input action here
@@ -174,7 +174,7 @@ fn broadcast_player_states_system(
     return;
   }
 
-  if let Ok(message) = bincode::serialize(&ServerMessage::UpdatePlayerStates { states }) {
+  if let Ok(message) = encode_to_bytes(&ServerMessage::UpdatePlayerStates { states }) {
     server.broadcast_message(DefaultChannel::Unreliable, message);
   } else {
     warn!("Failed to serialise player states message");
@@ -192,7 +192,7 @@ fn receive_ordered_client_messages_system(
 ) {
   for client_id in lobby.connected.clone() {
     while let Some(message) = server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
-      if let Ok(client_message) = bincode::deserialize(&message) {
+      if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::PlayerRegistration(message) => {
             handle_player_registration_message_from_client(
@@ -236,7 +236,7 @@ fn handle_player_registration_message_from_client(
 ) {
   if has_registered {
     info!("[{}] with client ID [{}] registered", player_id, client_id);
-    let message = bincode::serialize(&ServerMessage::PlayerRegistered {
+    let message = encode_to_bytes(&ServerMessage::PlayerRegistered {
       client_id: *client_id,
       player_id: player_id.0,
     })
@@ -251,7 +251,7 @@ fn handle_player_registration_message_from_client(
     lobby.register_player(*client_id, player_id);
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
-    let message = bincode::serialize(&ServerMessage::PlayerUnregistered {
+    let message = encode_to_bytes(&ServerMessage::PlayerUnregistered {
       client_id: *client_id,
       player_id: player_id.0,
     })
@@ -275,7 +275,7 @@ fn broadcast_local_app_state_system(
         winner_info: winner.get(),
       };
       debug!("Broadcasting: {:?}", state_changed_message);
-      if let Ok(message) = bincode::serialize(&state_changed_message) {
+      if let Ok(message) = encode_to_bytes(&state_changed_message) {
         server.broadcast_message(DefaultChannel::ReliableOrdered, message);
       } else {
         warn!("{}: {:?}", CLIENT_MESSAGE_SERIALISATION, state_changed_message);
@@ -297,7 +297,7 @@ fn broadcast_local_player_registration_system(
     }
     if message.has_registered {
       debug!("Broadcasting: [{}] registered locally...", message.player_id);
-      let message = bincode::serialize(&ServerMessage::PlayerRegistered {
+      let message = encode_to_bytes(&ServerMessage::PlayerRegistered {
         client_id: 0,
         player_id: message.player_id.0,
       })
@@ -305,7 +305,7 @@ fn broadcast_local_player_registration_system(
       server.broadcast_message(DefaultChannel::ReliableOrdered, message);
     } else {
       debug!("Broadcasting: [{}] unregistered locally...", message.player_id);
-      let message = bincode::serialize(&ServerMessage::PlayerUnregistered {
+      let message = encode_to_bytes(&ServerMessage::PlayerUnregistered {
         client_id: 0,
         player_id: message.player_id.0,
       })
@@ -324,7 +324,7 @@ fn process_and_broadcast_local_exit_lobby_message(
 ) {
   for _ in messages.read() {
     info!("Informing all clients about intention to shut down server and scheduling shutdown...");
-    let exit_message = bincode::serialize(&ServerMessage::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
+    let exit_message = encode_to_bytes(&ServerMessage::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
     server.broadcast_message(DefaultChannel::ReliableOrdered, exit_message);
     commands.insert_resource(ShutdownCountdown(Timer::new(
       Duration::from_millis(500),
