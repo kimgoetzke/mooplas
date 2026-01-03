@@ -2,13 +2,16 @@ use crate::app_state::AppState;
 use crate::prelude::constants::NORMAL_FONT;
 use crate::prelude::{CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
+use crate::ui::shared::{
+  BackgroundRoot, despawn_menu, menu_base_node, spawn_background_if_not_exists, spawn_button, spawn_logo,
+};
 use bevy::app::{App, Plugin};
-use bevy::asset::AssetServer;
+use bevy::asset::{AssetServer, Assets};
+use bevy::image::TextureAtlasLayout;
 use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Changed, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs, JustifyContent, MessageReader,
-  MessageWriter, Node, Query, Res, Update, With, default, in_state, px,
+  MessageWriter, Node, Query, Res, ResMut, Update, With, default, in_state, px,
 };
 
 /// A plugin to manage the play online menu UI. Players can choose to host or join an online game from this menu.
@@ -45,21 +48,39 @@ fn handle_toggle_menu_message(
   asset_server: Res<AssetServer>,
   mut messages: MessageReader<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<PlayOnlineMenuRoot>>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+  mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::PlayOnlineMenu => spawn_menu(&mut commands, &asset_server),
+      MenuName::PlayOnlineMenu => spawn_menu(
+        &mut commands,
+        &asset_server,
+        background_root_query,
+        &mut texture_atlas_layouts,
+      ),
       _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
 }
 
-fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
-  let background_image = asset_server.load("images/background_menu_main.png");
+fn spawn_menu(
+  commands: &mut Commands,
+  asset_server: &AssetServer,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+  texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
+) {
+  let background_image = asset_server.load("images/background.png");
   let logo_image = asset_server.load("images/logo.png");
 
   // Background & logo
-  spawn_background(commands, PlayOnlineMenuRoot, background_image);
+  spawn_background_if_not_exists(
+    commands,
+    BackgroundRoot,
+    background_image,
+    texture_atlas_layouts,
+    background_root_query,
+  );
   spawn_logo(commands, PlayOnlineMenuRoot, logo_image);
 
   // Play online UI

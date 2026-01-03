@@ -1,3 +1,4 @@
+mod animation;
 mod app_state;
 mod camera;
 mod controls;
@@ -22,6 +23,7 @@ use crate::debug::DebugPlugin;
 #[cfg(feature = "online")]
 use crate::online::OnlinePlugin;
 
+use crate::animation::AnimationPlugin;
 use crate::app_state::AppStatePlugin;
 use crate::camera::CameraPlugin;
 use crate::controls::ControlsPlugin;
@@ -54,6 +56,7 @@ fn main() {
       GameLoopPlugin,
       UiPlugin,
       ControlsPlugin,
+      AnimationPlugin,
     ));
 
   #[cfg(feature = "online")]

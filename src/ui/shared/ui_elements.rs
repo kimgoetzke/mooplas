@@ -2,22 +2,24 @@ use crate::prelude::constants::{
   BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, PIXEL_PERFECT_LAYER, RESOLUTION_HEIGHT, RESOLUTION_WIDTH,
   TEXT_COLOUR,
 };
-use crate::prelude::{CustomInteraction, RegularButton};
+use crate::prelude::{AnimationIndices, AnimationTimer, CustomInteraction, RegularButton};
 use crate::ui;
 use crate::ui::ButtonAnimation;
-use bevy::asset::{AssetServer, Handle};
+use crate::ui::shared::BackgroundRoot;
+use bevy::asset::{AssetServer, Assets, Handle};
 use bevy::color::palettes::tailwind;
 use bevy::color::{Alpha, Color};
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
-use bevy::image::Image;
-use bevy::math::Vec2;
+use bevy::image::{Image, TextureAtlas, TextureAtlasLayout};
+use bevy::math::{UVec2, Vec2};
 use bevy::prelude::{
   AlignItems, BackgroundColor, BorderColor, BorderGradient, BorderRadius, Bundle, ChildOf, Component, Entity,
-  FlexDirection, ImageNode, JustifyContent, LinearGradient, Name, Node, NodeImageMode, PositionType, Query, Text,
-  TextFont, TextShadow, UiRect, With, default, percent, px,
+  FlexDirection, ImageNode, JustifyContent, LinearGradient, Name, Node, NodeImageMode, PositionType, Query,
+  SpriteImageMode, Text, TextFont, TextShadow, Timer, TimerMode, UiRect, With, default, percent, px,
 };
 use bevy::prelude::{Commands, SpawnRelated, Sprite, Transform};
+use bevy::sprite::ScalingMode;
 
 /// Creates a node with the given marker component and name. This node serves as the base for every menu.
 pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bundle {
@@ -67,18 +69,39 @@ pub fn spawn_logo<T: Component>(commands: &mut Commands, marker_component: T, lo
   ));
 }
 
-/// Spawns the background image for the given menu.
-pub fn spawn_background<T: Component>(commands: &mut Commands, marker_component: T, background_image: Handle<Image>) {
+/// Spawns the background image for the given menu if it doesn't exist already.
+pub fn spawn_background_if_not_exists<T: Component>(
+  commands: &mut Commands,
+  marker_component: T,
+  background_image: Handle<Image>,
+  texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+) {
+  if !background_root_query.is_empty() {
+    return;
+  }
+
+  let layout = TextureAtlasLayout::from_grid(UVec2::new(320, 160), 20, 1, None, None);
+  let texture_atlas_layout = texture_atlas_layouts.add(layout);
+  let animation_indices = AnimationIndices { first: 1, last: 19 };
+
   commands.spawn((
     Name::new(format!("Background for {}", std::any::type_name::<T>())),
     marker_component,
     Sprite {
-      image: background_image.clone(),
+      image: background_image,
+      texture_atlas: Some(TextureAtlas {
+        layout: texture_atlas_layout,
+        index: 0,
+      }),
       custom_size: Some(Vec2::new(RESOLUTION_WIDTH as f32, RESOLUTION_HEIGHT as f32)),
+      image_mode: SpriteImageMode::Scale(ScalingMode::FillCenter),
       ..default()
     },
     Transform::from_xyz(0., 0., -2.),
     PIXEL_PERFECT_LAYER,
+    animation_indices,
+    AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
   ));
 }
 

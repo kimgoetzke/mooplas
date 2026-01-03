@@ -1,5 +1,5 @@
 use crate::prelude::constants::*;
-use crate::prelude::{RegularButton, TouchControlButton};
+use crate::prelude::{AppState, RegularButton, TouchControlButton};
 use crate::shared::{CustomInteraction, Settings};
 #[cfg(feature = "online")]
 use crate::ui::host_game_menu::HostGameMenuPlugin;
@@ -7,6 +7,7 @@ use crate::ui::host_game_menu::HostGameMenuPlugin;
 use crate::ui::join_game_menu::JoinGameMenuPlugin;
 use crate::ui::main_menu::MainMenuPlugin;
 use crate::ui::play_online_menu::PlayOnlineMenuPlugin;
+use crate::ui::shared::{BackgroundRoot, ButtonAnimation};
 use bevy::color::palettes::tailwind;
 use bevy::prelude::*;
 #[cfg(feature = "online")]
@@ -39,16 +40,13 @@ impl Plugin for UiPlugin {
         touch_control_button_reactive_design_system.run_if(has_touch_controls_enabled),
       )
       .add_systems(Update, (regular_button_reactive_design_system, animate_button_system))
-      .add_systems(PostUpdate, clear_released_interaction_system);
+      .add_systems(PostUpdate, clear_released_interaction_system)
+      .add_systems(OnExit(AppState::Preparing), despawn_background_system);
 
     #[cfg(feature = "online")]
     app.add_plugins((HostGameMenuPlugin, JoinGameMenuPlugin, TextInputPlugin));
   }
 }
-
-/// Marker component for button animations.
-#[derive(Component)]
-struct ButtonAnimation;
 
 fn has_touch_controls_enabled(settings: Res<Settings>) -> bool {
   settings.general.enable_touch_controls
@@ -229,5 +227,12 @@ fn clear_released_interaction_system(mut query: Query<(Entity, &mut CustomIntera
       interaction.set_changed();
       trace!("Interaction for {entity} set to [{:?}]", *interaction);
     }
+  }
+}
+
+/// A system to despawn all entities with the [`BackgroundRoot`] component. Intended to be run when exiting the [`AppState::Preparing`] state.
+fn despawn_background_system(mut commands: Commands, background_root_query: Query<Entity, With<BackgroundRoot>>) {
+  for entity in background_root_query.iter() {
+    commands.entity(entity).despawn();
   }
 }

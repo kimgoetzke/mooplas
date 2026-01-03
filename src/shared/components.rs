@@ -1,7 +1,7 @@
 use crate::prelude::constants::SNAKE_LENGTH_MAX_CONTINUOUS;
 use bevy::color::Color;
 use bevy::math::Vec2;
-use bevy::prelude::{Component, Entity};
+use bevy::prelude::{Component, Deref, DerefMut, Entity, Timer};
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Display};
 
@@ -117,6 +117,15 @@ impl SnakeSegment {
     self.collider_entity = Some(entity);
   }
 }
+
+#[derive(Component)]
+pub(crate) struct AnimationIndices {
+  pub(crate) first: usize,
+  pub(crate) last: usize,
+}
+
+#[derive(Component, Deref, DerefMut)]
+pub(crate) struct AnimationTimer(pub Timer);
 
 /// A marker component for buttons that are not directly related to touch controls.
 #[derive(Component, Clone)]

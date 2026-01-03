@@ -5,16 +5,19 @@ use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, NORMAL_FONT};
 use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::BUTTON_ALPHA_DEFAULT;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
+use crate::ui::shared::{
+  BackgroundRoot, despawn_menu, menu_base_node, spawn_background_if_not_exists, spawn_button, spawn_logo,
+};
 use bevy::app::{App, Plugin};
-use bevy::asset::AssetServer;
+use bevy::asset::{AssetServer, Assets};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
+use bevy::image::TextureAtlasLayout;
 use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Click, Commands, Component, Entity,
   FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, On, OnExit,
-  Pointer, Query, Res, TextColor, TextFont, UiRect, Update, With, default, in_state, percent, px,
+  Pointer, Query, Res, ResMut, TextColor, TextFont, UiRect, Update, With, default, in_state, percent, px,
 };
 use bevy_ui_text_input::actions::TextInputAction;
 use bevy_ui_text_input::{SubmitText, TextInputMode, TextInputNode, TextInputPrompt, TextInputQueue};
@@ -57,23 +60,41 @@ fn handle_toggle_menu_message(
   asset_server: Res<AssetServer>,
   mut messages: MessageReader<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<JoinGameMenuRoot>>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+  mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::JoinGameMenu => spawn_menu(&mut commands, &asset_server),
+      MenuName::JoinGameMenu => spawn_menu(
+        &mut commands,
+        &asset_server,
+        &mut texture_atlas_layouts,
+        background_root_query,
+      ),
       _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
 }
 
 // TODO: Display error message on failed connection attempt
-fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
+fn spawn_menu(
+  commands: &mut Commands,
+  asset_server: &AssetServer,
+  texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+) {
   let font = asset_server.load(DEFAULT_FONT);
-  let background_image = asset_server.load("images/background_menu_main.png");
+  let background_image = asset_server.load("images/background.png");
   let logo_image = asset_server.load("images/logo.png");
 
   // Background & logo
-  spawn_background(commands, JoinGameMenuRoot, background_image.clone());
+  spawn_background_if_not_exists(
+    commands,
+    BackgroundRoot,
+    background_image,
+    texture_atlas_layouts,
+    background_root_query,
+  );
   spawn_logo(commands, JoinGameMenuRoot, logo_image);
 
   // Host game UI

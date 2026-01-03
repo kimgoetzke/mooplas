@@ -5,16 +5,19 @@ use crate::prelude::constants::{ACCENT_COLOUR, BUTTON_ALPHA_DEFAULT, DEFAULT_FON
 use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::SMALL_FONT;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
+use crate::ui::shared::{
+  BackgroundRoot, despawn_menu, menu_base_node, spawn_background_if_not_exists, spawn_button, spawn_logo,
+};
 use bevy::app::{App, Plugin};
-use bevy::asset::AssetServer;
+use bevy::asset::{AssetServer, Assets};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
+use bevy::image::TextureAtlasLayout;
 use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Commands, Component, Entity, FlexDirection,
   IntoScheduleConfigs, Justify, JustifyContent, Local, MessageReader, MessageWriter, Name, Node, OnExit, Query, Res,
-  Text, TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
+  ResMut, Text, TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
 };
 use bevy::text::LineHeight;
 use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
@@ -55,23 +58,41 @@ fn handle_toggle_menu_message(
   asset_server: Res<AssetServer>,
   mut messages: MessageReader<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<HostGameMenuRoot>>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+  mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::HostGameMenu => spawn_menu(&mut commands, &asset_server),
+      MenuName::HostGameMenu => spawn_menu(
+        &mut commands,
+        &asset_server,
+        &mut texture_atlas_layouts,
+        background_root_query,
+      ),
       _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
 }
 
-fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
+fn spawn_menu(
+  commands: &mut Commands,
+  asset_server: &AssetServer,
+  texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+) {
   let font = asset_server.load(DEFAULT_FONT);
   let heading_font = font.clone();
-  let background_image = asset_server.load("images/background_menu_main.png");
+  let background_image = asset_server.load("images/background.png");
   let logo_image = asset_server.load("images/logo.png");
 
   // Background & logo
-  spawn_background(commands, HostGameMenuRoot, background_image);
+  spawn_background_if_not_exists(
+    commands,
+    BackgroundRoot,
+    background_image,
+    texture_atlas_layouts,
+    background_root_query,
+  );
   spawn_logo(commands, HostGameMenuRoot, logo_image);
 
   // Host game UI

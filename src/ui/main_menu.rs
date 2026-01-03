@@ -2,12 +2,14 @@ use crate::app_state::AppState;
 use crate::prelude::constants::NORMAL_FONT;
 use crate::prelude::{MenuName, ToggleMenuMessage};
 use crate::shared::CustomInteraction;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
+use crate::ui::shared::{
+  BackgroundRoot, despawn_menu, menu_base_node, spawn_background_if_not_exists, spawn_button, spawn_logo,
+};
 use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, App, AssetServer, Changed, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
-  JustifyContent, MessageReader, MessageWriter, NextState, Node, OnEnter, OnExit, Plugin, Query, Res, ResMut, Update,
-  With, default, in_state, px,
+  AlignItems, App, AssetServer, Assets, Changed, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
+  JustifyContent, MessageReader, MessageWriter, NextState, Node, OnEnter, OnExit, Plugin, Query, Res, ResMut,
+  TextureAtlasLayout, Update, With, default, in_state, px,
 };
 
 /// Plugin that provides and manages the main menu UI.
@@ -42,16 +44,37 @@ struct PlayLocalButton;
 struct ExitButton;
 
 /// System to spawn the main menu UI including the background image.
-fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>) {
-  spawn_main_menu(&mut commands, &asset_server);
+fn spawn_main_menu_system(
+  mut commands: Commands,
+  asset_server: Res<AssetServer>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+  mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+) {
+  spawn_main_menu(
+    &mut commands,
+    &asset_server,
+    &mut texture_atlas_layouts,
+    background_root_query,
+  );
 }
 
-fn spawn_main_menu(commands: &mut Commands, asset_server: &AssetServer) {
-  let background_image = asset_server.load("images/background_menu_main.png");
+fn spawn_main_menu(
+  commands: &mut Commands,
+  asset_server: &AssetServer,
+  texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
+) {
   let logo_image = asset_server.load("images/logo.png");
+  let background_image = asset_server.load("images/background.png");
 
   // Background & logo
-  spawn_background(commands, MainMenuRoot, background_image);
+  spawn_background_if_not_exists(
+    commands,
+    BackgroundRoot,
+    background_image,
+    texture_atlas_layouts,
+    background_root_query,
+  );
   spawn_logo(commands, MainMenuRoot, logo_image);
 
   // Main Menu UI
@@ -114,10 +137,17 @@ fn handle_toggle_menu_message(
   mut messages: MessageReader<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<MainMenuRoot>>,
   asset_server: Res<AssetServer>,
+  mut texture_atlas_layouts: ResMut<Assets<TextureAtlasLayout>>,
+  background_root_query: Query<Entity, With<BackgroundRoot>>,
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::MainMenu => spawn_main_menu(&mut commands, &asset_server),
+      MenuName::MainMenu => spawn_main_menu(
+        &mut commands,
+        &asset_server,
+        &mut texture_atlas_layouts,
+        background_root_query,
+      ),
       _ => despawn_menu(&mut commands, &menu_root_query),
     }
   }
