@@ -101,7 +101,7 @@ pub fn spawn_background_if_not_exists<T: Component>(
     Transform::from_xyz(0., 0., -2.),
     PIXEL_PERFECT_LAYER,
     animation_indices,
-    AnimationTimer(Timer::from_seconds(0.1, TimerMode::Repeating)),
+    AnimationTimer(Timer::from_seconds(0.15, TimerMode::Repeating)),
   ));
 }
 
