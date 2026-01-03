@@ -40,13 +40,22 @@ pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bu
 }
 
 /// Spawn the logo in an absolute positioned node.
-pub fn spawn_logo<T: Component>(commands: &mut Commands, marker_component: T, logo_image: Handle<Image>) {
+pub fn spawn_logo<T: Component>(
+  commands: &mut Commands,
+  marker_component: T,
+  logo_image: Handle<Image>,
+  texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
+) {
+  let layout = TextureAtlasLayout::from_grid(UVec2::new(99, 25), 10, 1, None, None);
+  let texture_atlas_layout = texture_atlas_layouts.add(layout);
+  let animation_indices = AnimationIndices { first: 1, last: 9 };
+
   commands.spawn((
     Name::new("Logo Node"),
     marker_component,
     Node {
       width: percent(100),
-      height: px(200),
+      height: percent(25),
       position_type: PositionType::Absolute,
       flex_direction: FlexDirection::Row,
       justify_content: JustifyContent::Center,
@@ -63,8 +72,14 @@ pub fn spawn_logo<T: Component>(commands: &mut Commands, marker_component: T, lo
       ImageNode {
         image: logo_image,
         image_mode: NodeImageMode::Stretch,
+        texture_atlas: Some(TextureAtlas {
+          layout: texture_atlas_layout,
+          index: 0,
+        }),
         ..default()
       },
+      animation_indices,
+      AnimationTimer(Timer::from_seconds(0.25, TimerMode::Repeating)),
     )],
   ));
 }

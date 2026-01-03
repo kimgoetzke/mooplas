@@ -64,7 +64,7 @@ fn spawn_main_menu(
   texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
   background_root_query: Query<Entity, With<BackgroundRoot>>,
 ) {
-  let logo_image = asset_server.load("images/logo.png");
+  let logo_image = asset_server.load("images/logo_animated.png");
   let background_image = asset_server.load("images/background.png");
 
   // Background & logo
@@ -75,7 +75,7 @@ fn spawn_main_menu(
     texture_atlas_layouts,
     background_root_query,
   );
-  spawn_logo(commands, MainMenuRoot, logo_image);
+  spawn_logo(commands, MainMenuRoot, logo_image, texture_atlas_layouts);
 
   // Main Menu UI
   commands

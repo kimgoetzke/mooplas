@@ -71,7 +71,7 @@ fn spawn_menu(
   texture_atlas_layouts: &mut Assets<TextureAtlasLayout>,
 ) {
   let background_image = asset_server.load("images/background.png");
-  let logo_image = asset_server.load("images/logo.png");
+  let logo_image = asset_server.load("images/logo_animated.png");
 
   // Background & logo
   spawn_background_if_not_exists(
@@ -81,7 +81,7 @@ fn spawn_menu(
     texture_atlas_layouts,
     background_root_query,
   );
-  spawn_logo(commands, PlayOnlineMenuRoot, logo_image);
+  spawn_logo(commands, PlayOnlineMenuRoot, logo_image, texture_atlas_layouts);
 
   // Play online UI
   commands

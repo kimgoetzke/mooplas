@@ -83,7 +83,7 @@ fn spawn_menu(
   let font = asset_server.load(DEFAULT_FONT);
   let heading_font = font.clone();
   let background_image = asset_server.load("images/background.png");
-  let logo_image = asset_server.load("images/logo.png");
+  let logo_image = asset_server.load("images/logo_animated.png");
 
   // Background & logo
   spawn_background_if_not_exists(
@@ -93,7 +93,7 @@ fn spawn_menu(
     texture_atlas_layouts,
     background_root_query,
   );
-  spawn_logo(commands, HostGameMenuRoot, logo_image);
+  spawn_logo(commands, HostGameMenuRoot, logo_image, texture_atlas_layouts);
 
   // Host game UI
   commands

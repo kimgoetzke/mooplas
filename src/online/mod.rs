@@ -46,7 +46,6 @@ impl Plugin for OnlinePlugin {
 const PROTOCOL_ID: u64 = 1000;
 const DEFAULT_SERVER_PORT: u16 = 0;
 
-// TODO: Implement host/client menus and waiting states
 fn handle_toggle_menu_message(
   mut commands: Commands,
   mut messages: MessageReader<ToggleMenuMessage>,
@@ -91,6 +90,7 @@ fn handle_toggle_menu_message(
   }
 }
 
+// TODO: Don't blow up on invalid connection strings but rather display an error message in the UI
 fn handle_connection_info_message(mut messages: MessageReader<ConnectionInfoMessage>, mut commands: Commands) {
   for message in messages.read() {
     debug!(
