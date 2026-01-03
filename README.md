@@ -1,4 +1,6 @@
-# Mooplas
+<p align="center">
+  <img src="./assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
+</p>
 
 This repository contains a basic multiplayer game inspired by _Achtung, die Kurve!_, written in Rust using Bevy Engine
 (v0.17). The goal of the project was to explore network programming when real-time movement is involved.
@@ -16,15 +18,19 @@ This repository contains a basic multiplayer game inspired by _Achtung, die Kurv
 ## Demo
 
 Online multiplayer:
+
 ![Demo GIF](assets/ignore/demo/demo.gif)
 
-Lobby (local + multiplayer):
-![Screenshots 1](assets/ignore/demo/screenshot-1.png)
+Menu:
+
+![Screenshot 4](assets/ignore/demo/screenshot-4.png)
 
 Lobby with touch controls enabled:
+
 ![Screenshots 2](assets/ignore/demo/screenshot-2.png)
 
 In-game:
+
 ![Screenshots 3](assets/ignore/demo/screenshot-3.png)
 
 ## How to develop
