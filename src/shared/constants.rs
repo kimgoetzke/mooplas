@@ -84,9 +84,6 @@ pub(crate) const BUTTON_BORDER_WIDTH: f32 = 3.;
 /// The path to the default font used in the game.
 pub(crate) const DEFAULT_FONT: &str = "fonts/Tiny5.ttf";
 
-/// Font size for header elements.
-pub(crate) const HEADER_FONT: f32 = 120.;
-
 /// Font size for large text elements.
 pub(crate) const LARGE_FONT: f32 = 60.;
 

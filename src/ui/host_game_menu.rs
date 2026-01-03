@@ -1,13 +1,11 @@
 #![cfg(feature = "online")]
 
 use crate::app_state::AppState;
-use crate::prelude::constants::{
-  ACCENT_COLOUR, BUTTON_ALPHA_DEFAULT, DEFAULT_FONT, HEADER_FONT, NORMAL_FONT, TEXT_COLOUR,
-};
+use crate::prelude::constants::{ACCENT_COLOUR, BUTTON_ALPHA_DEFAULT, DEFAULT_FONT, NORMAL_FONT, TEXT_COLOUR};
 use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::SMALL_FONT;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button};
+use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
 use bevy::app::{App, Plugin};
 use bevy::asset::AssetServer;
 use bevy::color::Color;
@@ -70,27 +68,16 @@ fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
   let font = asset_server.load(DEFAULT_FONT);
   let heading_font = font.clone();
   let background_image = asset_server.load("images/background_menu_main.png");
+  let logo_image = asset_server.load("images/logo.png");
 
-  // Background
-  spawn_background(commands, HostGameMenuRoot, background_image.clone());
+  // Background & logo
+  spawn_background(commands, HostGameMenuRoot, background_image);
+  spawn_logo(commands, HostGameMenuRoot, logo_image);
 
   // Host game UI
   commands
     .spawn(menu_base_node(HostGameMenuRoot, "Host Game Menu".to_string()))
     .with_children(|parent| {
-      // Title
-      parent.spawn((
-        Text::new("Mooplas"),
-        TextFont {
-          font: heading_font.clone(),
-          font_size: HEADER_FONT,
-          ..default()
-        },
-        TextColor(Color::from(ACCENT_COLOUR)),
-        TextShadow::default(),
-      ));
-
-      // The actual menu
       parent
         .spawn(Node {
           flex_direction: FlexDirection::Column,

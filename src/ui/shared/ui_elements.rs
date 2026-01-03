@@ -14,8 +14,8 @@ use bevy::image::Image;
 use bevy::math::Vec2;
 use bevy::prelude::{
   AlignItems, BackgroundColor, BorderColor, BorderGradient, BorderRadius, Bundle, ChildOf, Component, Entity,
-  FlexDirection, JustifyContent, LinearGradient, Name, Node, PositionType, Query, Text, TextFont, TextShadow, UiRect,
-  With, default, percent, px,
+  FlexDirection, ImageNode, JustifyContent, LinearGradient, Name, Node, NodeImageMode, PositionType, Query, Text,
+  TextFont, TextShadow, UiRect, With, default, percent, px,
 };
 use bevy::prelude::{Commands, SpawnRelated, Sprite, Transform};
 
@@ -37,6 +37,36 @@ pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bu
   )
 }
 
+/// Spawn the logo in an absolute positioned node.
+pub fn spawn_logo<T: Component>(commands: &mut Commands, marker_component: T, logo_image: Handle<Image>) {
+  commands.spawn((
+    Name::new("Logo Node"),
+    marker_component,
+    Node {
+      width: percent(100),
+      height: px(200),
+      position_type: PositionType::Absolute,
+      flex_direction: FlexDirection::Row,
+      justify_content: JustifyContent::Center,
+      align_items: AlignItems::Center,
+      ..default()
+    },
+    children![(
+      Name::new("Logo"),
+      Node {
+        width: px(500.),
+        height: px(125.),
+        ..default()
+      },
+      ImageNode {
+        image: logo_image,
+        image_mode: NodeImageMode::Stretch,
+        ..default()
+      },
+    )],
+  ));
+}
+
 /// Spawns the background image for the given menu.
 pub fn spawn_background<T: Component>(commands: &mut Commands, marker_component: T, background_image: Handle<Image>) {
   commands.spawn((
@@ -47,7 +77,7 @@ pub fn spawn_background<T: Component>(commands: &mut Commands, marker_component:
       custom_size: Some(Vec2::new(RESOLUTION_WIDTH as f32, RESOLUTION_HEIGHT as f32)),
       ..default()
     },
-    Transform::from_xyz(0., 0., -1.),
+    Transform::from_xyz(0., 0., -2.),
     PIXEL_PERFECT_LAYER,
   ));
 }

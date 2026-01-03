@@ -1,13 +1,13 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, HEADER_FONT, NORMAL_FONT};
+use crate::prelude::constants::NORMAL_FONT;
 use crate::prelude::{MenuName, ToggleMenuMessage};
 use crate::shared::CustomInteraction;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button};
+use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
 use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, App, AssetServer, Changed, Color, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
-  JustifyContent, MessageReader, MessageWriter, NextState, Node, OnEnter, OnExit, Plugin, Query, Res, ResMut, Text,
-  TextColor, TextFont, TextShadow, Update, With, default, in_state, px,
+  AlignItems, App, AssetServer, Changed, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs,
+  JustifyContent, MessageReader, MessageWriter, NextState, Node, OnEnter, OnExit, Plugin, Query, Res, ResMut, Update,
+  With, default, in_state, px,
 };
 
 /// Plugin that provides and manages the main menu UI.
@@ -47,30 +47,17 @@ fn spawn_main_menu_system(mut commands: Commands, asset_server: Res<AssetServer>
 }
 
 fn spawn_main_menu(commands: &mut Commands, asset_server: &AssetServer) {
-  let font = asset_server.load(DEFAULT_FONT);
-  let heading_font = font.clone();
   let background_image = asset_server.load("images/background_menu_main.png");
+  let logo_image = asset_server.load("images/logo.png");
 
-  // Background
+  // Background & logo
   spawn_background(commands, MainMenuRoot, background_image);
+  spawn_logo(commands, MainMenuRoot, logo_image);
 
   // Main Menu UI
   commands
     .spawn(menu_base_node(MainMenuRoot, "Main Menu".to_string()))
     .with_children(|parent| {
-      // Title
-      parent.spawn((
-        Text::new("Mooplas"),
-        TextFont {
-          font: heading_font.clone(),
-          font_size: HEADER_FONT,
-          ..default()
-        },
-        TextColor(Color::from(ACCENT_COLOUR)),
-        TextShadow::default(),
-      ));
-
-      // Buttons
       parent
         .spawn(Node {
           flex_direction: FlexDirection::Column,

@@ -1,11 +1,11 @@
 #![cfg(feature = "online")]
 
 use crate::app_state::AppState;
-use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, HEADER_FONT, NORMAL_FONT};
+use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, NORMAL_FONT};
 use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::BUTTON_ALPHA_DEFAULT;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button};
+use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
 use bevy::app::{App, Plugin};
 use bevy::asset::AssetServer;
 use bevy::color::Color;
@@ -14,7 +14,7 @@ use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Click, Commands, Component, Entity,
   FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, On, OnExit,
-  Pointer, Query, Res, Text, TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
+  Pointer, Query, Res, TextColor, TextFont, UiRect, Update, With, default, in_state, percent, px,
 };
 use bevy_ui_text_input::actions::TextInputAction;
 use bevy_ui_text_input::{SubmitText, TextInputMode, TextInputNode, TextInputPrompt, TextInputQueue};
@@ -69,29 +69,17 @@ fn handle_toggle_menu_message(
 // TODO: Display error message on failed connection attempt
 fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
   let font = asset_server.load(DEFAULT_FONT);
-  let heading_font = font.clone();
   let background_image = asset_server.load("images/background_menu_main.png");
+  let logo_image = asset_server.load("images/logo.png");
 
-  // Background
+  // Background & logo
   spawn_background(commands, JoinGameMenuRoot, background_image.clone());
+  spawn_logo(commands, JoinGameMenuRoot, logo_image);
 
   // Host game UI
   commands
     .spawn(menu_base_node(JoinGameMenuRoot, "Join Game Menu".to_string()))
     .with_children(|parent| {
-      // Title
-      parent.spawn((
-        Text::new("Mooplas"),
-        TextFont {
-          font: heading_font.clone(),
-          font_size: HEADER_FONT,
-          ..default()
-        },
-        TextColor(Color::from(ACCENT_COLOUR)),
-        TextShadow::default(),
-      ));
-
-      // Text & button
       parent
         .spawn(Node {
           flex_direction: FlexDirection::Column,

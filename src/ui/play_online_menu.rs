@@ -1,15 +1,14 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, HEADER_FONT, NORMAL_FONT};
+use crate::prelude::constants::NORMAL_FONT;
 use crate::prelude::{CustomInteraction, MenuName};
 use crate::shared::ToggleMenuMessage;
-use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button};
+use crate::ui::shared::{despawn_menu, menu_base_node, spawn_background, spawn_button, spawn_logo};
 use bevy::app::{App, Plugin};
 use bevy::asset::AssetServer;
-use bevy::color::Color;
 use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Changed, Commands, Component, Entity, FlexDirection, IntoScheduleConfigs, JustifyContent, MessageReader,
-  MessageWriter, Node, Query, Res, Text, TextColor, TextFont, TextShadow, Update, With, default, in_state, px,
+  MessageWriter, Node, Query, Res, Update, With, default, in_state, px,
 };
 
 /// A plugin to manage the play online menu UI. Players can choose to host or join an online game from this menu.
@@ -56,30 +55,17 @@ fn handle_toggle_menu_message(
 }
 
 fn spawn_menu(commands: &mut Commands, asset_server: &AssetServer) {
-  let font = asset_server.load(DEFAULT_FONT);
-  let heading_font = font.clone();
   let background_image = asset_server.load("images/background_menu_main.png");
+  let logo_image = asset_server.load("images/logo.png");
 
-  // Background
+  // Background & logo
   spawn_background(commands, PlayOnlineMenuRoot, background_image);
+  spawn_logo(commands, PlayOnlineMenuRoot, logo_image);
 
   // Play online UI
   commands
     .spawn(menu_base_node(PlayOnlineMenuRoot, "Play Online Menu".to_string()))
     .with_children(|parent| {
-      // Title
-      parent.spawn((
-        Text::new("Mooplas"),
-        TextFont {
-          font: heading_font.clone(),
-          font_size: HEADER_FONT,
-          ..default()
-        },
-        TextColor(Color::from(ACCENT_COLOUR)),
-        TextShadow::default(),
-      ));
-
-      // Buttons
       parent
         .spawn(Node {
           flex_direction: FlexDirection::Column,
