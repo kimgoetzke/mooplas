@@ -2,7 +2,7 @@
 
 use crate::app_state::AppState;
 use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, NORMAL_FONT};
-use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName};
+use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName, UiErrorMessage};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::BUTTON_ALPHA_DEFAULT;
 use crate::ui::shared::{
@@ -12,13 +12,16 @@ use bevy::app::{App, Plugin};
 use bevy::asset::{AssetServer, Assets};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
+use bevy::ecs::children;
 use bevy::image::TextureAtlasLayout;
 use bevy::log::debug;
 use bevy::prelude::{
-  AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Click, Commands, Component, Entity,
-  FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, On, OnExit,
-  Pointer, Query, Res, ResMut, TextColor, TextFont, UiRect, Update, With, default, in_state, percent, px,
+  AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Click, Commands, Component, DetectChangesMut,
+  Entity, FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, On,
+  OnExit, Pointer, PositionType, Query, Res, ResMut, Single, TextColor, TextFont, UiRect, Update, With, Without,
+  default, in_state, percent, px,
 };
+use bevy::prelude::{SpawnRelated, Text};
 use bevy_ui_text_input::actions::TextInputAction;
 use bevy_ui_text_input::{SubmitText, TextInputMode, TextInputNode, TextInputPrompt, TextInputQueue};
 
@@ -35,6 +38,7 @@ impl Plugin for JoinGameMenuPlugin {
           handle_toggle_menu_message,
           handle_button_interactions_system,
           handle_submit_text_messages,
+          handle_ui_error_messages,
         )
           .run_if(in_state(AppState::Preparing)),
       )
@@ -45,6 +49,10 @@ impl Plugin for JoinGameMenuPlugin {
 /// Marker component for the root of the menu. Used for despawning.
 #[derive(Component)]
 struct JoinGameMenuRoot;
+
+/// Marker component for displaying an error message.
+#[derive(Component)]
+struct ErrorMessage;
 
 /// Marker component for the connect button.
 #[derive(Component)]
@@ -112,7 +120,7 @@ fn spawn_menu(
         })
         .with_children(|parent| {
           // Input field
-          let editor = parent
+          let input_field_entity = parent
             .spawn((
               Name::new("Input Field"),
               TextInputNode {
@@ -123,7 +131,7 @@ fn spawn_menu(
                 ..Default::default()
               },
               TextFont {
-                font,
+                font: font.clone(),
                 font_size: NORMAL_FONT,
                 ..Default::default()
               },
@@ -157,7 +165,7 @@ fn spawn_menu(
           let connect_button = spawn_button(parent, &asset_server, ConnectButton, "Connect", 300, NORMAL_FONT);
           parent.commands().entity(connect_button).observe(
             move |_: On<Pointer<Click>>, mut query: Query<&mut TextInputQueue>| {
-              query.get_mut(editor).unwrap().add(TextInputAction::Submit);
+              query.get_mut(input_field_entity).unwrap().add(TextInputAction::Submit);
             },
           );
 
@@ -165,6 +173,31 @@ fn spawn_menu(
           spawn_button(parent, &asset_server, BackButton, "Back", 300, NORMAL_FONT);
         });
     });
+
+  commands.spawn((
+    Name::new("Error Message UI"),
+    JoinGameMenuRoot,
+    Node {
+      width: percent(100),
+      height: percent(25),
+      bottom: px(0.0),
+      position_type: PositionType::Absolute,
+      flex_direction: FlexDirection::Column,
+      justify_content: JustifyContent::Center,
+      align_items: AlignItems::Center,
+      ..default()
+    },
+    children![(
+      TextFont {
+        font,
+        font_size: NORMAL_FONT,
+        ..default()
+      },
+      TextColor(Color::from(tailwind::RED_500)),
+      Text::default(),
+      ErrorMessage,
+    )],
+  ));
 }
 
 /// A system to handle button interactions, excluding the connect button which is handled via an observer because it
@@ -187,16 +220,57 @@ fn handle_button_interactions_system(
 fn handle_submit_text_messages(
   mut messages: MessageReader<SubmitText>,
   mut connection_info_message: MessageWriter<ConnectionInfoMessage>,
+  mut error_message_query: Query<&mut Text, With<ErrorMessage>>,
+  mut connect_button_interaction: Single<&mut CustomInteraction, (With<ConnectButton>, Without<BackButton>)>,
+  mut back_button_interaction: Single<&mut CustomInteraction, (With<BackButton>, Without<ConnectButton>)>,
 ) {
   for message in messages.read() {
+    // Remove any existing error message
+    for mut text in &mut error_message_query {
+      text.0 = "".to_string();
+    }
+
+    // Ignore empty submissions
     if message.text.is_empty() {
-      debug!("Received empty connection string submission, ignoring...");
+      debug!("Received empty connection string submission, ignoring button press...");
       continue;
     }
+
+    // Ignore if connect button is disabled
+    if **connect_button_interaction == CustomInteraction::Disabled {
+      debug!("Connect button is disabled, ignoring button press...");
+      return;
+    }
+
+    // Disable buttons to prevent multiple submissions and race conditions on client-related resources
+    **connect_button_interaction = CustomInteraction::Disabled;
+    connect_button_interaction.set_changed();
+    **back_button_interaction = CustomInteraction::Disabled;
+    back_button_interaction.set_changed();
+
+    // Send connection info message for networking systems to process
     debug!("Sending [ConnectionInfoMessage] with text: {:?}", message.text);
     connection_info_message.write(ConnectionInfoMessage {
       connection_string: message.text.to_string(),
     });
+  }
+}
+
+/// A system to handle UI error messages and display them in the menu. Also re-enables the connect and back buttons.
+fn handle_ui_error_messages(
+  mut messages: MessageReader<UiErrorMessage>,
+  mut error_message_query: Query<&mut Text, With<ErrorMessage>>,
+  mut connect_button_interaction: Single<&mut CustomInteraction, (With<ConnectButton>, Without<BackButton>)>,
+  mut back_button_interaction: Single<&mut CustomInteraction, (With<BackButton>, Without<ConnectButton>)>,
+) {
+  for event in messages.read() {
+    for mut text in &mut error_message_query {
+      text.0 = event.message.clone();
+    }
+    **connect_button_interaction = CustomInteraction::None;
+    connect_button_interaction.set_changed();
+    **back_button_interaction = CustomInteraction::None;
+    back_button_interaction.set_changed();
   }
 }
 

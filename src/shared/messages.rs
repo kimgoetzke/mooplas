@@ -20,7 +20,9 @@ impl Plugin for SharedMessagesPlugin {
       .add_message::<InputMessage>();
 
     #[cfg(feature = "online")]
-    app.add_message::<ConnectionInfoMessage>();
+    app
+      .add_message::<ConnectionInfoMessage>()
+      .add_message::<UiErrorMessage>();
   }
 }
 
@@ -112,6 +114,19 @@ impl ExitLobbyMessage {
 #[derive(Message, Clone)]
 pub struct ConnectionInfoMessage {
   pub connection_string: String,
+}
+
+/// A [`Message`] for displaying an error message in the UI.
+#[cfg(feature = "online")]
+#[derive(Message, Clone)]
+pub struct UiErrorMessage {
+  pub message: String,
+}
+
+impl UiErrorMessage {
+  pub fn new(message: String) -> Self {
+    Self { message }
+  }
 }
 
 #[cfg(test)]

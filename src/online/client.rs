@@ -1,10 +1,11 @@
 use crate::online::lib::{
-  ClientMessage, NetworkTransformInterpolation, PlayerStateUpdateMessage, SerialisableInputActionMessage,
-  ServerMessage, decode_from_bytes, encode_to_bytes, utils,
+  ClientMessage, NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage,
+  SerialisableInputActionMessage, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
 };
+use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
-  SnakeHead, WinnerInfo,
+  SnakeHead, UiErrorMessage, WinnerInfo,
 };
 use crate::shared::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH, WRAPAROUND_MARGIN};
 use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
@@ -13,11 +14,12 @@ use bevy::log::*;
 use bevy::math::Quat;
 use bevy::prelude::{
   App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
-  State, Time, Transform, With, Without, in_state,
+  State, Time, Transform, With, Without, in_state, resource_exists,
 };
-use bevy_renet::netcode::NetcodeClientPlugin;
+use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::{DefaultChannel, RenetClient};
 use bevy_renet::{RenetClientPlugin, client_connected};
+use std::time::Instant;
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
 /// running in client mode (i.e. someone else is the server). Mutually exclusive with the
@@ -28,6 +30,10 @@ impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_plugins((RenetClientPlugin, NetcodeClientPlugin))
+      .add_systems(
+        Update,
+        client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
+      )
       .add_systems(Update, receive_reliable_server_messages_system.run_if(client_connected))
       .add_systems(
         Update,
@@ -49,6 +55,40 @@ impl Plugin for ClientPlugin {
           .run_if(in_state(AppState::Playing))
           .run_if(client_connected),
       );
+  }
+}
+
+/// System that checks whether the client completed the handshake before the deadline.
+/// If the handshake did not complete in time, it cleans up the client transport and
+/// emits a UI error message.
+pub fn client_handshake_system(
+  mut commands: Commands,
+  client: Res<RenetClient>,
+  handshake: Option<Res<PendingClientHandshake>>,
+  mut ui_error_message_writer: MessageWriter<UiErrorMessage>,
+) {
+  let handshake = match handshake {
+    Some(h) => h,
+    None => return,
+  };
+
+  if client.is_connected() {
+    commands.remove_resource::<PendingClientHandshake>();
+    info!("Client handshake completed");
+    return;
+  }
+
+  let now = Instant::now();
+  if now > handshake.deadline {
+    let message = format!(
+      "Couldn't complete handshake with server within {}s - is there a typo in the connection string?",
+      CLIENT_HAND_SHAKE_TIMEOUT_SECS
+    );
+    error!("{}", message);
+    ui_error_message_writer.write(UiErrorMessage::new(message));
+    commands.remove_resource::<RenetClient>();
+    commands.remove_resource::<NetcodeClientTransport>();
+    commands.remove_resource::<PendingClientHandshake>();
   }
 }
 

@@ -58,8 +58,8 @@ pub fn spawn_logo<T: Component>(
       height: percent(25),
       position_type: PositionType::Absolute,
       flex_direction: FlexDirection::Row,
-      justify_content: JustifyContent::Center,
-      align_items: AlignItems::Center,
+      justify_content: JustifyContent::Center, // Horizontally centre child text
+      align_items: AlignItems::Center,         // Vertically centre child text
       ..default()
     },
     children![(

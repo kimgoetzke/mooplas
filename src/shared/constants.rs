@@ -1,6 +1,7 @@
 use bevy::camera::visibility::RenderLayers;
 use bevy::color::palettes::tailwind;
 use bevy::prelude::{Color, Srgba, TextColor};
+
 // General and rendering
 // --------------------------------//
 
@@ -101,3 +102,10 @@ pub(crate) const DEFAULT_COLOUR: Color = Color::srgb(0.9, 0.9, 0.9);
 
 /// Standard text colour used throughout the UI, uses the default colour.
 pub(crate) const TEXT_COLOUR: TextColor = TextColor(Color::srgb(0.9, 0.9, 0.9));
+
+// Multiplayer
+// --------------------------------//
+
+/// The timeout duration (in seconds) for the client handshake process to complete before considering it as having
+/// failed.
+pub(crate) const CLIENT_HAND_SHAKE_TIMEOUT_SECS: u64 = 7;

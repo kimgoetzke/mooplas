@@ -1,9 +1,11 @@
+use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::shared::PlayerId;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Resource;
 use bevy_renet::renet::ClientId;
 use std::collections::HashMap;
 use std::fmt::Debug;
+use std::time::{Duration, Instant};
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
 pub struct NetworkingResourcesPlugin;
@@ -49,6 +51,21 @@ impl Lobby {
   pub fn clear(&mut self) {
     self.connected.clear();
     self.registered.clear();
+  }
+}
+
+/// Resource used to track the handshake deadline for a client connection. Used to trigger actions if a client was
+/// created but did not complete the handshake in time.
+#[derive(Resource)]
+pub struct PendingClientHandshake {
+  pub deadline: Instant,
+}
+
+impl PendingClientHandshake {
+  pub fn new() -> Self {
+    Self {
+      deadline: Instant::now() + Duration::from_secs(CLIENT_HAND_SHAKE_TIMEOUT_SECS),
+    }
   }
 }
 

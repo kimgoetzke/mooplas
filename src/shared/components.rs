@@ -144,6 +144,7 @@ pub enum CustomInteraction {
   Hovered,
   Pressed,
   Released,
+  Disabled,
 }
 
 #[cfg(test)]

@@ -85,6 +85,11 @@ fn regular_button_reactive_design_system(
         *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
         *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
       }
+      CustomInteraction::Disabled => {
+        *border_gradient = shared::default_gradient(0.);
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_700));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
+      }
     }
   }
 }
@@ -117,6 +122,10 @@ fn touch_control_button_reactive_design_system(
         *border_colour = BorderColor::all(Color::from(tailwind::SLATE_500));
         *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
       }
+      CustomInteraction::Disabled => {
+        *border_colour = BorderColor::all(Color::from(tailwind::SLATE_700));
+        *background_colour = BackgroundColor(background_colour.0.with_alpha(BUTTON_ALPHA_DEFAULT));
+      }
     }
   }
 }
@@ -144,7 +153,7 @@ fn set_interaction_on_hover(action: On<Pointer<Over>>, mut interaction_query: Qu
     .iter_mut()
     .filter(|(entity, _)| action.entity == *entity)
     .for_each(|(entity, mut interaction)| {
-      if *interaction != CustomInteraction::Hovered {
+      if *interaction != CustomInteraction::Hovered && *interaction != CustomInteraction::Disabled {
         *interaction = CustomInteraction::Hovered;
         interaction.set_changed();
         trace!("Interaction for {entity} set to [{:?}]", *interaction);
@@ -161,7 +170,9 @@ fn set_interaction_on_hover_exit(
     .iter_mut()
     .filter(|(entity, _)| action.entity == *entity)
     .for_each(|(entity, mut interaction)| {
-      if *interaction != CustomInteraction::Hovered || *interaction != CustomInteraction::Pressed {
+      if (*interaction != CustomInteraction::Hovered || *interaction != CustomInteraction::Pressed)
+        && *interaction != CustomInteraction::Disabled
+      {
         *interaction = CustomInteraction::None;
         interaction.set_changed();
         trace!("Interaction for {entity} set to [{:?}]", *interaction);
@@ -178,7 +189,7 @@ fn set_interaction_on_press(
     .iter_mut()
     .filter(|(entity, _)| action.entity == *entity)
     .for_each(|(entity, mut interaction)| {
-      if *interaction != CustomInteraction::Pressed {
+      if *interaction != CustomInteraction::Pressed && *interaction != CustomInteraction::Disabled {
         *interaction = CustomInteraction::Pressed;
         interaction.set_changed();
         trace!("Interaction for {entity} set to [{:?}]", *interaction);
@@ -194,9 +205,11 @@ fn set_interaction_on_release(
     .iter_mut()
     .filter(|(entity, _)| action.entity == *entity)
     .for_each(|(entity, mut interaction)| {
-      *interaction = CustomInteraction::Released;
-      interaction.set_changed();
-      trace!("Interaction for {entity} set to [{:?}]", *interaction);
+      if *interaction != CustomInteraction::Disabled {
+        *interaction = CustomInteraction::Released;
+        interaction.set_changed();
+        trace!("Interaction for {entity} set to [{:?}]", *interaction);
+      }
     });
 }
 
@@ -209,7 +222,7 @@ fn set_interaction_on_cancel(
     .iter_mut()
     .filter(|(entity, _)| action.entity == *entity)
     .for_each(|(entity, mut interaction)| {
-      if *interaction != CustomInteraction::None {
+      if *interaction != CustomInteraction::None && *interaction != CustomInteraction::Disabled {
         *interaction = CustomInteraction::None;
         interaction.set_changed();
         trace!("Interaction for {entity} set to [{:?}]", *interaction);
@@ -222,7 +235,7 @@ fn set_interaction_on_cancel(
 /// [`PostUpdate`].
 fn clear_released_interaction_system(mut query: Query<(Entity, &mut CustomInteraction), Changed<CustomInteraction>>) {
   for (entity, mut interaction) in query.iter_mut() {
-    if *interaction == CustomInteraction::Released {
+    if *interaction == CustomInteraction::Released && *interaction != CustomInteraction::Disabled {
       *interaction = CustomInteraction::None;
       interaction.set_changed();
       trace!("Interaction for {entity} set to [{:?}]", *interaction);

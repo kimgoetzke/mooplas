@@ -7,9 +7,9 @@ mod server;
 
 use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
-use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin};
+use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake};
 use crate::online::server::ServerPlugin;
-use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage};
+use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage, UiErrorMessage};
 use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
 use bevy::log::*;
@@ -90,32 +90,38 @@ fn handle_toggle_menu_message(
   }
 }
 
-// TODO: Don't blow up on invalid connection strings but rather display an error message in the UI
-fn handle_connection_info_message(mut messages: MessageReader<ConnectionInfoMessage>, mut commands: Commands) {
+fn handle_connection_info_message(
+  mut messages: MessageReader<ConnectionInfoMessage>,
+  mut commands: Commands,
+  mut ui_error_message_writer: MessageWriter<UiErrorMessage>,
+) {
   for message in messages.read() {
     debug!(
       "Received [ConnectionInfoMessage] with connection string [{}], attempting to parse now...",
       message.connection_string,
     );
-    let server_address: SocketAddr = message
-      .connection_string
-      .parse()
-      .unwrap_or_else(|_| panic!("Invalid server address or port: [{}]", message.connection_string,));
-    match create_new_renet_client_resources(server_address) {
-      Ok((client, transport)) => {
-        info!("Created client with connection to [{}]", server_address);
-        commands.insert_resource(client);
-        commands.insert_resource(transport);
+    if let Ok(server_address) = message.connection_string.parse() {
+      match create_new_renet_client_resources(server_address) {
+        Ok((client, transport)) => {
+          info!("Created client with connection to [{}]", server_address);
+          commands.insert_resource(client);
+          commands.insert_resource(transport);
+          commands.insert_resource(PendingClientHandshake::new());
+        }
+        Err(e) => {
+          error!("An error occurred: {}", e.to_string());
+          ui_error_message_writer.write(UiErrorMessage::new(e.to_string()));
+        }
       }
-      Err(e) => {
-        error!("Failed to create client: {}", e);
-      }
+    } else {
+      let message = format!("Invalid server address or port: [{}]", message.connection_string);
+      warn!("Failed to parse connection string: {}", message);
+      ui_error_message_writer.write(UiErrorMessage::new(message));
     }
   }
 }
 
 // TODO: Add secure authentication
-// TODO: Handle scenario where client is created but handshake doesn't occur
 /// Creates client resources with a specific server address
 fn create_new_renet_client_resources(
   server_address: SocketAddr,
