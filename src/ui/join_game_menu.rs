@@ -84,7 +84,6 @@ fn handle_toggle_menu_message(
   }
 }
 
-// TODO: Display error message on failed connection attempt
 fn spawn_menu(
   commands: &mut Commands,
   asset_server: &AssetServer,
