@@ -123,6 +123,7 @@ pub struct UiErrorMessage {
   pub message: String,
 }
 
+#[cfg(feature = "online")]
 impl UiErrorMessage {
   pub fn new(message: String) -> Self {
     Self { message }
