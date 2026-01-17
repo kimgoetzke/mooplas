@@ -7,7 +7,7 @@ use crate::prelude::constants::{
 };
 use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
-  SnakeHead, UiErrorMessage, WinnerInfo,
+  SnakeHead, UiNotification, WinnerInfo,
 };
 use crate::shared::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH, WRAPAROUND_MARGIN};
 use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
@@ -90,7 +90,7 @@ pub fn client_handshake_system(
   mut commands: Commands,
   client: Res<RenetClient>,
   handshake: Option<Res<PendingClientHandshake>>,
-  mut ui_error_message_writer: MessageWriter<UiErrorMessage>,
+  mut ui_message_writer: MessageWriter<UiNotification>,
 ) {
   let handshake = match handshake {
     Some(h) => h,
@@ -105,15 +105,13 @@ pub fn client_handshake_system(
 
   let now = Instant::now();
   if now > handshake.deadline {
-    let message = format!(
-      "Couldn't complete handshake with server within {}s - is there a typo in the connection string?",
-      CLIENT_HAND_SHAKE_TIMEOUT_SECS
-    );
-    error!("{}", message);
-    ui_error_message_writer.write(UiErrorMessage::new(message));
+    let message = "Couldn't complete handshake with server - is there a typo in the connection string?".to_string();
+    error!("Timed out after {}s: {}", CLIENT_HAND_SHAKE_TIMEOUT_SECS, message);
+    ui_message_writer.write(UiNotification::error(message));
     commands.remove_resource::<RenetClient>();
     commands.remove_resource::<NetcodeClientTransport>();
     commands.remove_resource::<PendingClientHandshake>();
+    commands.remove_resource::<RenetClientVisualizer<VISUALISER_DISPLAY_VALUES>>()
   }
 }
 

@@ -103,6 +103,12 @@ pub(crate) const DEFAULT_COLOUR: Color = Color::srgb(0.9, 0.9, 0.9);
 /// Standard text colour used throughout the UI, uses the default colour.
 pub(crate) const TEXT_COLOUR: TextColor = TextColor(Color::srgb(0.9, 0.9, 0.9));
 
+/// Colour for info text such as the text of info notifications.
+pub(crate) const INFO_COLOUR: Srgba = tailwind::AMBER_400;
+
+/// Colour for error text.
+pub(crate) const ERROR_COLOUR: Srgba = tailwind::RED_500;
+
 // Multiplayer
 // --------------------------------//
 

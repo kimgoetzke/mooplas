@@ -1,8 +1,9 @@
 use crate::prelude::NetworkRole;
+use crate::prelude::constants::{ERROR_COLOUR, INFO_COLOUR};
 use crate::shared::PlayerId;
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
-use bevy::prelude::Message;
+use bevy::prelude::{Color, Message, Srgba};
 use serde::{Deserialize, Serialize};
 
 /// A plugin that registers all shared messages used across multiple plugins and systems.
@@ -22,7 +23,7 @@ impl Plugin for SharedMessagesPlugin {
     #[cfg(feature = "online")]
     app
       .add_message::<ConnectionInfoMessage>()
-      .add_message::<UiErrorMessage>();
+      .add_message::<UiNotification>();
   }
 }
 
@@ -119,14 +120,36 @@ pub struct ConnectionInfoMessage {
 /// A [`Message`] for displaying an error message in the UI.
 #[cfg(feature = "online")]
 #[derive(Message, Clone)]
-pub struct UiErrorMessage {
-  pub message: String,
+pub struct UiNotification {
+  pub text: String,
+  srbga: Srgba,
+  reset_custom_interaction: bool,
 }
 
 #[cfg(feature = "online")]
-impl UiErrorMessage {
-  pub fn new(message: String) -> Self {
-    Self { message }
+impl UiNotification {
+  pub fn error(text: String) -> Self {
+    Self {
+      text,
+      srbga: ERROR_COLOUR,
+      reset_custom_interaction: true,
+    }
+  }
+
+  pub fn info(text: String) -> Self {
+    Self {
+      text,
+      srbga: INFO_COLOUR,
+      reset_custom_interaction: false,
+    }
+  }
+
+  pub fn colour(&self) -> Color {
+    Color::from(self.srbga)
+  }
+
+  pub fn should_reset_custom_interaction(&self) -> bool {
+    self.reset_custom_interaction
   }
 }
 

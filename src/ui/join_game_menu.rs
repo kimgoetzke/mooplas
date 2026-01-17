@@ -2,7 +2,7 @@
 
 use crate::app_state::AppState;
 use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, NORMAL_FONT};
-use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName, UiErrorMessage};
+use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName, UiNotification};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::BUTTON_ALPHA_DEFAULT;
 use crate::ui::shared::{
@@ -38,7 +38,7 @@ impl Plugin for JoinGameMenuPlugin {
           handle_toggle_menu_message,
           handle_button_interactions_system,
           handle_submit_text_messages,
-          handle_ui_error_messages,
+          handle_ui_notification_messages,
         )
           .run_if(in_state(AppState::Preparing)),
       )
@@ -50,9 +50,9 @@ impl Plugin for JoinGameMenuPlugin {
 #[derive(Component)]
 struct JoinGameMenuRoot;
 
-/// Marker component for displaying an error message.
+/// Marker component for displaying a notifications.
 #[derive(Component)]
-struct ErrorMessage;
+struct NotificationText;
 
 /// Marker component for the connect button.
 #[derive(Component)]
@@ -174,7 +174,7 @@ fn spawn_menu(
     });
 
   commands.spawn((
-    Name::new("Error Message UI"),
+    Name::new("Notification UI"),
     JoinGameMenuRoot,
     Node {
       width: percent(100),
@@ -194,7 +194,7 @@ fn spawn_menu(
       },
       TextColor(Color::from(tailwind::RED_500)),
       Text::default(),
-      ErrorMessage,
+      NotificationText,
     )],
   ));
 }
@@ -219,15 +219,17 @@ fn handle_button_interactions_system(
 fn handle_submit_text_messages(
   mut messages: MessageReader<SubmitText>,
   mut connection_info_message: MessageWriter<ConnectionInfoMessage>,
-  mut error_message_query: Query<&mut Text, With<ErrorMessage>>,
+  mut notification_text_query: Query<&mut Text, With<NotificationText>>,
   mut connect_button_interaction: Single<&mut CustomInteraction, (With<ConnectButton>, Without<BackButton>)>,
   mut back_button_interaction: Single<&mut CustomInteraction, (With<BackButton>, Without<ConnectButton>)>,
+  mut ui_message_writer: MessageWriter<UiNotification>,
 ) {
   for message in messages.read() {
     // Remove any existing error message
-    for mut text in &mut error_message_query {
+    for mut text in &mut notification_text_query {
       text.0 = "".to_string();
     }
+    ui_message_writer.write(UiNotification::info("Attempting to connect...".to_string()));
 
     // Ignore empty submissions
     if message.text.is_empty() {
@@ -256,20 +258,23 @@ fn handle_submit_text_messages(
 }
 
 /// A system to handle UI error messages and display them in the menu. Also re-enables the connect and back buttons.
-fn handle_ui_error_messages(
-  mut messages: MessageReader<UiErrorMessage>,
-  mut error_message_query: Query<&mut Text, With<ErrorMessage>>,
+fn handle_ui_notification_messages(
+  mut messages: MessageReader<UiNotification>,
+  mut notification_text_query: Query<(&mut Text, &mut TextColor), With<NotificationText>>,
   mut connect_button_interaction: Single<&mut CustomInteraction, (With<ConnectButton>, Without<BackButton>)>,
   mut back_button_interaction: Single<&mut CustomInteraction, (With<BackButton>, Without<ConnectButton>)>,
 ) {
-  for event in messages.read() {
-    for mut text in &mut error_message_query {
-      text.0 = event.message.clone();
+  for notification in messages.read() {
+    for (mut text, mut text_colour) in &mut notification_text_query {
+      text.0 = notification.text.clone();
+      text_colour.0 = *TextColor(notification.colour());
     }
-    **connect_button_interaction = CustomInteraction::None;
-    connect_button_interaction.set_changed();
-    **back_button_interaction = CustomInteraction::None;
-    back_button_interaction.set_changed();
+    if notification.should_reset_custom_interaction() {
+      **connect_button_interaction = CustomInteraction::None;
+      connect_button_interaction.set_changed();
+      **back_button_interaction = CustomInteraction::None;
+      back_button_interaction.set_changed();
+    }
   }
 }
 
