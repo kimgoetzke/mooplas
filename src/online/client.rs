@@ -2,7 +2,9 @@ use crate::online::lib::{
   ClientMessage, NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage,
   SerialisableInputActionMessage, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
 };
-use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
+use crate::prelude::constants::{
+  CLIENT_HAND_SHAKE_TIMEOUT_SECS, SHOW_VISUALISERS_BY_DEFAULT, VISUALISER_DISPLAY_VALUES,
+};
 use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
   SnakeHead, UiErrorMessage, WinnerInfo,
@@ -10,15 +12,18 @@ use crate::prelude::{
 use crate::shared::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH, WRAPAROUND_MARGIN};
 use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
 use bevy::app::Update;
+use bevy::input::common_conditions::input_toggle_active;
 use bevy::log::*;
 use bevy::math::Quat;
 use bevy::prelude::{
-  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
-  State, Time, Transform, With, Without, in_state, resource_exists,
+  App, Commands, Entity, IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, NextState, Plugin, Query, Res,
+  ResMut, State, Time, Transform, With, Without, in_state, resource_exists,
 };
+use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::{DefaultChannel, RenetClient};
 use bevy_renet::{RenetClientPlugin, client_connected};
+use renet_visualizer::RenetClientVisualizer;
 use std::time::Instant;
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
@@ -30,6 +35,12 @@ impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_plugins((RenetClientPlugin, NetcodeClientPlugin))
+      .add_systems(
+        Update,
+        update_client_visualiser_system
+          .run_if(resource_exists::<RenetClientVisualizer<VISUALISER_DISPLAY_VALUES>>)
+          .run_if(input_toggle_active(SHOW_VISUALISERS_BY_DEFAULT, KeyCode::F2)),
+      )
       .add_systems(
         Update,
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
@@ -55,6 +66,20 @@ impl Plugin for ClientPlugin {
           .run_if(in_state(AppState::Playing))
           .run_if(client_connected),
       );
+  }
+}
+
+/// System that updates and displays the Renet client visualiser when toggled by the user.
+fn update_client_visualiser_system(
+  mut egui_contexts: EguiContexts,
+  mut visualizer: ResMut<RenetClientVisualizer<200>>,
+  client: Res<RenetClient>,
+) {
+  visualizer.add_network_info(client.network_info());
+  if let Ok(ctx) = egui_contexts.ctx_mut() {
+    visualizer.show_window(ctx);
+  } else {
+    warn!("Failed to get Egui context for Renet client visualiser");
   }
 }
 

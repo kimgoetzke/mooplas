@@ -9,6 +9,7 @@ use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
 use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake};
 use crate::online::server::ServerPlugin;
+use crate::prelude::constants::VISUALISER_DISPLAY_VALUES;
 use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage, UiErrorMessage};
 use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
@@ -20,6 +21,7 @@ use bevy_renet::netcode::{
   ServerAuthentication, ServerConfig,
 };
 use bevy_renet::renet::{ConnectionConfig, RenetClient, RenetServer};
+use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
@@ -64,6 +66,8 @@ fn handle_toggle_menu_message(
         commands.remove_resource::<NetcodeServerTransport>();
         commands.remove_resource::<RenetClient>();
         commands.remove_resource::<NetcodeClientTransport>();
+        commands.remove_resource::<RenetServerVisualizer<VISUALISER_DISPLAY_VALUES>>();
+        commands.remove_resource::<RenetClientVisualizer<VISUALISER_DISPLAY_VALUES>>();
       }
       NetworkRole::Server => {
         let port = DEFAULT_SERVER_PORT;
@@ -75,6 +79,7 @@ fn handle_toggle_menu_message(
             });
             commands.insert_resource(server);
             commands.insert_resource(transport);
+            commands.insert_resource(RenetServerVisualizer::<VISUALISER_DISPLAY_VALUES>::default());
           }
           Err(e) => {
             error!("Failed to create server: {}", e);
@@ -107,6 +112,7 @@ fn handle_connection_info_message(
           commands.insert_resource(client);
           commands.insert_resource(transport);
           commands.insert_resource(PendingClientHandshake::new());
+          commands.insert_resource(RenetClientVisualizer::<VISUALISER_DISPLAY_VALUES>::default());
         }
         Err(e) => {
           error!("An error occurred: {}", e.to_string());
@@ -177,11 +183,12 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
       if let Ok(response_body) = response.body_mut().read_to_string() {
         let ip_string = response_body.trim();
         if let Ok(ip) = ip_string.parse::<std::net::IpAddr>() {
-          info!("Public IP detected using [{}]: {}", service, ip);
-          return Some(SocketAddr::new(ip, port));
-        } else {
-          warn!("Invalid IP format received from service [{}]: {}", service, ip_string);
+          if ip.is_ipv6() {
+            info!("Public IPv6 detected using [{}]: {}", service, ip);
+            return Some(SocketAddr::new(ip, port));
+          }
         }
+        warn!("Invalid IP format received from service [{}]: {}", service, ip_string);
       } else {
         warn!("Failed to read response body from [{}]", service);
       }

@@ -109,3 +109,10 @@ pub(crate) const TEXT_COLOUR: TextColor = TextColor(Color::srgb(0.9, 0.9, 0.9));
 /// The timeout duration (in seconds) for the client handshake process to complete before considering it as having
 /// failed.
 pub(crate) const CLIENT_HAND_SHAKE_TIMEOUT_SECS: u64 = 7;
+
+/// Whether to show the Renet visualisers by default when starting the game in online multiplayer mode.
+/// Use this only during development and testing.
+pub(crate) const SHOW_VISUALISERS_BY_DEFAULT: bool = true;
+
+/// The number of values to display in the renet visualiser graphs.
+pub(crate) const VISUALISER_DISPLAY_VALUES: usize = 200;
