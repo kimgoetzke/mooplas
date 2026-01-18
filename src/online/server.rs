@@ -165,8 +165,18 @@ fn receive_unreliable_client_inputs_system(
       if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::Input(action) => {
-            // TODO: Validate input action here
-            input_message.write(action.into());
+            let message: InputMessage = action.into();
+            if match message {
+              InputMessage::Action(player_id) => lobby.validate_registration(&client_id, &player_id),
+              InputMessage::Move(player_id, _) => lobby.validate_registration(&client_id, &player_id),
+            } {
+              input_message.write(message);
+              continue;
+            }
+            warn!(
+              "Received invalid input action on [Unreliable] channel from client ID [{}]: {:?}",
+              client_id, message
+            );
           }
           _ => {
             warn!(

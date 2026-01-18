@@ -48,6 +48,16 @@ impl Lobby {
     self.registered.get(client_id).cloned().unwrap_or(Vec::new())
   }
 
+  /// Validates if the given player ID is registered for the given client ID. Returns `true` if a player is registered
+  /// for the client, `false` otherwise.
+  pub fn validate_registration(&self, client_id: &ClientId, player_id: &PlayerId) -> bool {
+    if let Some(players) = self.registered.get(client_id) {
+      players.contains(player_id)
+    } else {
+      false
+    }
+  }
+
   pub fn clear(&mut self) {
     self.connected.clear();
     self.registered.clear();
@@ -123,5 +133,55 @@ mod tests {
     lobby.register_player(client_id, player_id2);
     let players = lobby.get_registered_players_cloned(&client_id);
     assert_eq!(players, vec![player_id1, player_id2]);
+  }
+
+  #[test]
+  fn validate_registration_returns_true_for_registered_player() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::from(6u64);
+    let player_id = PlayerId(42);
+    lobby.register_player(client_id, player_id);
+    assert!(lobby.validate_registration(&client_id, &player_id));
+  }
+
+  #[test]
+  fn validate_registration_returns_false_for_unregistered_player() {
+    let lobby = Lobby::default();
+    let client_id = ClientId::from(6u64);
+    let player_id = PlayerId(42);
+    assert!(!lobby.validate_registration(&client_id, &player_id));
+  }
+
+  #[test]
+  fn validate_registration_returns_false_for_different_client() {
+    let mut lobby = Lobby::default();
+    let registered_client = ClientId::default();
+    let other_client = ClientId::from(1u64);
+    let registered_player = PlayerId(42);
+    lobby.register_player(registered_client, registered_player);
+    assert!(!lobby.validate_registration(&other_client, &registered_player));
+  }
+
+  #[test]
+  fn validate_registration_returns_false_for_different_player() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let registered_player = PlayerId(42);
+    let other_player = PlayerId(43);
+    lobby.register_player(client_id, registered_player);
+    assert!(!lobby.validate_registration(&client_id, &other_player));
+  }
+
+  #[test]
+  fn validate_registration_returns_false_after_player_is_unregistered() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default();
+    let player_id_1 = PlayerId(42);
+    let player_id_2 = PlayerId(43);
+    lobby.register_player(client_id, player_id_1);
+    lobby.register_player(client_id, player_id_2);
+    lobby.unregister_player(client_id, player_id_1);
+    assert!(!lobby.validate_registration(&client_id, &player_id_1));
+    assert!(lobby.validate_registration(&client_id, &player_id_2));
   }
 }
