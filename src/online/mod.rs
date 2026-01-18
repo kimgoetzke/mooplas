@@ -98,7 +98,7 @@ fn handle_toggle_menu_message(
 fn handle_connection_info_message(
   mut messages: MessageReader<ConnectionInfoMessage>,
   mut commands: Commands,
-  mut ui_message_writer: MessageWriter<UiNotification>,
+  mut ui_message: MessageWriter<UiNotification>,
 ) {
   for message in messages.read() {
     debug!(
@@ -116,13 +116,13 @@ fn handle_connection_info_message(
         }
         Err(e) => {
           error!("An error occurred: {}", e.to_string());
-          ui_message_writer.write(UiNotification::error(e.to_string()));
+          ui_message.write(UiNotification::error(e.to_string()));
         }
       }
     } else {
       let message = format!("Invalid server address or port: [{}]", message.connection_string);
       warn!("Failed to parse connection string: {}", message);
-      ui_message_writer.write(UiNotification::error(message));
+      ui_message.write(UiNotification::error(message));
     }
   }
 }

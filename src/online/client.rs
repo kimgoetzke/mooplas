@@ -90,7 +90,7 @@ pub fn client_handshake_system(
   mut commands: Commands,
   client: Res<RenetClient>,
   handshake: Option<Res<PendingClientHandshake>>,
-  mut ui_message_writer: MessageWriter<UiNotification>,
+  mut ui_message: MessageWriter<UiNotification>,
 ) {
   let handshake = match handshake {
     Some(h) => h,
@@ -107,7 +107,7 @@ pub fn client_handshake_system(
   if now > handshake.deadline {
     let message = "Couldn't complete handshake with server - is there a typo in the connection string?".to_string();
     error!("Timed out after {}s: {}", CLIENT_HAND_SHAKE_TIMEOUT_SECS, message);
-    ui_message_writer.write(UiNotification::error(message));
+    ui_message.write(UiNotification::error(message));
     commands.remove_resource::<RenetClient>();
     commands.remove_resource::<NetcodeClientTransport>();
     commands.remove_resource::<PendingClientHandshake>();
