@@ -219,16 +219,12 @@ fn handle_button_interactions_system(
 fn handle_submit_text_messages(
   mut messages: MessageReader<SubmitText>,
   mut connection_info_message: MessageWriter<ConnectionInfoMessage>,
-  mut notification_text_query: Query<&mut Text, With<NotificationText>>,
   mut connect_button_interaction: Single<&mut CustomInteraction, (With<ConnectButton>, Without<BackButton>)>,
   mut back_button_interaction: Single<&mut CustomInteraction, (With<BackButton>, Without<ConnectButton>)>,
   mut ui_message: MessageWriter<UiNotification>,
 ) {
   for message in messages.read() {
-    // Remove any existing error message
-    for mut text in &mut notification_text_query {
-      text.0 = "".to_string();
-    }
+    // Let user know we're trying to connect
     ui_message.write(UiNotification::info("Attempting to connect...".to_string()));
 
     // Ignore empty submissions
