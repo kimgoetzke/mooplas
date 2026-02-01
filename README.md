@@ -7,6 +7,9 @@ This repository contains a basic multiplayer game inspired by _Achtung, die Kurv
 
 ## Features
 
+> [!NOTE]
+> This branch uses `bevy_renet` (over UDP) for networking.
+
 - Implementation of _Achtung, die Kurve!_ with screen wrap-around
 - Local multiplayer (up to 5 players)
 - Online multiplayer (up to 5 players) over UDP using `bevy_renet`
@@ -62,7 +65,7 @@ Upgrade the flake by running `nix flake update --flake .` in the repository's ba
 
 ## How to build WASM for the web
 
-> [!WARNING] 
+> [!WARNING]
 > The web version does not support online multiplayer due to browser limitations around UDP.
 
 #### Prerequisites
