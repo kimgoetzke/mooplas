@@ -62,6 +62,9 @@ Upgrade the flake by running `nix flake update --flake .` in the repository's ba
 
 ## How to build WASM for the web
 
+> [!WARNING] 
+> The web version does not support online multiplayer due to browser limitations around UDP.
+
 #### Prerequisites
 
 1. Run (already included in the Flake if using Nix):
@@ -85,7 +88,7 @@ Then you can build the WASM file:
 
 1. Build the WASM file:
    ```shell
-   RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release
+   RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --no-default-features
    ```
 2. Clean the `/www/public` directory and copy the game's assets over:
     - **Linux**:

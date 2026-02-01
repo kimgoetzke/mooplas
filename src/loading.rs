@@ -11,7 +11,7 @@ impl Plugin for LoadingPlugin {
   }
 }
 
-// TODO: Add asset loading, possibly loading screen
+// TODO: Add asset loading, possibly loading screen for web builds
 fn change_state_system(mut next_state: ResMut<NextState<AppState>>) {
   next_state.set(AppState::Preparing);
 }
