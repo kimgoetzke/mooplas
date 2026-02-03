@@ -7,10 +7,11 @@ This repository contains a basic multiplayer game inspired by _Achtung, die Kurv
 
 ## Features
 
-- Implementation of _Achtung, die Kurve!_ with screen wrap-around
+- Implementation of _Achtung, die Kurve!_ (also known as _Curve Fever_)
 - Local multiplayer (up to 5 players)
 - Online multiplayer (up to 5 players) over UDP using `bevy_renet`
 - Touch controls for mobile devices
+- Cross-platform (Linux, Windows, WebAssembly)
 
 ## Demo
 
@@ -62,7 +63,7 @@ Upgrade the flake by running `nix flake update --flake .` in the repository's ba
 
 ## How to build WASM for the web
 
-> [!WARNING] 
+> [!WARNING]
 > The web version does not support online multiplayer due to browser limitations around UDP.
 
 #### Prerequisites

@@ -9,7 +9,6 @@ use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
   SnakeHead, UiNotification, WinnerInfo,
 };
-use crate::shared::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH, WRAPAROUND_MARGIN};
 use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
 use bevy::app::Update;
 use bevy::input::common_conditions::input_toggle_active;
@@ -295,34 +294,10 @@ fn apply_state_interpolation_system(
 
   // Interpolate all remote players towards their targets
   let delta = time.delta_secs();
-  let domain_width = RESOLUTION_WIDTH as f32 + 2. * WRAPAROUND_MARGIN;
-  let domain_height = RESOLUTION_HEIGHT as f32 + 2. * WRAPAROUND_MARGIN;
 
   for (mut transform, interpolation, _) in snake_head_query.iter_mut() {
     let current_position = transform.translation.truncate();
-    let mut target_position = interpolation.target_position;
-
-    // If the difference between current and target X position is big enough to indicate wraparound,
-    // adjust the target position to keep going and let the wraparound happen in the wraparound system
-    let dx = target_position.x - current_position.x;
-    if dx.abs() > domain_width / 2. {
-      if dx > 0. {
-        target_position.x -= domain_width;
-      } else {
-        target_position.x += domain_width;
-      }
-    }
-
-    // If the difference between current and target Y position is big enough to indicate wraparound,
-    // adjust the target position to keep going and let the wraparound happen in the wraparound system
-    let dy = target_position.y - current_position.y;
-    if dy.abs() > domain_height / 2. {
-      if dy > 0. {
-        target_position.y -= domain_height;
-      } else {
-        target_position.y += domain_height;
-      }
-    }
+    let target_position = interpolation.target_position;
 
     let new_position = current_position.lerp(target_position, interpolation.interpolation_speed * delta * 60.);
     transform.translation.x = new_position.x;
@@ -339,6 +314,7 @@ fn apply_state_interpolation_system(
 mod tests {
   use super::*;
   use crate::online::lib::NetworkingMessagesPlugin;
+  use crate::prelude::constants::RESOLUTION_WIDTH;
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::math::Vec3;
   use bevy::prelude::*;
@@ -394,10 +370,10 @@ mod tests {
   }
 
   #[test]
-  fn apply_state_interpolation_system_ignores_post_wraparound_position() {
+  fn apply_state_interpolation_system_handles_far_targets() {
     let mut app = setup();
 
-    // Spawn an entity that the system will operate on
+    // Spawn an entity that the system will operate on at the right edge
     let entity = app
       .world_mut()
       .spawn((
@@ -408,7 +384,7 @@ mod tests {
       ))
       .id();
 
-    // Add the system to be tested and the message to be processed inside the system
+    // Add the system to be tested and the message to be processed inside the system - target is on the left side
     app.add_systems(Update, apply_state_interpolation_system);
     app
       .world_mut()
@@ -419,18 +395,15 @@ mod tests {
     // Advance the time a little
     advance_time_by(&mut app, Duration::from_millis(100));
 
+    // After interpolation the X should have moved towards 0 (decreased)
     let translation = app.world_mut().get::<Transform>(entity).unwrap().translation;
-    let epsilon = 1e-4_f32; // Tolerance for floating point rounding
     assert!(
-      (translation.y - 100.0).abs() <= epsilon,
-      "Y position differs by more than {}: {}",
-      epsilon,
-      translation.y
+      translation.y > 99.999 && translation.y < 100.001,
+      "Y position should remain approximately 100"
     );
-    assert_ne!(translation.x, 0.);
     assert!(
-      translation.x > RESOLUTION_WIDTH as f32,
-      "X position did not advance beyond during interpolation"
+      translation.x < RESOLUTION_WIDTH as f32,
+      "X position should move towards the target on the left"
     );
   }
 }

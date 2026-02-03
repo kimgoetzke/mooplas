@@ -44,11 +44,6 @@ pub(crate) const ROTATION_SPEED: f32 = 120.;
 // Snake and gameplay constants
 // --------------------------------//
 
-/// The margin beyond the screen edges for wraparound behaviour to occur. Allows adjusting the point at which wraparound
-/// happens. The larger the margin, the further the wraparound entity can travel off-screen before reappearing on the
-/// opposite side.
-pub(crate) const WRAPAROUND_MARGIN: f32 = 2.; // Must be divisible by 2
-
 /// The length (in pixel) to which the snake tail needs to grow before certain logic is applied, such as introducing
 /// gaps.
 pub(crate) const SNAKE_TAIL_POSITION_SAMPLE_DISTANCE: f32 = 5.;

@@ -1,3 +1,4 @@
+use crate::prelude::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, NetworkRole, PlayerId,
   PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
@@ -33,7 +34,11 @@ impl Plugin for GameLoopPlugin {
       )
       .add_systems(
         Update,
-        (check_snake_collisions_system, transition_to_game_over_system)
+        (
+          check_snake_collisions_system,
+          check_screen_bounds_collisions_system,
+          transition_to_game_over_system,
+        )
           .run_if(in_state(AppState::Playing))
           .run_if(|role: Res<NetworkRole>| role.is_server() || role.is_none()),
       )
@@ -174,6 +179,28 @@ fn check_snake_collisions_system(
 
     process_pair(a, b);
     process_pair(b, a);
+  }
+}
+
+/// Checks whether any snake head is "touching" the bounds. If so, mark the corresponding player as dead.
+fn check_screen_bounds_collisions_system(
+  mut registered_players: ResMut<RegisteredPlayers>,
+  snake_head_query: Query<(&GlobalTransform, &PlayerId), With<SnakeHead>>,
+) {
+  let half_width = RESOLUTION_WIDTH as f32 / 2.;
+  let half_height = RESOLUTION_HEIGHT as f32 / 2.;
+
+  for (global_transform, player_id) in snake_head_query.iter() {
+    let position = global_transform.translation();
+    if position.x.abs() > half_width || position.y.abs() > half_height {
+      if let Some(player) = registered_players.players.iter_mut().find(|p| p.id == *player_id) {
+        debug!(
+          "Player [{:?}] left bounds at position {:?} and is eliminated",
+          player.id, position
+        );
+        player.alive = false;
+      }
+    }
   }
 }
 

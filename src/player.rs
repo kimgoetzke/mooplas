@@ -1,7 +1,5 @@
 use crate::prelude::constants::*;
-use crate::prelude::{
-  AppState, Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeSegment, SnakeTail, SpawnPoints, WrapAroundEntity,
-};
+use crate::prelude::{AppState, Player, PlayerId, RegisteredPlayers, SnakeHead, SnakeSegment, SnakeTail, SpawnPoints};
 use avian2d::math::Vector;
 use avian2d::prelude::*;
 use bevy::asset::RenderAssetUsages;
@@ -19,7 +17,6 @@ impl Plugin for PlayerPlugin {
       .add_systems(
         Update,
         ((
-          wraparound_system,
           update_snake_tail_segments_system,
           update_active_segment_collider_system,
           update_active_segment_mesh_system,
@@ -91,7 +88,6 @@ fn spawn_players_system(
         Name::new("Snake Head"),
         SnakeHead,
         PlayerId(index),
-        WrapAroundEntity,
         Sprite {
           image: snake_head_handle.clone(),
           color: player.colour,
@@ -381,51 +377,6 @@ fn create_snake_tail_mesh(positions: &[Vec2]) -> Mesh {
   Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::default())
     .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, vertices)
     .with_inserted_indices(Indices::U32(indices))
-}
-
-/// Wraps the relevant entities around the screen edges, making them reappear on the opposite side.
-fn wraparound_system(
-  mut snake_head_query: Query<(&mut Transform, &GlobalTransform, &ChildOf), (With<SnakeHead>, With<WrapAroundEntity>)>,
-  mut snake_tail_query: Query<&mut SnakeTail>,
-  children_query: Query<&Children>,
-) {
-  let extents = Vec3::new(RESOLUTION_WIDTH as f32 / 2., RESOLUTION_HEIGHT as f32 / 2., 0.);
-  let domain_width = RESOLUTION_WIDTH as f32 + 2.0 * WRAPAROUND_MARGIN;
-  let domain_height = RESOLUTION_HEIGHT as f32 + 2.0 * WRAPAROUND_MARGIN;
-
-  for (mut transform, global_transform, parent) in snake_head_query.iter_mut() {
-    let global_translation = global_transform.translation();
-    let mut was_wrapped = false;
-
-    // Move snake head to opposite side if it goes out of bounds and set flag
-    if global_translation.x > (extents.x + WRAPAROUND_MARGIN) {
-      transform.translation.x -= domain_width;
-      was_wrapped = true;
-    } else if global_translation.x < (-extents.x - WRAPAROUND_MARGIN) {
-      transform.translation.x += domain_width;
-      was_wrapped = true;
-    }
-    if global_translation.y > (extents.y + WRAPAROUND_MARGIN) {
-      transform.translation.y -= domain_height;
-      was_wrapped = true;
-    } else if global_translation.y < (-extents.y - WRAPAROUND_MARGIN) {
-      transform.translation.y += domain_height;
-      was_wrapped = true;
-    }
-
-    // If snake head was moved, find the corresponding snake tail and stop it from growing
-    if was_wrapped {
-      let parent_entity = parent.get();
-      if let Ok(children) = children_query.get(parent_entity) {
-        for child in children.iter() {
-          if let Ok(mut snake_tail) = snake_tail_query.get_mut(child) {
-            snake_tail.gap_samples_remaining = SNAKE_GAP_LENGTH / 2;
-            snake_tail.distance_since_last_sample = 0.0;
-          }
-        }
-      }
-    }
-  }
 }
 
 /// Disables eliminated players by removing the [`SnakeHead`] component, which prevents input and stops the snake from

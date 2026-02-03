@@ -13,10 +13,6 @@ pub struct Player;
 #[derive(Component)]
 pub struct SnakeHead;
 
-/// A marker component for entities that should wrap around the screen edges.
-#[derive(Component)]
-pub struct WrapAroundEntity;
-
 /// A component identifying a player. Used to link player entities together.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlayerId(pub u8);
