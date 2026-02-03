@@ -129,14 +129,16 @@ fn spawn_touch_controls_ui(
           parent
             .spawn((
               // Left movement button
-              touch_control_button(None),
+              touch_control_button(
+                None,
+                BorderRadius {
+                  top_left: percent(50),
+                  bottom_left: percent(50),
+                  top_right: percent(20),
+                  bottom_right: percent(20),
+                },
+              ),
               TouchControl::Movement(config.id.into(), -1.0),
-              BorderRadius {
-                top_left: percent(50),
-                bottom_left: percent(50),
-                top_right: percent(20),
-                bottom_right: percent(20),
-              },
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -150,9 +152,8 @@ fn spawn_touch_controls_ui(
           parent
             .spawn((
               // Player action button
-              touch_control_button(Some(config.colour)),
+              touch_control_button(Some(config.colour), BorderRadius::all(percent(20))),
               TouchControl::Action(config.id.into()),
-              BorderRadius::all(percent(20)),
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -164,14 +165,16 @@ fn spawn_touch_controls_ui(
           parent
             .spawn((
               // Right movement button
-              touch_control_button(None),
+              touch_control_button(
+                None,
+                BorderRadius {
+                  top_left: percent(20),
+                  bottom_left: percent(20),
+                  top_right: percent(50),
+                  bottom_right: percent(50),
+                },
+              ),
               TouchControl::Movement(config.id.into(), 1.0),
-              BorderRadius {
-                top_left: percent(20),
-                bottom_left: percent(20),
-                top_right: percent(50),
-                bottom_right: percent(50),
-              },
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -371,7 +374,7 @@ fn controller_positioning_node(config: &AvailablePlayerConfig) -> (Node, UiTrans
 }
 
 /// A bundle for a button that is involved in controlling a player.
-fn touch_control_button(custom_colour: Option<Color>) -> impl Bundle {
+fn touch_control_button(custom_colour: Option<Color>, border_radius: BorderRadius) -> impl Bundle {
   (
     Node {
       width: px(TOUCH_CONTROL_WIDTH),
@@ -380,6 +383,7 @@ fn touch_control_button(custom_colour: Option<Color>) -> impl Bundle {
       justify_content: JustifyContent::Center,
       align_items: AlignItems::Center,
       margin: UiRect::all(px(MARGIN)),
+      border_radius,
       ..default()
     },
     TouchControlButton,

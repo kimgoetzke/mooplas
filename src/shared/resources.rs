@@ -114,7 +114,7 @@ pub struct SpawnPoints {
 }
 
 /// A resource that holds all pre-configured player configurations available for players to choose from.
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Debug)]
 pub struct AvailablePlayerConfigs {
   pub(crate) configs: Vec<AvailablePlayerConfig>,
 }

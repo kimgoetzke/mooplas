@@ -15,8 +15,8 @@ use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, AssetServer, Changed, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font,
   Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection,
-  Name, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, SpawnRelated, Text,
-  TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
+  Name, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, Text, TextBackgroundColor,
+  TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
 };
 use bevy::text::LineHeight;
 use bevy::ui::{BackgroundColor, PositionType, percent};
@@ -287,7 +287,8 @@ fn spawn_call_to_action_to_start(
   if !has_any_registered {
     parent.spawn((
       Text::new("More players needed to start..."),
-      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      default_font.clone(),
+      LineHeight::RelativeToFont(3.),
       TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
@@ -295,7 +296,8 @@ fn spawn_call_to_action_to_start(
   } else if !is_permitted_action {
     parent.spawn((
       Text::new("Waiting for host to start..."),
-      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      default_font.clone(),
+      LineHeight::RelativeToFont(3.),
       TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
@@ -303,7 +305,8 @@ fn spawn_call_to_action_to_start(
   } else {
     parent.spawn((
       Text::new("Press "),
-      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      default_font.clone(),
+      LineHeight::RelativeToFont(3.),
       TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
@@ -313,7 +316,8 @@ fn spawn_call_to_action_to_start(
     } else {
       parent.spawn((
         Text::new("[Space]"),
-        default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+        default_font.clone(),
+        LineHeight::RelativeToFont(3.),
         TextColor(Color::from(ACCENT_COLOUR)),
         TextLayout::new(Justify::Center, LineBreak::WordBoundary),
         default_shadow,
@@ -321,7 +325,8 @@ fn spawn_call_to_action_to_start(
     }
     parent.spawn((
       Text::new(" to start..."),
-      default_font.clone().with_line_height(LineHeight::RelativeToFont(3.)),
+      default_font.clone(),
+      LineHeight::RelativeToFont(3.),
       TEXT_COLOUR,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
@@ -686,7 +691,8 @@ fn spawn_game_over_ui_system(
           if !is_permitted_action {
             parent.spawn((
               Text::new("Waiting for host to continue..."),
-              default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+              default_font(&font),
+              LineHeight::RelativeToFont(3.0),
               TEXT_COLOUR,
               TextLayout::new(Justify::Center, LineBreak::WordBoundary),
               default_shadow,
@@ -696,7 +702,8 @@ fn spawn_game_over_ui_system(
 
           parent.spawn((
             Text::new("Press "),
-            default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+            default_font(&font),
+            LineHeight::RelativeToFont(3.0),
             TEXT_COLOUR,
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,
@@ -707,7 +714,8 @@ fn spawn_game_over_ui_system(
           } else {
             parent.spawn((
               Text::new("[Space]"),
-              default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+              default_font(&font),
+              LineHeight::RelativeToFont(3.0),
               TextColor(Color::from(ACCENT_COLOUR)),
               TextLayout::new(Justify::Center, LineBreak::WordBoundary),
               default_shadow,
@@ -716,7 +724,8 @@ fn spawn_game_over_ui_system(
 
           parent.spawn((
             Text::new(" to continue..."),
-            default_font(&font).with_line_height(LineHeight::RelativeToFont(3.0)),
+            default_font(&font),
+            LineHeight::RelativeToFont(3.0),
             TEXT_COLOUR,
             TextLayout::new(Justify::Center, LineBreak::WordBoundary),
             default_shadow,

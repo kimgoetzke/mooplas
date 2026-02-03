@@ -7,21 +7,25 @@ mod server;
 
 use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
-use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake};
+use crate::online::lib::{
+  NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake, RenetClientVisualiser,
+  RenetServerVisualiser,
+};
 use crate::online::server::ServerPlugin;
-use crate::prelude::constants::VISUALISER_DISPLAY_VALUES;
 use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage, UiNotification};
 use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
 use bevy::log::*;
-use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, Plugin, Res, ResMut, in_state};
+use bevy::prelude::{
+  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, On, Plugin, Res, ResMut, in_state,
+};
 use bevy_inspector_egui::egui::TextBuffer;
 use bevy_renet::netcode::{
-  ClientAuthentication, NetcodeClientTransport, NetcodeError, NetcodeServerTransport, NetcodeTransportError,
-  ServerAuthentication, ServerConfig,
+  ClientAuthentication, NetcodeClientTransport, NetcodeError, NetcodeErrorEvent, NetcodeServerTransport,
+  NetcodeTransportError, ServerAuthentication, ServerConfig,
 };
-use bevy_renet::renet::{ConnectionConfig, RenetClient, RenetServer};
-use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
+use bevy_renet::renet::ConnectionConfig;
+use bevy_renet::{RenetClient, RenetServer};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
@@ -39,7 +43,7 @@ impl Plugin for OnlinePlugin {
           .run_if(in_state(AppState::Preparing))
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
       )
-      .add_systems(Update, handle_netcode_transport_error_message)
+      .add_observer(handle_netcode_transport_error_event)
       .add_plugins((InterfacePlugin, NetworkingResourcesPlugin, NetworkingMessagesPlugin));
     info!("Online multiplayer is enabled");
   }
@@ -66,8 +70,8 @@ fn handle_toggle_menu_message(
         commands.remove_resource::<NetcodeServerTransport>();
         commands.remove_resource::<RenetClient>();
         commands.remove_resource::<NetcodeClientTransport>();
-        commands.remove_resource::<RenetServerVisualizer<VISUALISER_DISPLAY_VALUES>>();
-        commands.remove_resource::<RenetClientVisualizer<VISUALISER_DISPLAY_VALUES>>();
+        commands.remove_resource::<RenetServerVisualiser>();
+        commands.remove_resource::<RenetClientVisualiser>();
       }
       NetworkRole::Server => {
         let port = DEFAULT_SERVER_PORT;
@@ -79,7 +83,7 @@ fn handle_toggle_menu_message(
             });
             commands.insert_resource(server);
             commands.insert_resource(transport);
-            commands.insert_resource(RenetServerVisualizer::<VISUALISER_DISPLAY_VALUES>::default());
+            commands.insert_resource(RenetServerVisualiser::default());
           }
           Err(e) => {
             error!("Failed to create server: {}", e);
@@ -112,7 +116,7 @@ fn handle_connection_info_message(
           commands.insert_resource(client);
           commands.insert_resource(transport);
           commands.insert_resource(PendingClientHandshake::new());
-          commands.insert_resource(RenetClientVisualizer::<VISUALISER_DISPLAY_VALUES>::default());
+          commands.insert_resource(RenetClientVisualiser::default());
         }
         Err(e) => {
           error!("An error occurred: {}", e.to_string());
@@ -202,15 +206,16 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
 }
 
 #[allow(clippy::never_loop)]
-fn handle_netcode_transport_error_message(mut messages: MessageReader<NetcodeTransportError>) {
-  for error in messages.read() {
-    if matches!(
-      error,
-      NetcodeTransportError::Renet(_) | NetcodeTransportError::Netcode(NetcodeError::Disconnected(_))
-    ) {
-      return;
-    }
-    error!("Netcode transport error occurred: [{}], panicking now...", error);
-    panic!("{}", error);
+fn handle_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>) {
+  if matches!(
+    **error_event,
+    NetcodeTransportError::Renet(_) | NetcodeTransportError::Netcode(NetcodeError::Disconnected(_))
+  ) {
+    return;
   }
+  error!(
+    "Netcode transport error occurred: [{}], panicking now...",
+    **error_event
+  );
+  panic!("{}", **error_event);
 }

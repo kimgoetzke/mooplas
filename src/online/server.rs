@@ -1,24 +1,24 @@
-use crate::online::lib::{ClientMessage, Lobby, ServerMessage, decode_from_bytes, encode_to_bytes, utils};
+use crate::online::lib::{
+  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
+};
 use crate::prelude::constants::SHOW_VISUALISERS_BY_DEFAULT;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
   RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
 };
-use crate::shared::constants::VISUALISER_DISPLAY_VALUES;
 use crate::shared::{ExitLobbyMessage, WinnerInfo};
 use bevy::app::{App, Plugin, Update};
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::log::*;
 use bevy::prelude::{
-  Commands, IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, NextState, Query, Res, ResMut, Resource,
+  Commands, IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, NextState, On, Query, Res, ResMut, Resource,
   StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
 use bevy::time::TimerMode;
 use bevy_inspector_egui::bevy_egui::EguiContexts;
-use bevy_renet::RenetServerPlugin;
 use bevy_renet::netcode::NetcodeServerPlugin;
-use bevy_renet::renet::{ClientId, DefaultChannel, RenetServer, ServerEvent};
-use renet_visualizer::RenetServerVisualizer;
+use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
+use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
 use std::time::Duration;
 
 /// A plugin that adds server-side online multiplayer capabilities to the game. Only active when the game is running in
@@ -32,16 +32,13 @@ impl Plugin for ServerPlugin {
       .add_systems(
         Update,
         update_server_visualiser_system
-          .run_if(resource_exists::<RenetServerVisualizer<VISUALISER_DISPLAY_VALUES>>)
+          .run_if(resource_exists::<RenetServerVisualiser>)
           .run_if(input_toggle_active(SHOW_VISUALISERS_BY_DEFAULT, KeyCode::F2)),
       )
+      .add_observer(receive_server_events)
       .add_systems(
         Update,
-        (
-          receive_server_events,
-          receive_ordered_client_messages_system,
-          broadcast_local_app_state_system,
-        )
+        (receive_ordered_client_messages_system, broadcast_local_app_state_system)
           .run_if(resource_exists::<RenetServer>),
       )
       .add_systems(
@@ -74,22 +71,22 @@ const CLIENT_MESSAGE_SERIALISATION: &'static str = "Failed to serialise client m
 #[derive(Resource)]
 struct ShutdownCountdown(Timer);
 
-/// System that updates and displays the Renet server visualiser when toggled by the user.
+// /// System that updates and displays the Renet server visualiser when toggled by the user.
 fn update_server_visualiser_system(
   mut egui_contexts: EguiContexts,
-  mut visualizer: ResMut<RenetServerVisualizer<200>>,
+  mut visualiser: ResMut<RenetServerVisualiser>,
   server: Res<RenetServer>,
 ) {
-  visualizer.update(&server);
+  visualiser.update(&server);
   if let Ok(result) = egui_contexts.ctx_mut() {
-    visualizer.show_window(result);
+    visualiser.show_window(result);
   } else {
     warn!("Failed to get Egui context for Renet server visualiser");
   }
 }
 
 fn receive_server_events(
-  mut messages: MessageReader<ServerEvent>,
+  server_event: On<RenetServerEvent>,
   mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
@@ -97,59 +94,57 @@ fn receive_server_events(
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
-  mut visualiser: ResMut<RenetServerVisualizer<VISUALISER_DISPLAY_VALUES>>,
+  mut visualiser: ResMut<RenetServerVisualiser>,
 ) {
-  for message in messages.read() {
-    match message {
-      ServerEvent::ClientConnected { client_id } => {
-        info!("Client with ID [{}] connected", client_id);
-        visualiser.add_client(*client_id);
+  match **server_event {
+    ServerEvent::ClientConnected { client_id } => {
+      info!("Client with ID [{}] connected", client_id);
+      visualiser.add_client(client_id);
 
-        // Notify all other clients about the new connection
-        let connected_message = encode_to_bytes(&ServerMessage::ClientConnected { client_id: *client_id })
-          .expect(CLIENT_MESSAGE_SERIALISATION);
-        server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, connected_message);
-        lobby.connected.push(*client_id);
+      // Notify all other clients about the new connection
+      let connected_message =
+        encode_to_bytes(&ServerMessage::ClientConnected { client_id }).expect(CLIENT_MESSAGE_SERIALISATION);
+      server.broadcast_message_except(client_id, DefaultChannel::ReliableOrdered, connected_message);
+      lobby.connected.push(client_id);
 
-        // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
-        // Send the current seed to the newly connected client
-        let seed_message = encode_to_bytes(&ServerMessage::ClientInitialised {
-          seed: seed.get(),
-          client_id: *client_id,
-        })
-        .expect("Failed to serialise seed message");
-        server.send_message(*client_id, DefaultChannel::ReliableOrdered, seed_message);
-      }
-      ServerEvent::ClientDisconnected { client_id, reason } => {
-        info!("Client with ID [{}] disconnected: {}", client_id, reason);
-        visualiser.remove_client(*client_id);
-
-        // Unregister any players associated with this client and notify other clients about it
-        for player_id in lobby.get_registered_players_cloned(client_id).iter() {
-          handle_player_registration_message_from_client(
-            &mut server,
-            &mut registered_players,
-            &available_configs,
-            &mut player_registration_message,
-            client_id,
-            *player_id,
-            false,
-            &mut lobby,
-          );
-        }
-
-        // Notify all other clients about the disconnection itself
-        let message = encode_to_bytes(&ServerMessage::ClientDisconnected { client_id: *client_id })
-          .expect(CLIENT_MESSAGE_SERIALISATION);
-        server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
-        lobby.connected.retain(|&id| id != *client_id);
-      }
+      // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
+      // Send the current seed to the newly connected client
+      let seed_message = encode_to_bytes(&ServerMessage::ClientInitialised {
+        seed: seed.get(),
+        client_id,
+      })
+      .expect("Failed to serialise seed message");
+      server.send_message(client_id, DefaultChannel::ReliableOrdered, seed_message);
     }
+    ServerEvent::ClientDisconnected { client_id, reason } => {
+      info!("Client with ID [{}] disconnected: {}", client_id, reason);
+      visualiser.remove_client(client_id);
 
-    // TODO: Improve state transition logic
-    if lobby.connected.len() > 0 {
-      next_state.set(AppState::Initialising);
+      // Unregister any players associated with this client and notify other clients about it
+      for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
+        handle_player_registration_message_from_client(
+          &mut server,
+          &mut registered_players,
+          &available_configs,
+          &mut player_registration_message,
+          &client_id,
+          *player_id,
+          false,
+          &mut lobby,
+        );
+      }
+
+      // Notify all other clients about the disconnection itself
+      let message =
+        encode_to_bytes(&ServerMessage::ClientDisconnected { client_id }).expect(CLIENT_MESSAGE_SERIALISATION);
+      server.broadcast_message_except(client_id, DefaultChannel::ReliableOrdered, message);
+      lobby.connected.retain(|&id| id != client_id);
     }
+  }
+
+  // TODO: Improve state transition logic
+  if lobby.connected.len() > 0 {
+    next_state.set(AppState::Initialising);
   }
 }
 

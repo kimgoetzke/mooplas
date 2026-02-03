@@ -9,17 +9,16 @@ use crate::ui::shared::BackgroundRoot;
 use bevy::asset::{AssetServer, Assets, Handle};
 use bevy::color::palettes::tailwind;
 use bevy::color::{Alpha, Color};
-use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::image::{Image, TextureAtlas, TextureAtlasLayout};
 use bevy::math::{UVec2, Vec2};
 use bevy::prelude::{
   AlignItems, BackgroundColor, BorderColor, BorderGradient, BorderRadius, Bundle, ChildOf, Component, Entity,
   FlexDirection, ImageNode, JustifyContent, LinearGradient, Name, Node, NodeImageMode, PositionType, Query,
-  SpriteImageMode, Text, TextFont, TextShadow, Timer, TimerMode, UiRect, With, default, percent, px,
+  SpriteImageMode, SpriteScalingMode, Text, TextFont, TextShadow, Timer, TimerMode, UiRect, With, children, default,
+  percent, px,
 };
-use bevy::prelude::{Commands, SpawnRelated, Sprite, Transform};
-use bevy::sprite::ScalingMode;
+use bevy::prelude::{Commands, Sprite, Transform};
 
 /// Creates a node with the given marker component and name. This node serves as the base for every menu.
 pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bundle {
@@ -110,7 +109,7 @@ pub fn spawn_background_if_not_exists<T: Component>(
         index: 0,
       }),
       custom_size: Some(Vec2::new(RESOLUTION_WIDTH as f32, RESOLUTION_HEIGHT as f32)),
-      image_mode: SpriteImageMode::Scale(ScalingMode::FillCenter),
+      image_mode: SpriteImageMode::Scale(SpriteScalingMode::FillCenter),
       ..default()
     },
     Transform::from_xyz(0., 0., -2.),
@@ -154,6 +153,7 @@ fn button(
       justify_content: JustifyContent::Center, // Horizontally centre child text
       align_items: AlignItems::Center,         // Vertically centre child text
       padding: UiRect::all(px(2)),
+      border_radius: BorderRadius::all(px(10)),
       ..default()
     },
     Name::new(format!("Button: {}", button_text)),
@@ -161,7 +161,6 @@ fn button(
     CustomInteraction::default(),
     ButtonAnimation,
     button_type,
-    BorderRadius::all(px(10)),
     BorderColor::all(Color::from(tailwind::SLATE_500)),
     BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_PRESSED))),
     default_gradient(0.),

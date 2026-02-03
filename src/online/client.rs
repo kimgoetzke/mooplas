@@ -1,10 +1,8 @@
 use crate::online::lib::{
   ClientMessage, NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage,
-  SerialisableInputActionMessage, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
+  RenetClientVisualiser, SerialisableInputActionMessage, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
 };
-use crate::prelude::constants::{
-  CLIENT_HAND_SHAKE_TIMEOUT_SECS, SHOW_VISUALISERS_BY_DEFAULT, VISUALISER_DISPLAY_VALUES,
-};
+use crate::prelude::constants::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, SHOW_VISUALISERS_BY_DEFAULT};
 use crate::prelude::{
   AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
   SnakeHead, UiNotification, WinnerInfo,
@@ -20,9 +18,8 @@ use bevy::prelude::{
 };
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
-use bevy_renet::renet::{DefaultChannel, RenetClient};
-use bevy_renet::{RenetClientPlugin, client_connected};
-use renet_visualizer::RenetClientVisualizer;
+use bevy_renet::renet::DefaultChannel;
+use bevy_renet::{RenetClient, RenetClientPlugin, client_connected};
 use std::time::Instant;
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
@@ -37,7 +34,7 @@ impl Plugin for ClientPlugin {
       .add_systems(
         Update,
         update_client_visualiser_system
-          .run_if(resource_exists::<RenetClientVisualizer<VISUALISER_DISPLAY_VALUES>>)
+          .run_if(resource_exists::<RenetClientVisualiser>)
           .run_if(input_toggle_active(SHOW_VISUALISERS_BY_DEFAULT, KeyCode::F2)),
       )
       .add_systems(
@@ -71,12 +68,12 @@ impl Plugin for ClientPlugin {
 /// System that updates and displays the Renet client visualiser when toggled by the user.
 fn update_client_visualiser_system(
   mut egui_contexts: EguiContexts,
-  mut visualizer: ResMut<RenetClientVisualizer<200>>,
+  mut visualiser: ResMut<RenetClientVisualiser>,
   client: Res<RenetClient>,
 ) {
-  visualizer.add_network_info(client.network_info());
+  visualiser.add_network_info(client.network_info());
   if let Ok(ctx) = egui_contexts.ctx_mut() {
-    visualizer.show_window(ctx);
+    visualiser.show_window(ctx);
   } else {
     warn!("Failed to get Egui context for Renet client visualiser");
   }
@@ -110,7 +107,7 @@ pub fn client_handshake_system(
     commands.remove_resource::<RenetClient>();
     commands.remove_resource::<NetcodeClientTransport>();
     commands.remove_resource::<PendingClientHandshake>();
-    commands.remove_resource::<RenetClientVisualizer<VISUALISER_DISPLAY_VALUES>>()
+    commands.remove_resource::<RenetClientVisualiser>()
   }
 }
 
@@ -153,7 +150,7 @@ fn receive_reliable_server_messages_system(
         utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
       }
       ServerMessage::StateChanged { new_state, winner_info } => {
-        if !current_state.is_restricted() {
+        if !current_state.is_manual_transition_allowed_to(&AppState::from(&new_state)) {
           next_state.set(AppState::from(&new_state));
         } else {
           debug!(

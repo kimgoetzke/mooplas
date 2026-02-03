@@ -139,7 +139,6 @@ fn spawn_menu(
               ..Default::default()
             },
             TextColor(Color::from(ACCENT_COLOUR)),
-            BorderRadius::all(px(10)),
             BorderColor::all(Color::from(tailwind::SLATE_500)),
             BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
             Node {
@@ -148,6 +147,7 @@ fn spawn_menu(
               padding: UiRect::all(px(10.)),
               align_items: AlignItems::Center,
               justify_content: JustifyContent::Center,
+              border_radius: BorderRadius::all(px(10)),
               ..default()
             },
           ));
@@ -159,8 +159,8 @@ fn spawn_menu(
               font: heading_font.clone(),
               font_size: SMALL_FONT,
               ..default()
-            }
-            .with_line_height(LineHeight::RelativeToFont(2.)),
+            },
+            LineHeight::RelativeToFont(2.),
             TEXT_COLOUR,
             TextShadow::default(),
           ));

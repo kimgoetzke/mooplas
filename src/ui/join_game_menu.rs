@@ -18,10 +18,9 @@ use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Click, Commands, Component, DetectChangesMut,
   Entity, FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, On,
-  OnExit, Pointer, PositionType, Query, Res, ResMut, Single, TextColor, TextFont, UiRect, Update, With, Without,
+  OnExit, Pointer, PositionType, Query, Res, ResMut, Single, Text, TextColor, TextFont, UiRect, Update, With, Without,
   default, in_state, percent, px,
 };
-use bevy::prelude::{SpawnRelated, Text};
 use bevy_ui_text_input::actions::TextInputAction;
 use bevy_ui_text_input::{SubmitText, TextInputMode, TextInputNode, TextInputPrompt, TextInputQueue};
 
@@ -136,7 +135,6 @@ fn spawn_menu(
                 ..Default::default()
               },
               TextColor(Color::from(ACCENT_COLOUR)),
-              BorderRadius::all(px(10)),
               BorderColor::all(Color::from(tailwind::SLATE_500)),
               BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
               TextInputPrompt::new("Paste connection string here..."),
@@ -146,6 +144,7 @@ fn spawn_menu(
                 padding: UiRect::all(px(10.)),
                 align_items: AlignItems::Center,
                 justify_content: JustifyContent::Center,
+                border_radius: BorderRadius::all(px(10)),
                 ..default()
               },
             ))
