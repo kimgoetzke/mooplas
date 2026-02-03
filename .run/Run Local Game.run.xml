@@ -1,11 +1,9 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Mooplas Local with Dev &amp; Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command" activateToolWindowBeforeRun="false">
+  <configuration default="false" name="Run Local Game" type="CargoCommandRunConfiguration" factoryName="Cargo Command" activateToolWindowBeforeRun="false">
     <option name="buildProfileId" value="dev" />
-    <option name="command" value="run --package mooplas --bin mooplas --no-default-features --features dev" />
+    <option name="command" value="run --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
-    <envs>
-      <env name="RUST_LOG" value="mooplas=debug" />
-    </envs>
+    <envs />
     <option name="emulateTerminal" value="true" />
     <option name="channel" value="DEFAULT" />
     <option name="requiredFeatures" value="true" />

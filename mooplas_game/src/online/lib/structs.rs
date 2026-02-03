@@ -14,7 +14,7 @@ pub enum ServerMessage {
   /// Sent by the server to all clients (except the one that just disconnected) when a client has disconnected.
   ClientDisconnected { client_id: ClientId },
   /// Sent to a client when they have successfully initialised their connection to the server. Sent by the server in
-  /// response to a [`bevy_renet::renet::ServerEvent::ClientConnected`] to the client that just connected.
+  /// response to a [`ServerMessage::ClientConnected`] to the client that just connected.
   ClientInitialised { seed: u64, client_id: ClientId },
   /// Indicates that the app state has changed on the server.
   StateChanged {

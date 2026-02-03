@@ -1,10 +1,14 @@
 use crate::prelude::NetworkRole;
-use crate::prelude::constants::{ERROR_COLOUR, INFO_COLOUR};
 use crate::shared::PlayerId;
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
-use bevy::prelude::{Color, Message, Srgba};
+use bevy::prelude::Message;
 use serde::{Deserialize, Serialize};
+
+#[cfg(feature = "online")]
+use crate::prelude::constants::{ERROR_COLOUR, INFO_COLOUR};
+#[cfg(feature = "online")]
+use bevy::prelude::{Color, Srgba};
 
 /// A plugin that registers all shared messages used across multiple plugins and systems.
 pub struct SharedMessagesPlugin;

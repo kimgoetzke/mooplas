@@ -99,9 +99,11 @@ pub(crate) const DEFAULT_COLOUR: Color = Color::srgb(0.9, 0.9, 0.9);
 pub(crate) const TEXT_COLOUR: TextColor = TextColor(Color::srgb(0.9, 0.9, 0.9));
 
 /// Colour for info text such as the text of info notifications.
+#[allow(unused)]
 pub(crate) const INFO_COLOUR: Srgba = tailwind::AMBER_400;
 
 /// Colour for error text.
+#[allow(unused)]
 pub(crate) const ERROR_COLOUR: Srgba = tailwind::RED_500;
 
 // Multiplayer
@@ -109,11 +111,14 @@ pub(crate) const ERROR_COLOUR: Srgba = tailwind::RED_500;
 
 /// The timeout duration (in seconds) for the client handshake process to complete before considering it as having
 /// failed.
+#[allow(unused)]
 pub(crate) const CLIENT_HAND_SHAKE_TIMEOUT_SECS: u64 = 7;
 
 /// Whether to show the Renet visualisers by default when starting the game in online multiplayer mode.
 /// Use this only during development and testing.
+#[allow(unused)]
 pub(crate) const SHOW_VISUALISERS_BY_DEFAULT: bool = true;
 
 /// The number of values to display in the renet visualiser graphs.
+#[allow(unused)]
 pub(crate) const VISUALISER_DISPLAY_VALUES: usize = 200;
