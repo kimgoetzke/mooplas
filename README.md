@@ -4,7 +4,7 @@
 
 This repository contains a basic multiplayer game inspired
 by [Achtung, die Kurve!](https://en.wikipedia.org/wiki/Achtung,_die_Kurve!), written in Rust
-using [Bevy Engine](https://bevy.org/) (v0.17) and [Avian Physics](https://github.com/avianphysics/avian). The goal
+using [Bevy Engine](https://bevy.org/) (v0.18) and [Avian Physics](https://github.com/avianphysics/avian). The goal
 of the project was to explore network programming when real-time movement is involved.
 
 ## Features
