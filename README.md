@@ -2,8 +2,10 @@
   <img src="./assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
 </p>
 
-This repository contains a basic multiplayer game inspired by _Achtung, die Kurve!_, written in Rust using Bevy Engine
-(v0.17). The goal of the project was to explore network programming when real-time movement is involved.
+This repository contains a basic multiplayer game inspired
+by [Achtung, die Kurve!](https://en.wikipedia.org/wiki/Achtung,_die_Kurve!), written in Rust
+using [Bevy Engine](https://bevy.org/) (v0.17) and [Avian Physics](https://github.com/avianphysics/avian). The goal
+of the project was to explore network programming when real-time movement is involved.
 
 ## Features
 
@@ -12,6 +14,11 @@ This repository contains a basic multiplayer game inspired by _Achtung, die Kurv
 - Online multiplayer (up to 5 players) over UDP using `bevy_renet`
 - Touch controls for mobile devices
 - Cross-platform (Linux, Windows, WebAssembly)
+
+> [!NOTE]
+> Check out the branch [with-bevy-renet](https://github.com/kimgoetzke/mooplas/tree/with-bevy-renet) for a
+> P2P multiplayer implementation with `renet` which uses UDP. However, this version does not support WebAssembly
+> multiplayer due to browser limitations around UDP.
 
 ## Demo
 
