@@ -4,10 +4,9 @@ use crate::online::lib::{
 };
 use crate::prelude::constants::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, SHOW_VISUALISERS_BY_DEFAULT};
 use crate::prelude::{
-  AppState, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
-  SnakeHead, UiNotification, WinnerInfo,
+  AppState, AvailablePlayerConfigs, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
 };
-use crate::shared::{AvailablePlayerConfigs, ToggleMenuMessage};
 use bevy::app::Update;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::log::*;

@@ -3746,9 +3746,11 @@ dependencies = [
 name = "mooplas_networking"
 version = "0.1.0"
 dependencies = [
+ "bevy",
+ "bevy_renet",
  "crossbeam-channel",
  "postcard",
- "rand",
+ "renet_visualizer",
  "serde",
  "ureq",
  "wasm-bindgen",
