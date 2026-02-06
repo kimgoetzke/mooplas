@@ -1,11 +1,4 @@
+/.direnv/*
 /target
-.direnv
-.idea
-/nohup.out
-/www/public/assets/
-/www/public/mooplas.d.ts
-/www/public/mooplas.js
-/www/public/mooplas.wasm.d.ts
-/www/public/mooplas.wasm
-/www/public/mooplas_bg.wasm
-/www/public/mooplas_bg.wasm.d.ts
+/.idea/
+nohup.out
