@@ -1,11 +1,10 @@
 use crate::online::lib::{
-  ClientMessage, NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage,
-  RenetClientVisualiser, SerialisableInputActionMessage, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
+  NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage, ServerMessage, utils,
 };
 use crate::prelude::constants::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, SHOW_VISUALISERS_BY_DEFAULT};
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, ExitLobbyMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
-  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
+  AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
+  PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
 };
 use bevy::app::Update;
 use bevy::input::common_conditions::input_toggle_active;
@@ -19,6 +18,7 @@ use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::DefaultChannel;
 use bevy_renet::{RenetClient, RenetClientPlugin, client_connected};
+use mooplas_networking::prelude::{ClientMessage, RenetClientVisualiser, decode_from_bytes, encode_to_bytes};
 use std::time::Instant;
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
@@ -183,7 +183,7 @@ fn send_local_player_registration_system(
     if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
       continue;
     }
-    let client_message = ClientMessage::PlayerRegistration(*player_registration_message);
+    let client_message = ClientMessage::PlayerRegistration(player_registration_message.into());
     debug!("Sending: [{:?}]", client_message);
     let message = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
     client.send_message(DefaultChannel::ReliableOrdered, message);
@@ -210,21 +210,21 @@ fn process_and_send_local_exit_lobby_message_system(
 /// A system that handles local input action messages for mutable players by sending them to the server in order to sync
 /// the movements of the local player(s) with the server.
 fn send_local_input_messages(
-  mut messages: MessageReader<SerialisableInputActionMessage>,
+  mut messages: MessageReader<InputMessage>,
   registered_players: Res<RegisteredPlayers>,
   mut client: ResMut<RenetClient>,
 ) {
   for message in messages.read() {
     let player_id = match message {
-      SerialisableInputActionMessage::Action(player_id) => player_id,
-      SerialisableInputActionMessage::Move(player_id, _) => player_id,
+      InputMessage::Action(player_id) => player_id,
+      InputMessage::Move(player_id, _) => player_id,
     };
     if let Some(_) = registered_players
       .players
       .iter()
-      .find(|player| player.id.0 == *player_id && player.is_local())
+      .find(|player| player.id == *player_id && player.is_local())
     {
-      if let Ok(input_message) = encode_to_bytes(&ClientMessage::Input(*message)) {
+      if let Ok(input_message) = encode_to_bytes(&ClientMessage::Input(message.into())) {
         client.send_message(DefaultChannel::Unreliable, input_message);
       } else {
         warn!("Failed to serialise input action message: {:?}", message);

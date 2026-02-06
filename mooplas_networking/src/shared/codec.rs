@@ -5,12 +5,12 @@ use serde::de::DeserializeOwned;
 const MAX_NETWORK_MESSAGE_BYTES: usize = 256 * 1024;
 
 /// Encodes a serialisable value into a vector of bytes using postcard.
-pub(crate) fn encode_to_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, postcard::Error> {
+pub fn encode_to_bytes<T: Serialize>(value: &T) -> Result<Vec<u8>, postcard::Error> {
   postcard::to_allocvec(value)
 }
 
 /// Decodes a deserialisable value from a slice of bytes using postcard.
-pub(crate) fn decode_from_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, postcard::Error> {
+pub fn decode_from_bytes<T: DeserializeOwned>(bytes: &[u8]) -> Result<T, postcard::Error> {
   if bytes.len() > MAX_NETWORK_MESSAGE_BYTES {
     return Err(postcard::Error::DeserializeUnexpectedEnd);
   }

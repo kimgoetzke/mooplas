@@ -3735,11 +3735,10 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_renet",
  "bevy_ui_text_input",
- "postcard",
+ "mooplas_networking",
  "rand",
  "renet_visualizer",
  "serde",
- "ureq",
 ]
 
 [[package]]
@@ -3747,6 +3746,7 @@ name = "mooplas_networking"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy-inspector-egui",
  "bevy_renet",
  "crossbeam-channel",
  "postcard",

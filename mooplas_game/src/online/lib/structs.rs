@@ -1,5 +1,3 @@
-use crate::online::lib::messages::SerialisableInputActionMessage;
-use crate::prelude::PlayerRegistrationMessage;
 use crate::shared::PlayerId;
 use bevy::math::{Quat, Vec2};
 use bevy::prelude::Component;
@@ -30,25 +28,6 @@ pub enum ServerMessage {
   /// Informs the clients that the server is about to shut down. Gives clients time to prepare before being
   /// disconnected.
   ShutdownServer,
-}
-
-#[derive(Serialize, Deserialize)]
-pub enum ClientMessage {
-  PlayerRegistration(PlayerRegistrationMessage),
-  Input(SerialisableInputActionMessage),
-}
-
-impl Debug for ClientMessage {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-    match self {
-      ClientMessage::PlayerRegistration(message) => {
-        write!(f, "ClientMessage::PlayerRegistration for {}", message.player_id)
-      }
-      ClientMessage::Input(action) => {
-        write!(f, "ClientMessage::{:?}", action)
-      }
-    }
-  }
 }
 
 /// A component for interpolating network-synchronised transforms, controlled by the server. Used in an attempt to

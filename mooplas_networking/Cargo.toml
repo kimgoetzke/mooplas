@@ -7,9 +7,11 @@ edition = "2024"
 # Dependencies linked to Bevy version
 bevy = { version = "0.18.0", default-features = false, features = [
   "bevy_core_pipeline",
+  "bevy_log",
 ] }
 bevy_renet = { version = "4.0.0", optional = true }
 renet_visualizer = { version = "2.0.0", optional = true }
+bevy-inspector-egui = { version = "0.36.0", optional = true }
 
 # Other dependencies
 serde = { version = "1.0.228", features = ["derive"] }
@@ -31,6 +33,6 @@ web-sys = { version = "0.3.38", features = [
 crossbeam-channel = { version = "0.5.15", optional = true }
 
 [features]
-default = ["wasm", "native"]
-wasm = ["bevy_renet", "renet_visualizer", "ureq"]
-native = ["wasm-bindgen", "wasm-bindgen-futures", "web-sys", "crossbeam-channel"]
+default = ["native"]
+native = ["bevy_renet", "renet_visualizer", "ureq", "bevy-inspector-egui"]
+wasm = ["wasm-bindgen", "wasm-bindgen-futures", "web-sys", "crossbeam-channel"]

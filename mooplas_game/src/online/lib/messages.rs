@@ -1,5 +1,3 @@
-use crate::prelude::{InputMessage, PlayerId};
-use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
 use serde::{Deserialize, Serialize};
@@ -8,39 +6,7 @@ pub struct NetworkingMessagesPlugin;
 
 impl Plugin for NetworkingMessagesPlugin {
   fn build(&self, app: &mut App) {
-    app
-      .add_message::<SerialisableInputActionMessage>()
-      .add_message::<PlayerStateUpdateMessage>();
-  }
-}
-
-#[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum SerialisableInputActionMessage {
-  Move(u8, Scalar),
-  Action(u8),
-}
-
-impl Default for SerialisableInputActionMessage {
-  fn default() -> Self {
-    SerialisableInputActionMessage::Move(0, 0.0)
-  }
-}
-
-impl From<&InputMessage> for SerialisableInputActionMessage {
-  fn from(value: &InputMessage) -> Self {
-    match value {
-      InputMessage::Move(player_id, direction) => SerialisableInputActionMessage::Move(player_id.0, *direction),
-      InputMessage::Action(player_id) => SerialisableInputActionMessage::Action(player_id.0),
-    }
-  }
-}
-
-impl Into<InputMessage> for SerialisableInputActionMessage {
-  fn into(self) -> InputMessage {
-    match self {
-      SerialisableInputActionMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
-      SerialisableInputActionMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
-    }
+    app.add_message::<PlayerStateUpdateMessage>();
   }
 }
 

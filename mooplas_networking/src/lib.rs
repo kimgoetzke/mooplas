@@ -3,6 +3,7 @@ mod shared;
 mod wasm;
 
 pub mod prelude {
+  pub use crate::native::*;
   pub use crate::shared::*;
 }
 

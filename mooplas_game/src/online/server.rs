@@ -1,6 +1,4 @@
-use crate::online::lib::{
-  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, decode_from_bytes, encode_to_bytes, utils,
-};
+use crate::online::lib::{Lobby, ServerMessage, utils};
 use crate::prelude::constants::SHOW_VISUALISERS_BY_DEFAULT;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
@@ -19,6 +17,7 @@ use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::NetcodeServerPlugin;
 use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
 use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
+use mooplas_networking::prelude::{ClientMessage, RenetServerVisualiser, decode_from_bytes, encode_to_bytes};
 use std::time::Duration;
 
 /// A plugin that adds server-side online multiplayer capabilities to the game. Only active when the game is running in
@@ -234,7 +233,7 @@ fn receive_ordered_client_messages_system(
               &available_configs,
               &mut player_registration_message,
               &client_id,
-              message.player_id,
+              message.player_id.into(),
               message.has_registered,
               &mut lobby,
             );

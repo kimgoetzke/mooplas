@@ -1,9 +1,8 @@
-use crate::prelude::constants::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, VISUALISER_DISPLAY_VALUES};
+use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::shared::PlayerId;
 use bevy::app::{App, Plugin};
-use bevy::prelude::{Deref, DerefMut, Resource};
+use bevy::prelude::Resource;
 use bevy_renet::renet::ClientId;
-use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
 use std::collections::HashMap;
 use std::fmt::Debug;
 use std::time::{Duration, Instant};
@@ -79,12 +78,6 @@ impl PendingClientHandshake {
     }
   }
 }
-
-#[derive(Resource, Deref, DerefMut, Default)]
-pub struct RenetClientVisualiser(RenetClientVisualizer<{ VISUALISER_DISPLAY_VALUES }>);
-
-#[derive(Resource, Deref, DerefMut, Default)]
-pub struct RenetServerVisualiser(RenetServerVisualizer<{ VISUALISER_DISPLAY_VALUES }>);
 
 #[cfg(test)]
 mod tests {

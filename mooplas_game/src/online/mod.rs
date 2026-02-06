@@ -7,10 +7,7 @@ mod server;
 
 use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
-use crate::online::lib::{
-  NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake, RenetClientVisualiser,
-  RenetServerVisualiser,
-};
+use crate::online::lib::{NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake};
 use crate::online::server::ServerPlugin;
 use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage, UiNotification};
 use crate::shared::ConnectionInfoMessage;
@@ -19,13 +16,13 @@ use bevy::log::*;
 use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, On, Plugin, Res, ResMut, in_state,
 };
-use bevy_inspector_egui::egui::TextBuffer;
 use bevy_renet::netcode::{
   ClientAuthentication, NetcodeClientTransport, NetcodeError, NetcodeErrorEvent, NetcodeServerTransport,
-  NetcodeTransportError, ServerAuthentication, ServerConfig,
+  NetcodeTransportError,
 };
 use bevy_renet::renet::ConnectionConfig;
 use bevy_renet::{RenetClient, RenetServer};
+use mooplas_networking::prelude::{RenetClientVisualiser, RenetServerVisualiser, create_server};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
@@ -50,7 +47,6 @@ impl Plugin for OnlinePlugin {
 }
 
 const PROTOCOL_ID: u64 = 1000;
-const DEFAULT_SERVER_PORT: u16 = 0;
 
 fn handle_toggle_menu_message(
   mut commands: Commands,
@@ -73,24 +69,16 @@ fn handle_toggle_menu_message(
         commands.remove_resource::<RenetServerVisualiser>();
         commands.remove_resource::<RenetClientVisualiser>();
       }
-      NetworkRole::Server => {
-        let port = DEFAULT_SERVER_PORT;
-        match create_new_renet_server_resources(port) {
-          Ok((server, transport)) => {
-            debug!("Server started on {:?}", transport.addresses());
-            connection_info_message.write(ConnectionInfoMessage {
-              connection_string: transport.addresses()[0].to_string(),
-            });
-            commands.insert_resource(server);
-            commands.insert_resource(transport);
-            commands.insert_resource(RenetServerVisualiser::default());
-          }
-          Err(e) => {
-            error!("Failed to create server: {}", e);
-            *network_role = NetworkRole::None;
-          }
+      NetworkRole::Server => match create_server(&mut commands) {
+        Ok(connection_string) => {
+          debug!("Server started with connection string [{}]", connection_string);
+          connection_info_message.write(ConnectionInfoMessage { connection_string });
         }
-      }
+        Err(e) => {
+          error!("Failed to create server: {}", e);
+          *network_role = NetworkRole::None;
+        }
+      },
       NetworkRole::Client => {
         debug!("Waiting for connection info to create client...");
       }
@@ -150,59 +138,6 @@ fn create_new_renet_client_resources(
   let client = RenetClient::new(ConnectionConfig::default());
 
   Ok((client, transport))
-}
-
-fn create_new_renet_server_resources(
-  port: u16,
-) -> Result<(RenetServer, NetcodeServerTransport), Box<dyn std::error::Error>> {
-  let bind_address: SocketAddr = SocketAddr::new(std::net::IpAddr::V6(Ipv6Addr::UNSPECIFIED), port);
-  let socket = UdpSocket::bind(bind_address)?;
-  let local_address = socket.local_addr()?;
-  let current_time = SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?;
-  let public_address = get_public_ip_with_port(local_address.port()).unwrap_or(local_address);
-  let server_config = ServerConfig {
-    current_time,
-    max_clients: 64,
-    protocol_id: PROTOCOL_ID,
-    public_addresses: vec![public_address],
-    authentication: ServerAuthentication::Unsecure,
-  };
-  let transport = NetcodeServerTransport::new(server_config, socket)?;
-  let server = RenetServer::new(ConnectionConfig::default());
-
-  Ok((server, transport))
-}
-
-/// Attempts to determine the server's public IP address. Returns [`None`] if unable to determine (falls back to bind
-/// address).
-fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
-  let services = [
-    "https://icanhazip.com",
-    "https://api6.ipify.org",
-    "https://ifconfig.me/ip",
-  ];
-
-  for service in &services {
-    if let Ok(mut response) = ureq::get(service.as_str()).call() {
-      if let Ok(response_body) = response.body_mut().read_to_string() {
-        let ip_string = response_body.trim();
-        if let Ok(ip) = ip_string.parse::<std::net::IpAddr>() {
-          if ip.is_ipv6() {
-            info!("Public IPv6 detected using [{}]: {}", service, ip);
-            return Some(SocketAddr::new(ip, port));
-          }
-        }
-        warn!("Invalid IP format received from service [{}]: {}", service, ip_string);
-      } else {
-        warn!("Failed to read response body from [{}]", service);
-      }
-    } else {
-      warn!("Failed to get public IP from [{}]", service);
-    }
-  }
-
-  error!("Failed to determine public IP address");
-  None
 }
 
 #[allow(clippy::never_loop)]

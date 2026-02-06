@@ -35,6 +35,12 @@ impl Into<u8> for PlayerId {
   }
 }
 
+impl From<u8> for PlayerId {
+  fn from(value: u8) -> Self {
+    PlayerId(value)
+  }
+}
+
 /// The snake tail component that manages all [`SnakeSegment`]s and sampling.
 #[derive(Component)]
 pub struct SnakeTail {

@@ -2,8 +2,22 @@ use bevy::prelude::{Component, Message, Resource};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Clone, Copy)]
-pub struct ClientId(pub f64);
+pub enum NetworkingType {
+  Wasm,
+  Native,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub type RawClientId = u64;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type RawClientId = bevy_renet::renet::ClientId;
+
+/// A stable, non-generic client ID wrapper used by messages and APIs. The inner
+/// representation varies by target via `RawClientId`.
+#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Hash)]
+#[serde(transparent)]
+pub struct ClientId(pub RawClientId);
 
 #[derive(Debug, Serialize, Deserialize, Component)]
 pub enum ServerMessage {
