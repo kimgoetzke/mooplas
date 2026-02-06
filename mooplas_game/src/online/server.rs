@@ -1,4 +1,4 @@
-use crate::online::lib::{Lobby, ServerMessage, utils};
+use crate::online::lib::{Lobby, utils};
 use crate::prelude::constants::SHOW_VISUALISERS_BY_DEFAULT;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
@@ -17,7 +17,9 @@ use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::NetcodeServerPlugin;
 use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
 use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
-use mooplas_networking::prelude::{ClientMessage, RenetServerVisualiser, decode_from_bytes, encode_to_bytes};
+use mooplas_networking::prelude::{
+  ClientMessage, RenetServerVisualiser, ServerMessage, decode_from_bytes, encode_to_bytes,
+};
 use std::time::Duration;
 
 /// A plugin that adds server-side online multiplayer capabilities to the game. Only active when the game is running in
@@ -101,8 +103,10 @@ fn receive_server_events(
       visualiser.add_client(client_id);
 
       // Notify all other clients about the new connection
-      let connected_message =
-        encode_to_bytes(&ServerMessage::ClientConnected { client_id }).expect(CLIENT_MESSAGE_SERIALISATION);
+      let connected_message = encode_to_bytes(&ServerMessage::ClientConnected {
+        client_id: client_id.into(),
+      })
+      .expect(CLIENT_MESSAGE_SERIALISATION);
       server.broadcast_message_except(client_id, DefaultChannel::ReliableOrdered, connected_message);
       lobby.connected.push(client_id);
 
@@ -110,7 +114,7 @@ fn receive_server_events(
       // Send the current seed to the newly connected client
       let seed_message = encode_to_bytes(&ServerMessage::ClientInitialised {
         seed: seed.get(),
-        client_id,
+        client_id: client_id.into(),
       })
       .expect("Failed to serialise seed message");
       server.send_message(client_id, DefaultChannel::ReliableOrdered, seed_message);
@@ -134,8 +138,10 @@ fn receive_server_events(
       }
 
       // Notify all other clients about the disconnection itself
-      let message =
-        encode_to_bytes(&ServerMessage::ClientDisconnected { client_id }).expect(CLIENT_MESSAGE_SERIALISATION);
+      let message = encode_to_bytes(&ServerMessage::ClientDisconnected {
+        client_id: client_id.into(),
+      })
+      .expect(CLIENT_MESSAGE_SERIALISATION);
       server.broadcast_message_except(client_id, DefaultChannel::ReliableOrdered, message);
       lobby.connected.retain(|&id| id != client_id);
     }
@@ -269,7 +275,7 @@ fn handle_player_registration_message_from_client(
   if has_registered {
     info!("[{}] with client ID [{}] registered", player_id, client_id);
     let message = encode_to_bytes(&ServerMessage::PlayerRegistered {
-      client_id: *client_id,
+      client_id: (*client_id).into(),
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -284,7 +290,7 @@ fn handle_player_registration_message_from_client(
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
     let message = encode_to_bytes(&ServerMessage::PlayerUnregistered {
-      client_id: *client_id,
+      client_id: (*client_id).into(),
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -304,7 +310,7 @@ fn broadcast_local_app_state_system(
     if let Some(state_name) = message.entered {
       let state_changed_message = ServerMessage::StateChanged {
         new_state: state_name.to_string(),
-        winner_info: winner.get(),
+        winner_info: winner.get_as_u8(),
       };
       debug!("Broadcasting: {:?}", state_changed_message);
       if let Ok(message) = encode_to_bytes(&state_changed_message) {
@@ -330,7 +336,7 @@ fn broadcast_local_player_registration_system(
     if message.has_registered {
       debug!("Broadcasting: [{}] registered locally...", message.player_id);
       let message = encode_to_bytes(&ServerMessage::PlayerRegistered {
-        client_id: 0,
+        client_id: 0.into(),
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -338,7 +344,7 @@ fn broadcast_local_player_registration_system(
     } else {
       debug!("Broadcasting: [{}] unregistered locally...", message.player_id);
       let message = encode_to_bytes(&ServerMessage::PlayerUnregistered {
-        client_id: 0,
+        client_id: 0.into(),
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);

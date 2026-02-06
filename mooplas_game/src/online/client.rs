@@ -1,6 +1,4 @@
-use crate::online::lib::{
-  NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage, ServerMessage, utils,
-};
+use crate::online::lib::{NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage, utils};
 use crate::prelude::constants::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, SHOW_VISUALISERS_BY_DEFAULT};
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
@@ -18,7 +16,9 @@ use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::DefaultChannel;
 use bevy_renet::{RenetClient, RenetClientPlugin, client_connected};
-use mooplas_networking::prelude::{ClientMessage, RenetClientVisualiser, decode_from_bytes, encode_to_bytes};
+use mooplas_networking::prelude::{
+  ClientMessage, RenetClientVisualiser, ServerMessage, decode_from_bytes, encode_to_bytes,
+};
 use std::time::Instant;
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
@@ -127,10 +127,10 @@ fn receive_reliable_server_messages_system(
     debug!("Received server message: {:?}", server_message);
     match server_message {
       ServerMessage::ClientConnected { client_id } => {
-        info!("A client with ID [{}] connected", client_id);
+        info!("A client with ID [{:?}] connected", client_id);
       }
       ServerMessage::ClientDisconnected { client_id } => {
-        info!("A client with ID [{}] disconnected", client_id);
+        info!("A client with ID [{:?}] disconnected", client_id);
       }
       ServerMessage::ClientInitialised { seed: server_seed, .. } => {
         seed.set(server_seed);
@@ -158,7 +158,7 @@ fn receive_reliable_server_messages_system(
           );
         }
         if let Some(player_id) = winner_info {
-          winner.set(player_id);
+          winner.set(player_id.into());
         }
       }
       ServerMessage::ShutdownServer => {

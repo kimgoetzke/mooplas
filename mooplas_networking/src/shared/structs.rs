@@ -19,6 +19,12 @@ pub type RawClientId = bevy_renet::renet::ClientId;
 #[serde(transparent)]
 pub struct ClientId(pub RawClientId);
 
+impl From<u64> for ClientId {
+  fn from(value: u64) -> Self {
+    ClientId(value)
+  }
+}
+
 #[derive(Debug, Serialize, Deserialize, Component)]
 pub enum ServerMessage {
   /// Sent by the server to all clients (except the one that just connected) when a new client has connected.
@@ -29,10 +35,7 @@ pub enum ServerMessage {
   /// response to a [`ServerMessage::ClientConnected`] to the client that just connected.
   ClientInitialised { seed: u64, client_id: ClientId },
   /// Indicates that the app state has changed on the server.
-  StateChanged {
-    new_state: String,
-    winner_info: Option<ClientId>,
-  },
+  StateChanged { new_state: String, winner_info: Option<u8> },
   /// Informs clients that a player has registered in the lobby.
   PlayerRegistered { client_id: ClientId, player_id: u8 },
   /// Informs clients that a player has unregistered from the lobby.

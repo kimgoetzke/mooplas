@@ -236,6 +236,11 @@ impl WinnerInfo {
     self.winner
   }
 
+  /// Gets the winner's ID, if there is one.
+  pub fn get_as_u8(&self) -> Option<u8> {
+    self.winner.map(|player_id| player_id.0)
+  }
+
   /// Sets the winner's [`PlayerId`].
   pub fn set(&mut self, player_id: PlayerId) {
     self.winner = Some(player_id);
