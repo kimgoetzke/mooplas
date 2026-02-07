@@ -9,10 +9,28 @@ impl Plugin for InterfacePlugin {
   fn build(&self, _: &mut App) {}
 }
 
+impl From<&PlayerId> for mooplas_networking::prelude::PlayerId {
+  fn from(value: &PlayerId) -> Self {
+    mooplas_networking::prelude::PlayerId(value.0)
+  }
+}
+
+impl From<PlayerId> for mooplas_networking::prelude::PlayerId {
+  fn from(value: PlayerId) -> Self {
+    mooplas_networking::prelude::PlayerId(value.0)
+  }
+}
+
+impl Into<PlayerId> for mooplas_networking::prelude::PlayerId {
+  fn into(self) -> PlayerId {
+    PlayerId(self.0)
+  }
+}
+
 impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegistrationMessage {
   fn from(value: &PlayerRegistrationMessage) -> Self {
     mooplas_networking::prelude::PlayerRegistrationMessage {
-      player_id: value.player_id.0,
+      player_id: value.player_id.into(),
       has_registered: value.has_registered,
       is_anyone_registered: value.is_anyone_registered,
       network_role: value.network_role.map(|role| match role {
@@ -27,7 +45,7 @@ impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerReg
 impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegistrationMessage {
   fn into(self) -> PlayerRegistrationMessage {
     PlayerRegistrationMessage {
-      player_id: PlayerId(self.player_id),
+      player_id: self.player_id.into(),
       has_registered: self.has_registered,
       is_anyone_registered: self.is_anyone_registered,
       network_role: self.network_role.map(|role| match role {

@@ -1,6 +1,6 @@
 use bevy::prelude::{Component, Message, Resource};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 pub enum NetworkingType {
   Wasm,
@@ -12,6 +12,29 @@ pub type RawClientId = u64;
 
 #[cfg(not(target_arch = "wasm32"))]
 pub type RawClientId = bevy_renet::renet::ClientId;
+
+/// A component identifying a player. Used to link player entities together.
+#[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg(not(target_arch = "wasm32"))]
+pub struct PlayerId(pub u8);
+
+impl Display for PlayerId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Player {}", self.0)
+  }
+}
+
+impl Debug for PlayerId {
+  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    write!(f, "Player {}", self.0)
+  }
+}
+
+impl Into<u8> for PlayerId {
+  fn into(self) -> u8 {
+    self.0
+  }
+}
 
 /// A stable, non-generic client ID wrapper used by messages and APIs. The inner
 /// representation varies by target via `RawClientId`.
@@ -58,7 +81,7 @@ pub enum SerialisableInputActionMessage {
 /// A message that communicates a change to a user's registration status in the lobby.
 #[derive(Message, Debug, Serialize, Deserialize, Copy, Clone)]
 pub struct PlayerRegistrationMessage {
-  pub player_id: u8,
+  pub player_id: PlayerId,
   /// Whether the player has registered (true) or unregistered (false).
   pub has_registered: bool,
   /// Whether any player is currently registered, after this change.

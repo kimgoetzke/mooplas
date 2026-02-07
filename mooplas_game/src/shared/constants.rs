@@ -113,12 +113,3 @@ pub(crate) const ERROR_COLOUR: Srgba = tailwind::RED_500;
 /// failed.
 #[allow(unused)]
 pub(crate) const CLIENT_HAND_SHAKE_TIMEOUT_SECS: u64 = 7;
-
-/// Whether to show the Renet visualisers by default when starting the game in online multiplayer mode.
-/// Use this only during development and testing.
-#[allow(unused)]
-pub(crate) const SHOW_VISUALISERS_BY_DEFAULT: bool = true;
-
-/// The number of values to display in the renet visualiser graphs.
-#[allow(unused)]
-pub(crate) const VISUALISER_DISPLAY_VALUES: usize = 200;

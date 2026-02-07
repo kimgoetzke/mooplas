@@ -1,24 +1,22 @@
-use crate::online::lib::{Lobby, utils};
-use crate::prelude::constants::SHOW_VISUALISERS_BY_DEFAULT;
+use crate::online::lib::utils;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
   RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
 };
 use crate::shared::{ExitLobbyMessage, WinnerInfo};
 use bevy::app::{App, Plugin, Update};
-use bevy::input::common_conditions::input_toggle_active;
 use bevy::log::*;
 use bevy::prelude::{
-  Commands, IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, NextState, On, Query, Res, ResMut, Resource,
+  Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Query, Res, ResMut, Resource,
   StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
 use bevy::time::TimerMode;
-use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::netcode::NetcodeServerPlugin;
 use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
 use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
 use mooplas_networking::prelude::{
-  ClientMessage, RenetServerVisualiser, ServerMessage, ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
+  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, ServerVisualiserPlugin, decode_from_bytes,
+  encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -147,8 +145,8 @@ fn receive_unreliable_client_inputs_system(
           ClientMessage::Input(action) => {
             let message: InputMessage = action.into();
             if match message {
-              InputMessage::Action(player_id) => lobby.validate_registration(&client_id, &player_id),
-              InputMessage::Move(player_id, _) => lobby.validate_registration(&client_id, &player_id),
+              InputMessage::Action(player_id) => lobby.validate_registration(&client_id, &player_id.into()),
+              InputMessage::Move(player_id, _) => lobby.validate_registration(&client_id, &player_id.into()),
             } {
               input_message.write(message);
               continue;
@@ -219,7 +217,7 @@ fn receive_ordered_client_messages_system(
               &available_configs,
               &mut player_registration_message,
               &client_id,
-              message.player_id.into(),
+              message.player_id,
               message.has_registered,
               &mut lobby,
             );
@@ -248,7 +246,7 @@ fn handle_player_registration_message_from_client(
   available_configs: &Res<AvailablePlayerConfigs>,
   mut player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
   client_id: &ClientId,
-  player_id: PlayerId,
+  player_id: mooplas_networking::prelude::PlayerId,
   has_registered: bool,
   lobby: &mut ResMut<Lobby>,
 ) {
@@ -264,9 +262,9 @@ fn handle_player_registration_message_from_client(
       &mut registered_players,
       &available_configs,
       &mut player_registration_message,
-      player_id,
+      player_id.into(),
     );
-    lobby.register_player(*client_id, player_id);
+    lobby.register_player(*client_id, player_id.into());
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
     let message = encode_to_bytes(&ServerMessage::PlayerUnregistered {
@@ -275,7 +273,11 @@ fn handle_player_registration_message_from_client(
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
     server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
-    utils::unregister_player_locally(&mut registered_players, &mut player_registration_message, player_id);
+    utils::unregister_player_locally(
+      &mut registered_players,
+      &mut player_registration_message,
+      player_id.into(),
+    );
     lobby.unregister_player(*client_id, player_id);
   }
 }

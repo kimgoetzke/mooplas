@@ -1,4 +1,4 @@
-use crate::online::lib::{NetworkTransformInterpolation, PendingClientHandshake, PlayerStateUpdateMessage, utils};
+use crate::online::lib::{NetworkTransformInterpolation, PlayerStateUpdateMessage, utils};
 use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
@@ -15,11 +15,12 @@ use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::DefaultChannel;
 use bevy_renet::{RenetClient, RenetClientPlugin, client_connected};
 use mooplas_networking::prelude::{
-  ClientMessage, ClientVisualiserPlugin, ServerMessage, decode_from_bytes, encode_to_bytes,
+  ClientMessage, ClientVisualiserPlugin, PendingClientHandshake, ServerMessage, decode_from_bytes, encode_to_bytes,
 };
 use std::time::Instant;
 
-/// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
+/// A plugin that adds client-side online multiplayer capabilities to the game. Only
+/// active when the application is
 /// running in client mode (i.e. someone else is the server). Mutually exclusive with the
 /// [`crate::online::ServerPlugin`].
 pub struct ClientPlugin;
