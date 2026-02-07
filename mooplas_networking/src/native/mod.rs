@@ -6,9 +6,13 @@ use bevy_renet::renet::ConnectionConfig;
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
+mod client_visualiser;
 mod resources;
+mod server_visualiser;
 
+pub use client_visualiser::ClientVisualiserPlugin;
 pub use resources::*;
+pub use server_visualiser::ServerVisualiserPlugin;
 
 const PROTOCOL_ID: u64 = 1000;
 const DEFAULT_SERVER_PORT: u16 = 0;

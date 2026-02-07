@@ -18,7 +18,7 @@ use bevy_renet::netcode::NetcodeServerPlugin;
 use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
 use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
 use mooplas_networking::prelude::{
-  ClientMessage, RenetServerVisualiser, ServerMessage, decode_from_bytes, encode_to_bytes,
+  ClientMessage, RenetServerVisualiser, ServerMessage, ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -29,13 +29,7 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((RenetServerPlugin, NetcodeServerPlugin))
-      .add_systems(
-        Update,
-        update_server_visualiser_system
-          .run_if(resource_exists::<RenetServerVisualiser>)
-          .run_if(input_toggle_active(SHOW_VISUALISERS_BY_DEFAULT, KeyCode::F2)),
-      )
+      .add_plugins((RenetServerPlugin, NetcodeServerPlugin, ServerVisualiserPlugin))
       .add_observer(receive_server_events)
       .add_systems(
         Update,
@@ -71,20 +65,6 @@ const CLIENT_MESSAGE_SERIALISATION: &'static str = "Failed to serialise client m
 // A resource to schedule the actual disconnect after broadcasting the shutdown message.
 #[derive(Resource)]
 struct ShutdownCountdown(Timer);
-
-// /// System that updates and displays the Renet server visualiser when toggled by the user.
-fn update_server_visualiser_system(
-  mut egui_contexts: EguiContexts,
-  mut visualiser: ResMut<RenetServerVisualiser>,
-  server: Res<RenetServer>,
-) {
-  visualiser.update(&server);
-  if let Ok(result) = egui_contexts.ctx_mut() {
-    visualiser.show_window(result);
-  } else {
-    warn!("Failed to get Egui context for Renet server visualiser");
-  }
-}
 
 fn receive_server_events(
   server_event: On<RenetServerEvent>,
