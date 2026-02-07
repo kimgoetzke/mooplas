@@ -1,4 +1,4 @@
-use crate::online::lib::utils;
+use crate::online::utils;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
   RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,

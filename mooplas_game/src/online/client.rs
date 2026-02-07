@@ -1,4 +1,5 @@
-use crate::online::lib::{NetworkTransformInterpolation, utils};
+use crate::online::structs::NetworkTransformInterpolation;
+use crate::online::utils;
 use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
@@ -289,11 +290,11 @@ fn apply_state_interpolation_system(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use mooplas_networking::prelude::NetworkingMessagesPlugin;
   use crate::prelude::constants::RESOLUTION_WIDTH;
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::math::Vec3;
   use bevy::prelude::*;
+  use mooplas_networking::prelude::NetworkingMessagesPlugin;
   use std::time::Duration;
 
   fn setup() -> App {
