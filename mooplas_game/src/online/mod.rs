@@ -7,7 +7,6 @@ mod server;
 
 use crate::online::client::ClientPlugin;
 use crate::online::interface::InterfacePlugin;
-use crate::online::lib::NetworkingMessagesPlugin;
 use crate::online::server::ServerPlugin;
 use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage, UiNotification};
 use crate::shared::ConnectionInfoMessage;
@@ -23,7 +22,8 @@ use bevy_renet::netcode::{
 use bevy_renet::renet::ConnectionConfig;
 use bevy_renet::{RenetClient, RenetServer};
 use mooplas_networking::prelude::{
-  NetworkingResourcesPlugin, PendingClientHandshake, RenetClientVisualiser, RenetServerVisualiser, create_server,
+  NetworkingMessagesPlugin, NetworkingResourcesPlugin, PendingClientHandshake, RenetClientVisualiser,
+  RenetServerVisualiser, create_server,
 };
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
@@ -34,7 +34,7 @@ pub struct OnlinePlugin;
 impl Plugin for OnlinePlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((NetworkingResourcesPlugin))
+      .add_plugins((NetworkingResourcesPlugin, NetworkingMessagesPlugin))
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
@@ -44,7 +44,7 @@ impl Plugin for OnlinePlugin {
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
       )
       .add_observer(handle_netcode_transport_error_event)
-      .add_plugins((InterfacePlugin, NetworkingMessagesPlugin));
+      .add_plugins(InterfacePlugin);
     info!("Online multiplayer is enabled");
   }
 }

@@ -1,4 +1,4 @@
-use crate::online::lib::{NetworkTransformInterpolation, PlayerStateUpdateMessage, utils};
+use crate::online::lib::{NetworkTransformInterpolation, utils};
 use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
@@ -15,7 +15,8 @@ use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::DefaultChannel;
 use bevy_renet::{RenetClient, RenetClientPlugin, client_connected};
 use mooplas_networking::prelude::{
-  ClientMessage, ClientVisualiserPlugin, PendingClientHandshake, ServerMessage, decode_from_bytes, encode_to_bytes,
+  ClientMessage, ClientVisualiserPlugin, PendingClientHandshake, PlayerStateUpdateMessage, ServerMessage,
+  decode_from_bytes, encode_to_bytes,
 };
 use std::time::Instant;
 
@@ -288,7 +289,7 @@ fn apply_state_interpolation_system(
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::online::lib::NetworkingMessagesPlugin;
+  use mooplas_networking::prelude::NetworkingMessagesPlugin;
   use crate::prelude::constants::RESOLUTION_WIDTH;
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::math::Vec3;
