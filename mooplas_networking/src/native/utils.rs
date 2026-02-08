@@ -3,6 +3,7 @@ use bevy::prelude::Commands;
 use bevy_renet::netcode::{NetcodeClientTransport, NetcodeServerTransport};
 use bevy_renet::{RenetClient, RenetServer};
 
+/// Cleans up all networking resources for native platforms.
 pub fn remove_all_resources(commands: &mut Commands) {
   commands.remove_resource::<RenetServer>();
   commands.remove_resource::<NetcodeServerTransport>();

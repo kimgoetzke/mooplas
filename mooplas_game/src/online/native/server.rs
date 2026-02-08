@@ -1,4 +1,4 @@
-use crate::online::utils;
+use crate::online::native::utils;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
   RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
@@ -11,12 +11,11 @@ use bevy::prelude::{
   StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
 use bevy::time::TimerMode;
-use bevy_renet::netcode::NetcodeServerPlugin;
 use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
-use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
+use bevy_renet::{RenetServer, RenetServerEvent};
 use mooplas_networking::prelude::{
-  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, ServerVisualiserPlugin, decode_from_bytes,
-  encode_to_bytes,
+  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, ServerRenetPlugin, ServerVisualiserPlugin,
+  decode_from_bytes, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -27,7 +26,7 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((RenetServerPlugin, NetcodeServerPlugin, ServerVisualiserPlugin))
+      .add_plugins((ServerRenetPlugin, ServerVisualiserPlugin))
       .add_observer(receive_server_events)
       .add_systems(
         Update,

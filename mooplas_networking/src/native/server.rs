@@ -1,11 +1,21 @@
 use crate::prelude::{PROTOCOL_ID, RenetServerVisualiser};
+use bevy::app::Plugin;
 use bevy::log::{debug, error, info, warn};
-use bevy::prelude::Commands;
-use bevy_renet::RenetServer;
-use bevy_renet::netcode::{NetcodeServerTransport, ServerAuthentication, ServerConfig};
+use bevy::prelude::{App, Commands};
+use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
 use bevy_renet::renet::ConnectionConfig;
+use bevy_renet::{RenetServer, RenetServerPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
+
+/// A Bevy plugin that adds the necessary Renet plugins. Required to run any server code on native.
+pub struct ServerRenetPlugin;
+
+impl Plugin for ServerRenetPlugin {
+  fn build(&self, app: &mut App) {
+    app.add_plugins((RenetServerPlugin, NetcodeServerPlugin));
+  }
+}
 
 const DEFAULT_SERVER_PORT: u16 = 0;
 

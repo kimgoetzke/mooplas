@@ -1,6 +1,8 @@
 use crate::prelude::PlayerId;
 use bevy::app::{App, Plugin};
-use bevy::prelude::{Deref, DerefMut, Resource};
+use bevy::prelude::{Commands, Deref, DerefMut, Resource};
+use bevy_renet::RenetClient;
+use bevy_renet::netcode::NetcodeClientTransport;
 use bevy_renet::renet::ClientId;
 use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
 use std::collections::HashMap;
@@ -93,6 +95,13 @@ impl PendingClientHandshake {
     Self {
       deadline: Instant::now() + Duration::from_secs(CLIENT_HAND_SHAKE_TIMEOUT_SECS),
     }
+  }
+
+  pub fn clean_up_after_failure(&self, commands: &mut Commands) {
+    commands.remove_resource::<RenetClient>();
+    commands.remove_resource::<NetcodeClientTransport>();
+    commands.remove_resource::<PendingClientHandshake>();
+    commands.remove_resource::<RenetClientVisualiser>()
   }
 }
 

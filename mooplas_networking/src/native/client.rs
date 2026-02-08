@@ -1,12 +1,21 @@
 use crate::native::{PendingClientHandshake, RenetClientVisualiser};
 use crate::prelude::PROTOCOL_ID;
-use bevy::log::info;
-use bevy::prelude::Commands;
-use bevy_renet::RenetClient;
-use bevy_renet::netcode::{ClientAuthentication, NetcodeClientTransport};
+use bevy::log::*;
+use bevy::prelude::{Commands, Plugin};
+use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::ConnectionConfig;
+use bevy_renet::{RenetClient, RenetClientPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
+
+/// A Bevy plugin that adds the necessary Renet plugins. Required to run any client code on native.
+pub struct ClientRenetPlugin;
+
+impl Plugin for ClientRenetPlugin {
+  fn build(&self, app: &mut bevy::prelude::App) {
+    app.add_plugins((RenetClientPlugin, NetcodeClientPlugin));
+  }
+}
 
 pub fn create_client(commands: &mut Commands, server_address: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
   match create_new_renet_client_resources(server_address) {

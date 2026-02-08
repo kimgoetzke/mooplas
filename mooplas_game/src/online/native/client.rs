@@ -1,5 +1,5 @@
-use crate::online::structs::NetworkTransformInterpolation;
-use crate::online::utils;
+use crate::online::native::structs::NetworkTransformInterpolation;
+use crate::online::native::utils;
 use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
@@ -12,12 +12,11 @@ use bevy::prelude::{
   App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
   State, Time, Transform, With, Without, in_state, resource_exists,
 };
-use bevy_renet::netcode::{NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::DefaultChannel;
-use bevy_renet::{RenetClient, RenetClientPlugin, client_connected};
+use bevy_renet::{RenetClient, client_connected};
 use mooplas_networking::prelude::{
-  ClientMessage, ClientVisualiserPlugin, PendingClientHandshake, PlayerStateUpdateMessage, ServerMessage,
-  decode_from_bytes, encode_to_bytes,
+  ClientMessage, ClientRenetPlugin, ClientVisualiserPlugin, PendingClientHandshake, PlayerStateUpdateMessage,
+  ServerMessage, decode_from_bytes, encode_to_bytes,
 };
 use std::time::Instant;
 
@@ -30,7 +29,7 @@ pub struct ClientPlugin;
 impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((RenetClientPlugin, NetcodeClientPlugin, ClientVisualiserPlugin))
+      .add_plugins((ClientRenetPlugin, ClientVisualiserPlugin))
       .add_systems(
         Update,
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
@@ -84,10 +83,7 @@ pub fn client_handshake_system(
     let message = "Couldn't complete handshake with server - is there a typo in the connection string?".to_string();
     error!("Timed out after {}s: {}", CLIENT_HAND_SHAKE_TIMEOUT_SECS, message);
     ui_message.write(UiNotification::error(message));
-    commands.remove_resource::<RenetClient>();
-    commands.remove_resource::<NetcodeClientTransport>();
-    commands.remove_resource::<PendingClientHandshake>();
-    // commands.remove_resource::<RenetClientVisualiser>()
+    handshake.clean_up_after_failure(&mut commands);
   }
 }
 
@@ -271,11 +267,9 @@ fn apply_state_interpolation_system(
 
   // Interpolate all remote players towards their targets
   let delta = time.delta_secs();
-
   for (mut transform, interpolation, _) in snake_head_query.iter_mut() {
     let current_position = transform.translation.truncate();
     let target_position = interpolation.target_position;
-
     let new_position = current_position.lerp(target_position, interpolation.interpolation_speed * delta * 60.);
     transform.translation.x = new_position.x;
     transform.translation.y = new_position.y;

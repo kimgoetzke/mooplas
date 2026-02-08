@@ -1,6 +1,8 @@
-use bevy::prelude::{Component, Message, Resource};
+use bevy::prelude::{Component, Event, Message, Resource};
 use serde::{Deserialize, Serialize};
-use std::fmt::{Debug, Display};
+use std::error::Error;
+use std::fmt;
+use std::fmt::{Debug, Display, Formatter};
 
 pub enum NetworkingType {
   Wasm,
@@ -112,7 +114,7 @@ pub enum ClientMessage {
 }
 
 impl Debug for ClientMessage {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
       ClientMessage::PlayerRegistration(message) => {
         write!(f, "ClientMessage::PlayerRegistration for {}", message.player_id)
@@ -121,5 +123,22 @@ impl Debug for ClientMessage {
         write!(f, "ClientMessage::{:?}", action)
       }
     }
+  }
+}
+
+#[derive(Event, Debug)]
+pub enum MooplasNetworkingErrorEvent {
+  RenetDisconnect(String),
+  NetcodeDisconnect(String),
+  NetcodeTransportError(String),
+  IoError(String),
+  Other(String),
+}
+
+impl Error for MooplasNetworkingErrorEvent {}
+
+impl Display for MooplasNetworkingErrorEvent {
+  fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
+    Debug::fmt(&self, fmt)
   }
 }
