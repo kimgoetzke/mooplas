@@ -1,10 +1,10 @@
-use crate::prelude::{PROTOCOL_ID, RenetServerVisualiser};
+use crate::prelude::{MooplasServerEvent, PROTOCOL_ID, RenetServerVisualiser, ServerNetworkingActive};
 use bevy::app::Plugin;
 use bevy::log::{debug, error, info, warn};
-use bevy::prelude::{App, Commands, Resource};
+use bevy::prelude::{App, Commands, On};
 use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
-use bevy_renet::renet::ConnectionConfig;
-use bevy_renet::{RenetServer, RenetServerPlugin};
+use bevy_renet::renet::{ConnectionConfig, ServerEvent};
+use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
@@ -13,16 +13,13 @@ pub struct ServerRenetPlugin;
 
 impl Plugin for ServerRenetPlugin {
   fn build(&self, app: &mut App) {
-    app.add_plugins((RenetServerPlugin, NetcodeServerPlugin));
+    app
+      .add_plugins((RenetServerPlugin, NetcodeServerPlugin))
+      .add_observer(receive_renet_server_events);
   }
 }
 
 const DEFAULT_SERVER_PORT: u16 = 0;
-
-/// Marker resource inserted when a Renet server is active. The intention is to use this for running systems
-/// conditionally e.g. `.run_if(resource_exists::<ServerNetworkingActive>)`.
-#[derive(Resource, Default)]
-pub struct ServerNetworkingActive;
 
 pub fn create_server(commands: &mut Commands) -> Result<String, Box<dyn std::error::Error>> {
   let port = DEFAULT_SERVER_PORT;
@@ -59,6 +56,17 @@ pub fn create_new_renet_server_resources(
   let server = RenetServer::new(ConnectionConfig::default());
 
   Ok((server, transport))
+}
+
+/// Receives events from the [`RenetServer`] and triggers corresponding [`MooplasServerEvent`] for the game to react to.
+fn receive_renet_server_events(server_event: On<RenetServerEvent>, mut commands: Commands) {
+  let mooplas_server_event = match **server_event {
+    ServerEvent::ClientConnected { client_id } => MooplasServerEvent::ClientConnected(client_id.into()),
+    ServerEvent::ClientDisconnected { client_id, reason } => {
+      MooplasServerEvent::ClientDisconnected(client_id.into(), reason.to_string())
+    }
+  };
+  commands.trigger(mooplas_server_event);
 }
 
 /// Attempts to determine the server's public IP address. Returns [`None`] if unable to determine (falls back to bind

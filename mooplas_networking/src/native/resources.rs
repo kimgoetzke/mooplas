@@ -1,9 +1,8 @@
-use crate::prelude::PlayerId;
+use crate::prelude::{ClientId, PlayerId};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Commands, Deref, DerefMut, Resource};
 use bevy_renet::RenetClient;
 use bevy_renet::netcode::NetcodeClientTransport;
-use bevy_renet::renet::ClientId;
 use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -34,6 +33,21 @@ pub struct RenetClientVisualiser(RenetClientVisualizer<{ VISUALISER_DISPLAY_VALU
 
 #[derive(Resource, Deref, DerefMut, Default)]
 pub struct RenetServerVisualiser(RenetServerVisualizer<{ VISUALISER_DISPLAY_VALUES }>);
+
+impl RenetServerVisualiser {
+  pub fn add_client(&mut self, client_id: &ClientId) {
+    self.0.add_client(client_id.0);
+  }
+
+  pub fn remove_client(&mut self, client_id: &ClientId) {
+    self.0.remove_client(client_id.0);
+  }
+}
+
+/// Marker resource inserted when a Renet server is active. The intention is to use this for running systems
+/// conditionally e.g. `.run_if(resource_exists::<ServerNetworkingActive>)`.
+#[derive(Resource, Default)]
+pub struct ServerNetworkingActive;
 
 /// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]
@@ -108,7 +122,6 @@ impl PendingClientHandshake {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use bevy_renet::renet::ClientId;
 
   #[test]
   fn registers_player_for_client_id() {

@@ -21,13 +21,13 @@ pub type RawClientId = bevy_renet::renet::ClientId;
 pub struct PlayerId(pub u8);
 
 impl Display for PlayerId {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     write!(f, "Player {}", self.0)
   }
 }
 
 impl Debug for PlayerId {
-  fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     write!(f, "Player {}", self.0)
   }
 }
@@ -47,6 +47,12 @@ pub struct ClientId(pub RawClientId);
 impl From<u64> for ClientId {
   fn from(value: u64) -> Self {
     ClientId(value)
+  }
+}
+
+impl Display for ClientId {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    write!(f, "Client {}", self.0)
   }
 }
 
@@ -141,4 +147,10 @@ impl Display for MooplasNetworkingErrorEvent {
   fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
     Debug::fmt(&self, fmt)
   }
+}
+
+#[derive(Event, Debug, PartialEq, Eq)]
+pub enum MooplasServerEvent {
+  ClientConnected(ClientId),
+  ClientDisconnected(ClientId, String),
 }

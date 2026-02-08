@@ -11,11 +11,11 @@ use bevy::prelude::{
   StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
 use bevy::time::TimerMode;
-use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
-use bevy_renet::{RenetServer, RenetServerEvent};
+use bevy_renet::RenetServer;
+use bevy_renet::renet::DefaultChannel;
 use mooplas_networking::prelude::{
-  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, ServerNetworkingActive, ServerRenetPlugin,
-  ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
+  ClientMessage, Lobby, MooplasServerEvent, RenetServerVisualiser, ServerMessage, ServerNetworkingActive,
+  ServerRenetPlugin, ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -64,7 +64,7 @@ const CLIENT_MESSAGE_SERIALISATION: &'static str = "Failed to serialise client m
 struct ShutdownCountdown(Timer);
 
 fn receive_server_events(
-  server_event: On<RenetServerEvent>,
+  server_event: On<MooplasServerEvent>,
   mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
@@ -74,29 +74,27 @@ fn receive_server_events(
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
   mut visualiser: ResMut<RenetServerVisualiser>,
 ) {
-  match **server_event {
-    ServerEvent::ClientConnected { client_id } => {
+  match server_event.event() {
+    MooplasServerEvent::ClientConnected(client_id) => {
       info!("Client with ID [{}] connected", client_id);
       visualiser.add_client(client_id);
 
       // Notify all other clients about the new connection
-      let connected_message = encode_to_bytes(&ServerMessage::ClientConnected {
-        client_id: client_id.into(),
-      })
-      .expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message_except(client_id, DefaultChannel::ReliableOrdered, connected_message);
-      lobby.connected.push(client_id);
+      let connected_message =
+        encode_to_bytes(&ServerMessage::ClientConnected { client_id: *client_id }).expect(CLIENT_MESSAGE_SERIALISATION);
+      server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, connected_message);
+      lobby.connected.push(*client_id);
 
       // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
       // Send the current seed to the newly connected client
       let seed_message = encode_to_bytes(&ServerMessage::ClientInitialised {
         seed: seed.get(),
-        client_id: client_id.into(),
+        client_id: *client_id,
       })
       .expect("Failed to serialise seed message");
-      server.send_message(client_id, DefaultChannel::ReliableOrdered, seed_message);
+      server.send_message(client_id.0, DefaultChannel::ReliableOrdered, seed_message);
     }
-    ServerEvent::ClientDisconnected { client_id, reason } => {
+    MooplasServerEvent::ClientDisconnected(client_id, reason) => {
       info!("Client with ID [{}] disconnected: {}", client_id, reason);
       visualiser.remove_client(client_id);
 
@@ -115,12 +113,10 @@ fn receive_server_events(
       }
 
       // Notify all other clients about the disconnection itself
-      let message = encode_to_bytes(&ServerMessage::ClientDisconnected {
-        client_id: client_id.into(),
-      })
-      .expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message_except(client_id, DefaultChannel::ReliableOrdered, message);
-      lobby.connected.retain(|&id| id != client_id);
+      let message = encode_to_bytes(&ServerMessage::ClientDisconnected { client_id: *client_id })
+        .expect(CLIENT_MESSAGE_SERIALISATION);
+      server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, message);
+      lobby.connected.retain(|&id| id != *client_id);
     }
   }
 
@@ -138,7 +134,7 @@ fn receive_unreliable_client_inputs_system(
   mut input_message: MessageWriter<InputMessage>,
 ) {
   for client_id in lobby.connected.iter() {
-    while let Some(message) = server.receive_message(*client_id, DefaultChannel::Unreliable) {
+    while let Some(message) = server.receive_message(client_id.0, DefaultChannel::Unreliable) {
       if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::Input(action) => {
@@ -206,7 +202,7 @@ fn receive_ordered_client_messages_system(
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
   for client_id in lobby.connected.clone() {
-    while let Some(message) = server.receive_message(client_id, DefaultChannel::ReliableOrdered) {
+    while let Some(message) = server.receive_message(client_id.0, DefaultChannel::ReliableOrdered) {
       if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::PlayerRegistration(message) => {
@@ -244,7 +240,7 @@ fn handle_player_registration_message_from_client(
   mut registered_players: &mut ResMut<RegisteredPlayers>,
   available_configs: &Res<AvailablePlayerConfigs>,
   mut player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
-  client_id: &ClientId,
+  client_id: &mooplas_networking::prelude::ClientId,
   player_id: mooplas_networking::prelude::PlayerId,
   has_registered: bool,
   lobby: &mut ResMut<Lobby>,
@@ -256,7 +252,7 @@ fn handle_player_registration_message_from_client(
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
+    server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, message);
     utils::register_player_locally(
       &mut registered_players,
       &available_configs,
@@ -271,7 +267,7 @@ fn handle_player_registration_message_from_client(
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message_except(*client_id, DefaultChannel::ReliableOrdered, message);
+    server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, message);
     utils::unregister_player_locally(
       &mut registered_players,
       &mut player_registration_message,

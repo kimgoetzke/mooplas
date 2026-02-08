@@ -20,10 +20,9 @@ use mooplas_networking::prelude::{
 };
 use std::time::Instant;
 
-/// A plugin that adds client-side online multiplayer capabilities to the game. Only
-/// active when the application is
+/// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
 /// running in client mode (i.e. someone else is the server). Mutually exclusive with the
-/// [`crate::online::ServerPlugin`].
+/// [`crate::online::native::ServerPlugin`].
 pub struct ClientPlugin;
 
 impl Plugin for ClientPlugin {
