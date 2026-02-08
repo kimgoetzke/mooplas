@@ -1,7 +1,7 @@
 use crate::prelude::{PROTOCOL_ID, RenetServerVisualiser};
 use bevy::app::Plugin;
 use bevy::log::{debug, error, info, warn};
-use bevy::prelude::{App, Commands};
+use bevy::prelude::{App, Commands, Resource};
 use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
 use bevy_renet::renet::ConnectionConfig;
 use bevy_renet::{RenetServer, RenetServerPlugin};
@@ -19,6 +19,11 @@ impl Plugin for ServerRenetPlugin {
 
 const DEFAULT_SERVER_PORT: u16 = 0;
 
+/// Marker resource inserted when a Renet server is active. The intention is to use this for running systems
+/// conditionally e.g. `.run_if(resource_exists::<ServerNetworkingActive>)`.
+#[derive(Resource, Default)]
+pub struct ServerNetworkingActive;
+
 pub fn create_server(commands: &mut Commands) -> Result<String, Box<dyn std::error::Error>> {
   let port = DEFAULT_SERVER_PORT;
   match create_new_renet_server_resources(port) {
@@ -28,6 +33,7 @@ pub fn create_server(commands: &mut Commands) -> Result<String, Box<dyn std::err
       commands.insert_resource(server);
       commands.insert_resource(transport);
       commands.insert_resource(RenetServerVisualiser::default());
+      commands.insert_resource(ServerNetworkingActive::default());
       Ok(connection_string)
     }
     Err(e) => Err(e),

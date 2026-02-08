@@ -1,7 +1,7 @@
 use crate::native::{PendingClientHandshake, RenetClientVisualiser};
 use crate::prelude::PROTOCOL_ID;
 use bevy::log::*;
-use bevy::prelude::{Commands, Plugin};
+use bevy::prelude::{Commands, Plugin, Res};
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::ConnectionConfig;
 use bevy_renet::{RenetClient, RenetClientPlugin};
@@ -14,6 +14,13 @@ pub struct ClientRenetPlugin;
 impl Plugin for ClientRenetPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
     app.add_plugins((RenetClientPlugin, NetcodeClientPlugin));
+  }
+}
+
+pub fn is_client_connected(client: Option<Res<RenetClient>>) -> bool {
+  match client {
+    Some(client) => client.is_connected(),
+    None => false,
   }
 }
 

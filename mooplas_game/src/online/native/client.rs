@@ -12,11 +12,11 @@ use bevy::prelude::{
   App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
   State, Time, Transform, With, Without, in_state, resource_exists,
 };
+use bevy_renet::RenetClient;
 use bevy_renet::renet::DefaultChannel;
-use bevy_renet::{RenetClient, client_connected};
 use mooplas_networking::prelude::{
   ClientMessage, ClientRenetPlugin, ClientVisualiserPlugin, PendingClientHandshake, PlayerStateUpdateMessage,
-  ServerMessage, decode_from_bytes, encode_to_bytes,
+  ServerMessage, decode_from_bytes, encode_to_bytes, is_client_connected,
 };
 use std::time::Instant;
 
@@ -34,7 +34,10 @@ impl Plugin for ClientPlugin {
         Update,
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
       )
-      .add_systems(Update, receive_reliable_server_messages_system.run_if(client_connected))
+      .add_systems(
+        Update,
+        receive_reliable_server_messages_system.run_if(is_client_connected),
+      )
       .add_systems(
         Update,
         (
@@ -42,7 +45,7 @@ impl Plugin for ClientPlugin {
           process_and_send_local_exit_lobby_message_system,
         )
           .run_if(in_state(AppState::Registering))
-          .run_if(client_connected),
+          .run_if(is_client_connected),
       )
       .add_systems(
         Update,
@@ -53,7 +56,7 @@ impl Plugin for ClientPlugin {
           apply_state_interpolation_system,
         )
           .run_if(in_state(AppState::Playing))
-          .run_if(client_connected),
+          .run_if(is_client_connected),
       );
   }
 }

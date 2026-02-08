@@ -14,8 +14,8 @@ use bevy::time::TimerMode;
 use bevy_renet::renet::{ClientId, DefaultChannel, ServerEvent};
 use bevy_renet::{RenetServer, RenetServerEvent};
 use mooplas_networking::prelude::{
-  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, ServerRenetPlugin, ServerVisualiserPlugin,
-  decode_from_bytes, encode_to_bytes,
+  ClientMessage, Lobby, RenetServerVisualiser, ServerMessage, ServerNetworkingActive, ServerRenetPlugin,
+  ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -31,7 +31,7 @@ impl Plugin for ServerPlugin {
       .add_systems(
         Update,
         (receive_ordered_client_messages_system, broadcast_local_app_state_system)
-          .run_if(resource_exists::<RenetServer>),
+          .run_if(resource_exists::<ServerNetworkingActive>),
       )
       .add_systems(
         Update,
@@ -40,19 +40,19 @@ impl Plugin for ServerPlugin {
           process_and_broadcast_local_exit_lobby_message,
         )
           .run_if(in_state(AppState::Registering))
-          .run_if(resource_exists::<RenetServer>),
+          .run_if(resource_exists::<ServerNetworkingActive>),
       )
       .add_systems(
         Update,
         (receive_unreliable_client_inputs_system, broadcast_player_states_system)
           .run_if(in_state(AppState::Playing))
-          .run_if(resource_exists::<RenetServer>),
+          .run_if(resource_exists::<ServerNetworkingActive>),
       )
       .add_systems(
         Update,
         disconnect_all_clients_system
           .run_if(resource_exists::<ShutdownCountdown>)
-          .run_if(resource_exists::<RenetServer>),
+          .run_if(resource_exists::<ServerNetworkingActive>),
       );
   }
 }
