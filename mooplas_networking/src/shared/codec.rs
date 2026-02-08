@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {
-      let original = ClientMessage::PlayerRegistration(PlayerRegistrationMessage {
+      let original = ClientMessage::PlayerRegistrationRequest(PlayerRegistrationMessage {
         player_id: PlayerId(7),
         has_registered: true,
         is_anyone_registered: true,

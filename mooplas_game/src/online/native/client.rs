@@ -9,14 +9,13 @@ use bevy::app::Update;
 use bevy::log::*;
 use bevy::math::Quat;
 use bevy::prelude::{
-  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
+  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Query, Res, ResMut,
   State, Time, Transform, With, Without, in_state, resource_exists,
 };
 use bevy_renet::RenetClient;
-use bevy_renet::renet::DefaultChannel;
 use mooplas_networking::prelude::{
-  ClientMessage, ClientRenetPlugin, ClientVisualiserPlugin, PendingClientHandshake, PlayerStateUpdateMessage,
-  ServerMessage, decode_from_bytes, encode_to_bytes, is_client_connected,
+  ChannelType, ClientMessage, ClientRenetPlugin, ClientVisualiserPlugin, PendingClientHandshake,
+  PlayerStateUpdateMessage, ServerMessage, encode_to_bytes, is_client_connected,
 };
 use std::time::Instant;
 
@@ -33,10 +32,7 @@ impl Plugin for ClientPlugin {
         Update,
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
       )
-      .add_systems(
-        Update,
-        receive_reliable_server_messages_system.run_if(is_client_connected),
-      )
+      .add_observer(handle_server_message_event)
       .add_systems(
         Update,
         (
@@ -49,7 +45,6 @@ impl Plugin for ClientPlugin {
       .add_systems(
         Update,
         (
-          receive_unreliable_server_messages_system,
           send_local_input_messages,
           add_interpolation_component_system,
           apply_state_interpolation_system,
@@ -90,64 +85,60 @@ pub fn client_handshake_system(
 }
 
 /// Processes any incoming [`DefaultChannel::ReliableOrdered`] server messages and acts on them, if required.
-fn receive_reliable_server_messages_system(
-  mut client: ResMut<RenetClient>,
+fn handle_server_message_event(
+  server_message: On<ServerMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
-  mut registration_message: MessageWriter<PlayerRegistrationMessage>,
-  mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
   current_state: ResMut<State<AppState>>,
   mut next_state: ResMut<NextState<AppState>>,
   mut winner: ResMut<WinnerInfo>,
   mut seed: ResMut<Seed>,
+  mut registration_message: MessageWriter<PlayerRegistrationMessage>,
+  mut player_state_update_message: MessageWriter<PlayerStateUpdateMessage>,
+  mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
 ) {
-  while let Some(message) = client.receive_message(DefaultChannel::ReliableOrdered) {
-    let server_message = decode_from_bytes(&message).expect("Failed to deserialise server message");
-    debug!("Received server message: {:?}", server_message);
-    match server_message {
-      ServerMessage::ClientConnected { client_id } => {
-        info!("A client with ID [{:?}] connected", client_id);
-      }
-      ServerMessage::ClientDisconnected { client_id } => {
-        info!("A client with ID [{:?}] disconnected", client_id);
-      }
-      ServerMessage::ClientInitialised { seed: server_seed, .. } => {
-        seed.set(server_seed);
-      }
-      ServerMessage::PlayerRegistered { player_id, .. } => {
-        let player_id = PlayerId(player_id);
-        utils::register_player_locally(
-          &mut registered_players,
-          &available_configs,
-          &mut registration_message,
-          player_id,
+  match server_message.event() {
+    ServerMessage::ClientConnected { client_id } => {
+      info!("A client with ID [{:?}] connected", client_id);
+    }
+    ServerMessage::ClientDisconnected { client_id } => {
+      info!("A client with ID [{:?}] disconnected", client_id);
+    }
+    ServerMessage::ClientInitialised { seed: server_seed, .. } => {
+      seed.set(*server_seed);
+    }
+    ServerMessage::PlayerRegistered { player_id, .. } => {
+      let player_id = PlayerId(*player_id);
+      utils::register_player_locally(
+        &mut registered_players,
+        &available_configs,
+        &mut registration_message,
+        player_id,
+      );
+    }
+    ServerMessage::PlayerUnregistered { player_id, .. } => {
+      let player_id = PlayerId(*player_id);
+      utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
+    }
+    ServerMessage::StateChanged { new_state, winner_info } => {
+      if !current_state.is_manual_transition_allowed_to(&AppState::from(new_state)) {
+        next_state.set(AppState::from(new_state));
+      } else {
+        debug!(
+          "Ignoring state change to [{}] because [{:?}] is restricted...",
+          new_state, *current_state
         );
       }
-      ServerMessage::PlayerUnregistered { player_id, .. } => {
-        let player_id = PlayerId(player_id);
-        utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
+      if let Some(player_id) = winner_info {
+        winner.set((*player_id).into());
       }
-      ServerMessage::StateChanged { new_state, winner_info } => {
-        if !current_state.is_manual_transition_allowed_to(&AppState::from(&new_state)) {
-          next_state.set(AppState::from(&new_state));
-        } else {
-          debug!(
-            "Ignoring state change to [{}] because [{:?}] is restricted...",
-            new_state, *current_state
-          );
-        }
-        if let Some(player_id) = winner_info {
-          winner.set(player_id.into());
-        }
-      }
-      ServerMessage::ShutdownServer => {
-        exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
-      }
-      _ => {
-        warn!(
-          "Received unexpected message on [ReliableOrdered] channel: {:?}",
-          server_message
-        );
+    }
+    ServerMessage::ShutdownServer => {
+      exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
+    }
+    ServerMessage::UpdatePlayerStates { states } => {
+      for (player_id, x, y, rotation_z) in states {
+        player_state_update_message.write(PlayerStateUpdateMessage::new(*player_id, (*x, *y), *rotation_z));
       }
     }
   }
@@ -162,10 +153,10 @@ fn send_local_player_registration_system(
     if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
       continue;
     }
-    let client_message = ClientMessage::PlayerRegistration(player_registration_message.into());
+    let client_message = ClientMessage::PlayerRegistrationRequest(player_registration_message.into());
     debug!("Sending: [{:?}]", client_message);
     let message = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
-    client.send_message(DefaultChannel::ReliableOrdered, message);
+    client.send_message(ChannelType::ReliableOrdered, message);
   }
 }
 
@@ -203,37 +194,17 @@ fn send_local_input_messages(
       .iter()
       .find(|player| player.id == *player_id && player.is_local())
     {
-      if let Ok(input_message) = encode_to_bytes(&ClientMessage::Input(message.into())) {
-        client.send_message(DefaultChannel::Unreliable, input_message);
+      if let Ok(input_message) = encode_to_bytes(&ClientMessage::InputRequest(message.into())) {
+        client.send_message(ChannelType::Unreliable, input_message);
       } else {
         warn!("Failed to serialise input action message: {:?}", message);
       }
-    }
-  }
-}
-
-/// Processes any incoming [`DefaultChannel::Unreliable`] server messages and acts on them, if required.
-fn receive_unreliable_server_messages_system(
-  mut client: ResMut<RenetClient>,
-  mut player_state_update_message: MessageWriter<PlayerStateUpdateMessage>,
-) {
-  while let Some(message) = client.receive_message(DefaultChannel::Unreliable) {
-    if let Ok(server_message) = decode_from_bytes(&message) {
-      match server_message {
-        ServerMessage::UpdatePlayerStates { states } => {
-          for (player_id, x, y, rotation_z) in states {
-            player_state_update_message.write(PlayerStateUpdateMessage::new(player_id, (x, y), rotation_z));
-          }
-        }
-        _ => {
-          warn!(
-            "Received unexpected server message on [Unreliable] channel: {:?}",
-            server_message
-          );
-        }
-      }
     } else {
-      warn!("Failed to deserialise [Unreliable] server message");
+      error_once!(
+        "Received input action message for player ID [{}], but no matching local player was found: {:?}",
+        player_id,
+        message
+      );
     }
   }
 }

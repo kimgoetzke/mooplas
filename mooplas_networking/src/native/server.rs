@@ -1,14 +1,14 @@
 use crate::native::Lobby;
 use crate::prelude::{
-  ChannelType, MooplasServerEvent, PROTOCOL_ID, RenetServerVisualiser, ServerMessage, ServerNetworkingActive,
-  encode_to_bytes,
+  ChannelType, ClientMessage, MooplasServerEvent, PROTOCOL_ID, RenetServerVisualiser, ServerMessage,
+  ServerNetworkingActive, decode_from_bytes, encode_to_bytes,
 };
-use bevy::app::Plugin;
-use bevy::log::{debug, error, info, warn};
-use bevy::prelude::{App, Commands, On, ResMut};
+use bevy::app::{Plugin, Update};
+use bevy::log::*;
+use bevy::prelude::{App, Commands, IntoScheduleConfigs, On, Res, ResMut, resource_exists};
 use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
 use bevy_renet::renet::{ConnectionConfig, ServerEvent};
-use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
+use bevy_renet::{RenetClient, RenetServer, RenetServerEvent, RenetServerPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
@@ -19,7 +19,11 @@ impl Plugin for ServerRenetPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_plugins((RenetServerPlugin, NetcodeServerPlugin))
-      .add_observer(receive_renet_server_events);
+      .add_observer(receive_renet_server_events)
+      .add_systems(
+        Update,
+        receive_client_messages_system.run_if(resource_exists::<RenetServer>),
+      );
   }
 }
 
@@ -83,7 +87,7 @@ fn receive_renet_server_events(
       server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, connected_message);
       lobby.connected.push(client_id.into());
 
-      // Return new event for the game to react
+      // Return new event for an application to react to
       MooplasServerEvent::ClientConnected(client_id.into())
     }
     ServerEvent::ClientDisconnected { client_id, reason } => {
@@ -97,7 +101,7 @@ fn receive_renet_server_events(
       server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, message);
       lobby.connected.retain(|&id| id != client_id.into());
 
-      // Return new event for the game to react
+      // Return new event for an application to react to
       MooplasServerEvent::ClientDisconnected(client_id.into(), reason.to_string())
     }
   };
@@ -134,4 +138,36 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
 
   error!("Failed to determine public IP address");
   None
+}
+
+/// Processes any incoming messages from the [`RenetServer`] and triggers an event for each that can be observed and
+/// processed by an application.
+fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lobby>, mut commands: Commands) {
+  for client_id in lobby.connected.iter() {
+    while let Some(message) = server.receive_message(client_id.0, ChannelType::ReliableOrdered) {
+      let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
+      debug!(
+        "Received [{:?}] message from client [{}]: {:?}",
+        ChannelType::ReliableOrdered,
+        client_id,
+        client_message
+      );
+      let client_message = match client_message {
+        ClientMessage::PlayerRegistrationRequest(registration_message) => {
+          ClientMessage::PlayerRegistration(registration_message, *client_id)
+        }
+        other => other,
+      };
+      commands.trigger(client_message);
+    }
+
+    while let Some(message) = server.receive_message(client_id.0, ChannelType::Unreliable) {
+      let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
+      let client_message = match client_message {
+        ClientMessage::InputRequest(action) => ClientMessage::Input(action, *client_id),
+        other => other,
+      };
+      commands.trigger(client_message);
+    }
+  }
 }

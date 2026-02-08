@@ -4,7 +4,7 @@
     <option name="command" value="run --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online,dev" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
     <envs>
-      <env name="RUST_LOG" value="mooplas_game=debug" />
+      <env name="RUST_LOG" value="mooplas_game=debug,mooplas_networking=debug" />
     </envs>
     <option name="emulateTerminal" value="true" />
     <option name="channel" value="DEFAULT" />

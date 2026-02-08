@@ -1,9 +1,10 @@
 use crate::native::{PendingClientHandshake, RenetClientVisualiser};
-use crate::prelude::PROTOCOL_ID;
+use crate::prelude::{ChannelType, PROTOCOL_ID, ServerMessage, decode_from_bytes};
+use bevy::app::Update;
 use bevy::log::*;
-use bevy::prelude::{Commands, Plugin, Res};
+use bevy::prelude::{Commands, IntoScheduleConfigs, Plugin, Res, ResMut};
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport};
-use bevy_renet::renet::ConnectionConfig;
+use bevy_renet::renet::{ConnectionConfig, DefaultChannel};
 use bevy_renet::{RenetClient, RenetClientPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
@@ -13,14 +14,10 @@ pub struct ClientRenetPlugin;
 
 impl Plugin for ClientRenetPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
-    app.add_plugins((RenetClientPlugin, NetcodeClientPlugin));
-  }
-}
-
-pub fn is_client_connected(client: Option<Res<RenetClient>>) -> bool {
-  match client {
-    Some(client) => client.is_connected(),
-    None => false,
+    app.add_plugins((RenetClientPlugin, NetcodeClientPlugin)).add_systems(
+      Update,
+      receive_reliable_server_messages_system.run_if(is_client_connected),
+    );
   }
 }
 
@@ -57,4 +54,33 @@ fn create_new_renet_client_resources(
   let client = RenetClient::new(ConnectionConfig::default());
 
   Ok((client, transport))
+}
+
+/// Returns true if the [`RenetClient`] resource exists i.e. the client is connected to a server.
+pub fn is_client_connected(client: Option<Res<RenetClient>>) -> bool {
+  match client {
+    Some(client) => client.is_connected(),
+    None => false,
+  }
+}
+
+/// A system that reads all messages from the server on all channels, deserialises them and triggers them as events for
+/// an application to read and respond to.
+fn receive_reliable_server_messages_system(mut client: ResMut<RenetClient>, mut commands: Commands) {
+  while let Some(reliable_ordered_channel_message) = client.receive_message(DefaultChannel::ReliableOrdered) {
+    let server_message: ServerMessage =
+      decode_from_bytes(&reliable_ordered_channel_message).expect("Failed to deserialise server message");
+    debug!(
+      "Received [{:?}] server message: {:?}",
+      ChannelType::ReliableOrdered,
+      server_message
+    );
+    commands.trigger(server_message);
+  }
+
+  while let Some(unreliable_channel_message) = client.receive_message(DefaultChannel::Unreliable) {
+    let server_message: ServerMessage =
+      decode_from_bytes(&unreliable_channel_message).expect("Failed to deserialise server message");
+    commands.trigger(server_message);
+  }
 }

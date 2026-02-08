@@ -1,7 +1,7 @@
 use crate::prelude::{InputMessage, NetworkRole, PlayerId, PlayerRegistrationMessage};
 use bevy::math::{Quat, Vec2};
 use bevy::prelude::Component;
-use mooplas_networking::prelude::SerialisableInputActionMessage;
+use mooplas_networking::prelude::SerialisableInputMessage;
 
 /// A component for interpolating network-synchronised transforms, controlled by the server. Used in an attempt to
 /// smoothly transition from current transform's position/rotation to target position/rotation at a defined speed.
@@ -78,20 +78,29 @@ impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegi
   }
 }
 
-impl From<&InputMessage> for SerialisableInputActionMessage {
+impl From<&InputMessage> for SerialisableInputMessage {
   fn from(value: &InputMessage) -> Self {
     match value {
-      InputMessage::Move(player_id, direction) => SerialisableInputActionMessage::Move(player_id.0, *direction),
-      InputMessage::Action(player_id) => SerialisableInputActionMessage::Action(player_id.0),
+      InputMessage::Move(player_id, direction) => SerialisableInputMessage::Move(player_id.0, *direction),
+      InputMessage::Action(player_id) => SerialisableInputMessage::Action(player_id.0),
     }
   }
 }
 
-impl Into<InputMessage> for SerialisableInputActionMessage {
+impl Into<InputMessage> for SerialisableInputMessage {
   fn into(self) -> InputMessage {
     match self {
-      SerialisableInputActionMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
-      SerialisableInputActionMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
+      SerialisableInputMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
+      SerialisableInputMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
+    }
+  }
+}
+
+impl Into<InputMessage> for &SerialisableInputMessage {
+  fn into(self) -> InputMessage {
+    match self {
+      &SerialisableInputMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
+      &SerialisableInputMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
     }
   }
 }

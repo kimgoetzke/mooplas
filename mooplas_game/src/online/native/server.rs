@@ -11,9 +11,10 @@ use bevy::prelude::{
   StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
 use bevy::time::TimerMode;
+use bevy_renet::RenetServer;
 use mooplas_networking::prelude::{
-  ChannelType, ClientId, ClientMessage, Lobby, MooplasServerEvent, NativeServer, RenetServerVisualiser, ServerMessage,
-  ServerNetworkingActive, ServerRenetPlugin, ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
+  ChannelType, ClientId, ClientMessage, Lobby, MooplasServerEvent, RenetServerVisualiser, ServerMessage,
+  ServerNetworkingActive, ServerRenetPlugin, ServerVisualiserPlugin, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -26,10 +27,10 @@ impl Plugin for ServerPlugin {
     app
       .add_plugins((ServerRenetPlugin, ServerVisualiserPlugin))
       .add_observer(receive_server_events)
+      .add_observer(receive_client_messages_system)
       .add_systems(
         Update,
-        (receive_ordered_client_messages_system, broadcast_local_app_state_system)
-          .run_if(resource_exists::<ServerNetworkingActive>),
+        broadcast_local_app_state_system.run_if(resource_exists::<ServerNetworkingActive>),
       )
       .add_systems(
         Update,
@@ -42,7 +43,7 @@ impl Plugin for ServerPlugin {
       )
       .add_systems(
         Update,
-        (receive_unreliable_client_inputs_system, broadcast_player_states_system)
+        broadcast_player_states_system
           .run_if(in_state(AppState::Playing))
           .run_if(resource_exists::<ServerNetworkingActive>),
       )
@@ -64,7 +65,7 @@ struct ShutdownCountdown(Timer);
 /// The main observer system for server events.
 fn receive_server_events(
   server_event: On<MooplasServerEvent>,
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
@@ -85,7 +86,7 @@ fn receive_server_events(
         client_id: *client_id,
       })
       .expect("Failed to serialise seed message");
-      server.send_message(client_id, ChannelType::ReliableOrdered, seed_message);
+      server.send_message(client_id.0, ChannelType::ReliableOrdered, seed_message);
     }
     MooplasServerEvent::ClientDisconnected(client_id, reason) => {
       info!("Client with ID [{}] disconnected: {}", client_id, reason);
@@ -113,52 +114,10 @@ fn receive_server_events(
   }
 }
 
-/// Processes any incoming [`ChannelType::Unreliable`] messages from clients by applying them locally and
-/// broadcasting them to all other clients.
-fn receive_unreliable_client_inputs_system(
-  lobby: Res<Lobby>,
-  mut server: ResMut<NativeServer>,
-  mut input_message: MessageWriter<InputMessage>,
-) {
-  for client_id in lobby.connected.iter() {
-    while let Some(message) = server.receive_message(client_id.0, ChannelType::Unreliable) {
-      if let Ok(client_message) = decode_from_bytes(&message) {
-        match client_message {
-          ClientMessage::Input(action) => {
-            let message: InputMessage = action.into();
-            if match message {
-              InputMessage::Action(player_id) => lobby.validate_registration(&client_id, &player_id.into()),
-              InputMessage::Move(player_id, _) => lobby.validate_registration(&client_id, &player_id.into()),
-            } {
-              input_message.write(message);
-              continue;
-            }
-            warn!(
-              "Received invalid input action on [Unreliable] channel from client ID [{}]: {:?}",
-              client_id, message
-            );
-          }
-          _ => {
-            warn!(
-              "Received unrecognised client message on [Unreliable] channel from client ID [{}]: {:?}",
-              client_id, client_message
-            );
-          }
-        }
-      } else {
-        warn!(
-          "Failed to deserialise client message on [Unreliable] channel from client ID [{}]",
-          client_id
-        );
-      }
-    }
-  }
-}
-
 /// Broadcasts the authoritative state (position and rotation) of all snake heads to all clients.
 /// This runs every frame to ensure clients have up-to-date positions for interpolation.
 fn broadcast_player_states_system(
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
   snake_heads: Query<(&Transform, &PlayerId), With<SnakeHead>>,
 ) {
   let mut states = Vec::new();
@@ -179,51 +138,51 @@ fn broadcast_player_states_system(
   }
 }
 
-/// Processes any incoming [`ChannelType::ReliableOrdered`] messages from clients by applying them locally and
-/// broadcasting them to all other clients.
-fn receive_ordered_client_messages_system(
+/// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients,
+/// if necessary.
+fn receive_client_messages_system(
+  client_message: On<ClientMessage>,
   mut lobby: ResMut<Lobby>,
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
+  mut input_message: MessageWriter<InputMessage>,
 ) {
-  for client_id in lobby.connected.clone() {
-    while let Some(message) = server.receive_message(client_id.0, ChannelType::ReliableOrdered) {
-      if let Ok(client_message) = decode_from_bytes(&message) {
-        match client_message {
-          ClientMessage::PlayerRegistration(message) => {
-            handle_player_registration_message_from_client(
-              &mut server,
-              &mut registered_players,
-              &available_configs,
-              &mut player_registration_message,
-              &client_id,
-              message.player_id,
-              message.has_registered,
-              &mut lobby,
-            );
-          }
-          _ => {
-            warn!(
-              "Received unrecognised client message on [ReliableOrdered] channel from client ID [{}]: {:?}",
-              client_id, client_message
-            );
-          }
-        }
-      } else {
-        warn!(
-          "Failed to deserialise client message on [ReliableOrdered] channel from client ID [{}]",
-          client_id
-        );
+  match client_message.event() {
+    ClientMessage::PlayerRegistration(message, client_id) => {
+      handle_player_registration_message_from_client(
+        &mut server,
+        &mut registered_players,
+        &available_configs,
+        &mut player_registration_message,
+        &client_id,
+        message.player_id,
+        message.has_registered,
+        &mut lobby,
+      );
+    }
+    ClientMessage::Input(message, client_id) => {
+      let message: InputMessage = message.into();
+      let player_id = match message {
+        InputMessage::Action(player_id) => player_id,
+        InputMessage::Move(player_id, _) => player_id,
+      };
+      if lobby.validate_registration(&client_id, &player_id.into()) {
+        input_message.write(message);
+        return;
       }
+      warn!("Received invalid input action on [Unreliable] channel: {:?}", message);
+    }
+    _ => {
+      error!("Received invalid message: {:?}", client_message.event());
     }
   }
 }
 
 /// Processes an individual player registration message from [`ClientId`].
 fn handle_player_registration_message_from_client(
-  server: &mut ResMut<NativeServer>,
+  server: &mut ResMut<RenetServer>,
   mut registered_players: &mut ResMut<RegisteredPlayers>,
   available_configs: &Res<AvailablePlayerConfigs>,
   mut player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
@@ -239,7 +198,7 @@ fn handle_player_registration_message_from_client(
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, message);
+    server.broadcast_message_except(client_id.0, ChannelType::ReliableOrdered, message);
     utils::register_player_locally(
       &mut registered_players,
       &available_configs,
@@ -254,7 +213,7 @@ fn handle_player_registration_message_from_client(
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, message);
+    server.broadcast_message_except(client_id.0, ChannelType::ReliableOrdered, message);
     utils::unregister_player_locally(
       &mut registered_players,
       &mut player_registration_message,
@@ -266,7 +225,7 @@ fn handle_player_registration_message_from_client(
 
 /// A system that handles local state change events and broadcasts them to all connected clients.
 fn broadcast_local_app_state_system(
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
   mut app_state_messages: MessageReader<StateTransitionEvent<AppState>>,
   winner: Res<WinnerInfo>,
 ) {
@@ -291,7 +250,7 @@ fn broadcast_local_app_state_system(
 /// clients.
 fn broadcast_local_player_registration_system(
   mut messages: MessageReader<PlayerRegistrationMessage>,
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
 ) {
   for message in messages.read() {
     if utils::should_message_be_skipped(&message, NetworkRole::Client) {
@@ -322,7 +281,7 @@ fn broadcast_local_player_registration_system(
 fn process_and_broadcast_local_exit_lobby_message(
   mut messages: MessageReader<ExitLobbyMessage>,
   mut commands: Commands,
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
 ) {
   for _ in messages.read() {
     info!("Informing all clients about intention to shut down server and scheduling shutdown...");
@@ -341,7 +300,7 @@ fn disconnect_all_clients_system(
   mut commands: Commands,
   mut countdown: ResMut<ShutdownCountdown>,
   time: Res<Time>,
-  mut server: ResMut<NativeServer>,
+  mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
   mut registered_players: ResMut<RegisteredPlayers>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,

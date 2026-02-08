@@ -10,6 +10,7 @@ pub enum NetworkingType {
   Native,
 }
 
+#[derive(Debug)]
 pub enum ChannelType {
   Unreliable,
   ReliableOrdered,
@@ -89,11 +90,11 @@ impl From<u64> for ClientId {
 
 impl Display for ClientId {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-    write!(f, "Client {}", self.0)
+    write!(f, "{}", self.0)
   }
 }
 
-#[derive(Debug, Serialize, Deserialize, Component)]
+#[derive(Event, Debug, Serialize, Deserialize, Component)]
 pub enum ServerMessage {
   /// Sent by the server to all clients (except the one that just connected) when a new client has connected.
   ClientConnected { client_id: ClientId },
@@ -118,7 +119,7 @@ pub enum ServerMessage {
 // Local serialisable input action message so this crate can compile independently.
 // Matches the shape used elsewhere in the project.
 #[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
-pub enum SerialisableInputActionMessage {
+pub enum SerialisableInputMessage {
   Move(u8, f32),
   Action(u8),
 }
@@ -145,25 +146,34 @@ pub enum NetworkRole {
   Client,
 }
 
-// ClientMessage is generic over M (the player registration payload). M must implement
-// serde-serialisable/deserialisable; we express that via serde(bound). We avoid placing
-// additional trait bounds (e.g., Message) on the enum definition itself to keep this
-// crate flexible — callers who require `Message` can add that bound where they use
-// the enum. This also avoids lifetime shadowing issues with serde derive.
-#[derive(Serialize, Deserialize)]
+// TODO: Separate event client writes vs event that server reads in receive_client_messages_system
+// A message sent by the client for the server to process.
+#[derive(Event, Serialize, Deserialize)]
 pub enum ClientMessage {
-  PlayerRegistration(PlayerRegistrationMessage),
-  Input(SerialisableInputActionMessage),
+  PlayerRegistrationRequest(PlayerRegistrationMessage),
+  PlayerRegistration(PlayerRegistrationMessage, ClientId),
+  InputRequest(SerialisableInputMessage),
+  Input(SerialisableInputMessage, ClientId),
 }
 
 impl Debug for ClientMessage {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
-      ClientMessage::PlayerRegistration(message) => {
-        write!(f, "ClientMessage::PlayerRegistration for {}", message.player_id)
+      ClientMessage::PlayerRegistrationRequest(message) => {
+        write!(f, "ClientMessage::PlayerRegistrationRequest for {}", message.player_id)
       }
-      ClientMessage::Input(action) => {
+      ClientMessage::PlayerRegistration(message, client_id) => {
+        write!(
+          f,
+          "ClientMessage::PlayerRegistration for {} with client ID [{}]",
+          message.player_id, client_id
+        )
+      }
+      ClientMessage::InputRequest(action) => {
         write!(f, "ClientMessage::{:?}", action)
+      }
+      ClientMessage::Input(action, client_id) => {
+        write!(f, "ClientMessage::{:?} with client ID [{}]", action, client_id)
       }
     }
   }
