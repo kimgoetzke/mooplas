@@ -1,14 +1,14 @@
 use crate::native::Lobby;
 use crate::prelude::{
-  ChannelType, ClientMessage, MooplasServerEvent, PROTOCOL_ID, RenetServerVisualiser, ServerMessage,
+  ChannelType, ClientMessage, MooplasServerEvent, PROTOCOL_ID, RenetServerVisualiser, ServerEvent,
   ServerNetworkingActive, decode_from_bytes, encode_to_bytes,
 };
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{App, Commands, IntoScheduleConfigs, On, Res, ResMut, resource_exists};
 use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
-use bevy_renet::renet::{ConnectionConfig, ServerEvent};
-use bevy_renet::{RenetClient, RenetServer, RenetServerEvent, RenetServerPlugin};
+use bevy_renet::renet::ConnectionConfig;
+use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
@@ -76,11 +76,11 @@ fn receive_renet_server_events(
   mut lobby: ResMut<Lobby>,
 ) {
   let mooplas_server_event = match **server_event {
-    ServerEvent::ClientConnected { client_id } => {
+    bevy_renet::renet::ServerEvent::ClientConnected { client_id } => {
       info!("Client with ID [{}] connected", client_id);
 
       // Notify all other clients of the new connection
-      let connected_message = encode_to_bytes(&ServerMessage::ClientConnected {
+      let connected_message = encode_to_bytes(&ServerEvent::ClientConnected {
         client_id: client_id.into(),
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -90,11 +90,11 @@ fn receive_renet_server_events(
       // Return new event for an application to react to
       MooplasServerEvent::ClientConnected(client_id.into())
     }
-    ServerEvent::ClientDisconnected { client_id, reason } => {
+    bevy_renet::renet::ServerEvent::ClientDisconnected { client_id, reason } => {
       info!("Client with ID [{}] disconnected: {}", client_id, reason);
 
       // Notify all other clients about the disconnection itself
-      let message = encode_to_bytes(&ServerMessage::ClientDisconnected {
+      let message = encode_to_bytes(&ServerEvent::ClientDisconnected {
         client_id: client_id.into(),
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -146,28 +146,18 @@ fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lo
   for client_id in lobby.connected.iter() {
     while let Some(message) = server.receive_message(client_id.0, ChannelType::ReliableOrdered) {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-      debug!(
+      trace!(
         "Received [{:?}] message from client [{}]: {:?}",
         ChannelType::ReliableOrdered,
         client_id,
         client_message
       );
-      let client_message = match client_message {
-        ClientMessage::PlayerRegistrationRequest(registration_message) => {
-          ClientMessage::PlayerRegistration(registration_message, *client_id)
-        }
-        other => other,
-      };
-      commands.trigger(client_message);
+      commands.trigger(client_message.to_event(*client_id));
     }
 
     while let Some(message) = server.receive_message(client_id.0, ChannelType::Unreliable) {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-      let client_message = match client_message {
-        ClientMessage::InputRequest(action) => ClientMessage::Input(action, *client_id),
-        other => other,
-      };
-      commands.trigger(client_message);
+      commands.trigger(client_message.to_event(*client_id));
     }
   }
 }

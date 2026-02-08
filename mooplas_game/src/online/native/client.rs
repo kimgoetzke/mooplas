@@ -15,7 +15,7 @@ use bevy::prelude::{
 use bevy_renet::RenetClient;
 use mooplas_networking::prelude::{
   ChannelType, ClientMessage, ClientRenetPlugin, ClientVisualiserPlugin, PendingClientHandshake,
-  PlayerStateUpdateMessage, ServerMessage, encode_to_bytes, is_client_connected,
+  PlayerStateUpdateMessage, ServerEvent, encode_to_bytes, is_client_connected,
 };
 use std::time::Instant;
 
@@ -86,7 +86,7 @@ pub fn client_handshake_system(
 
 /// Processes any incoming [`DefaultChannel::ReliableOrdered`] server messages and acts on them, if required.
 fn handle_server_message_event(
-  server_message: On<ServerMessage>,
+  server_message: On<ServerEvent>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   current_state: ResMut<State<AppState>>,
@@ -98,16 +98,16 @@ fn handle_server_message_event(
   mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
 ) {
   match server_message.event() {
-    ServerMessage::ClientConnected { client_id } => {
+    ServerEvent::ClientConnected { client_id } => {
       info!("A client with ID [{:?}] connected", client_id);
     }
-    ServerMessage::ClientDisconnected { client_id } => {
+    ServerEvent::ClientDisconnected { client_id } => {
       info!("A client with ID [{:?}] disconnected", client_id);
     }
-    ServerMessage::ClientInitialised { seed: server_seed, .. } => {
+    ServerEvent::ClientInitialised { seed: server_seed, .. } => {
       seed.set(*server_seed);
     }
-    ServerMessage::PlayerRegistered { player_id, .. } => {
+    ServerEvent::PlayerRegistered { player_id, .. } => {
       let player_id = PlayerId(*player_id);
       utils::register_player_locally(
         &mut registered_players,
@@ -116,11 +116,11 @@ fn handle_server_message_event(
         player_id,
       );
     }
-    ServerMessage::PlayerUnregistered { player_id, .. } => {
+    ServerEvent::PlayerUnregistered { player_id, .. } => {
       let player_id = PlayerId(*player_id);
       utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
     }
-    ServerMessage::StateChanged { new_state, winner_info } => {
+    ServerEvent::StateChanged { new_state, winner_info } => {
       if !current_state.is_manual_transition_allowed_to(&AppState::from(new_state)) {
         next_state.set(AppState::from(new_state));
       } else {
@@ -133,10 +133,10 @@ fn handle_server_message_event(
         winner.set((*player_id).into());
       }
     }
-    ServerMessage::ShutdownServer => {
+    ServerEvent::ShutdownServer => {
       exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
     }
-    ServerMessage::UpdatePlayerStates { states } => {
+    ServerEvent::UpdatePlayerStates { states } => {
       for (player_id, x, y, rotation_z) in states {
         player_state_update_message.write(PlayerStateUpdateMessage::new(*player_id, (*x, *y), *rotation_z));
       }
@@ -153,7 +153,7 @@ fn send_local_player_registration_system(
     if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
       continue;
     }
-    let client_message = ClientMessage::PlayerRegistrationRequest(player_registration_message.into());
+    let client_message = ClientMessage::PlayerRegistration(player_registration_message.into());
     debug!("Sending: [{:?}]", client_message);
     let message = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
     client.send_message(ChannelType::ReliableOrdered, message);
@@ -194,7 +194,7 @@ fn send_local_input_messages(
       .iter()
       .find(|player| player.id == *player_id && player.is_local())
     {
-      if let Ok(input_message) = encode_to_bytes(&ClientMessage::InputRequest(message.into())) {
+      if let Ok(input_message) = encode_to_bytes(&ClientMessage::Input(message.into())) {
         client.send_message(ChannelType::Unreliable, input_message);
       } else {
         warn!("Failed to serialise input action message: {:?}", message);

@@ -1,6 +1,6 @@
 #![cfg(feature = "wasm")]
 
-use crate::prelude::{ClientMessage, ServerMessage};
+use crate::prelude::{ClientMessage, ServerEvent};
 use crossbeam_channel::{Receiver, Sender};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -13,7 +13,7 @@ use web_sys::{MessageEvent, RtcConfiguration, RtcDataChannelInit, RtcIceServer, 
 #[derive(Debug, Serialize, Deserialize)]
 pub enum NetworkMessage {
   Client(ClientMessage),
-  Server(ServerMessage),
+  Server(ServerEvent),
 }
 
 pub struct NetworkChannel {
@@ -64,7 +64,7 @@ pub fn create_peer(incoming_tx: Sender<NetworkMessage>, outgoing_rx: Receiver<Ne
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::{ClientId, ServerMessage};
+  use crate::prelude::{ClientId, ServerEvent};
   use crossbeam_channel::unbounded;
 
   #[test]
@@ -79,14 +79,14 @@ mod tests {
     assert!(
       channel
         .outgoing
-        .send(NetworkMessage::Server(ServerMessage::ClientConnected {
+        .send(NetworkMessage::Server(ServerEvent::ClientConnected {
           client_id: expected_client_id
         }))
         .is_ok()
     );
     assert!(!to_rx.is_empty());
     match to_rx.recv().unwrap() {
-      NetworkMessage::Server(ServerMessage::ClientConnected { client_id }) => {
+      NetworkMessage::Server(ServerEvent::ClientConnected { client_id }) => {
         assert_eq!(client_id, expected_client_id);
       }
       _ => panic!("Unexpected message type"),

@@ -1,5 +1,5 @@
 use crate::native::{PendingClientHandshake, RenetClientVisualiser};
-use crate::prelude::{ChannelType, PROTOCOL_ID, ServerMessage, decode_from_bytes};
+use crate::prelude::{ChannelType, PROTOCOL_ID, ServerEvent, decode_from_bytes};
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::prelude::{Commands, IntoScheduleConfigs, Plugin, Res, ResMut};
@@ -68,7 +68,7 @@ pub fn is_client_connected(client: Option<Res<RenetClient>>) -> bool {
 /// an application to read and respond to.
 fn receive_reliable_server_messages_system(mut client: ResMut<RenetClient>, mut commands: Commands) {
   while let Some(reliable_ordered_channel_message) = client.receive_message(DefaultChannel::ReliableOrdered) {
-    let server_message: ServerMessage =
+    let server_message: ServerEvent =
       decode_from_bytes(&reliable_ordered_channel_message).expect("Failed to deserialise server message");
     debug!(
       "Received [{:?}] server message: {:?}",
@@ -79,7 +79,7 @@ fn receive_reliable_server_messages_system(mut client: ResMut<RenetClient>, mut 
   }
 
   while let Some(unreliable_channel_message) = client.receive_message(DefaultChannel::Unreliable) {
-    let server_message: ServerMessage =
+    let server_message: ServerEvent =
       decode_from_bytes(&unreliable_channel_message).expect("Failed to deserialise server message");
     commands.trigger(server_message);
   }

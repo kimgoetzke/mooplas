@@ -95,13 +95,13 @@ impl Display for ClientId {
 }
 
 #[derive(Event, Debug, Serialize, Deserialize, Component)]
-pub enum ServerMessage {
+pub enum ServerEvent {
   /// Sent by the server to all clients (except the one that just connected) when a new client has connected.
   ClientConnected { client_id: ClientId },
   /// Sent by the server to all clients (except the one that just disconnected) when a client has disconnected.
   ClientDisconnected { client_id: ClientId },
   /// Sent to a client when they have successfully initialised their connection to the server. Sent by the server in
-  /// response to a [`ServerMessage::ClientConnected`] to the client that just connected.
+  /// response to a [`ServerEvent::ClientConnected`] to the client that just connected.
   ClientInitialised { seed: u64, client_id: ClientId },
   /// Indicates that the app state has changed on the server.
   StateChanged { new_state: String, winner_info: Option<u8> },
@@ -146,34 +146,55 @@ pub enum NetworkRole {
   Client,
 }
 
-// TODO: Separate event client writes vs event that server reads in receive_client_messages_system
-// A message sent by the client for the server to process.
-#[derive(Event, Serialize, Deserialize)]
+// A message sent by the client.
+#[derive(Serialize, Deserialize)]
 pub enum ClientMessage {
-  PlayerRegistrationRequest(PlayerRegistrationMessage),
-  PlayerRegistration(PlayerRegistrationMessage, ClientId),
-  InputRequest(SerialisableInputMessage),
-  Input(SerialisableInputMessage, ClientId),
+  PlayerRegistration(PlayerRegistrationMessage),
+  Input(SerialisableInputMessage),
+}
+
+impl ClientMessage {
+  pub fn to_event(self, client_id: ClientId) -> ClientEvent {
+    match self {
+      ClientMessage::PlayerRegistration(message) => ClientEvent::PlayerRegistration(message, client_id),
+      ClientMessage::Input(action) => ClientEvent::Input(action, client_id),
+    }
+  }
 }
 
 impl Debug for ClientMessage {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
-      ClientMessage::PlayerRegistrationRequest(message) => {
-        write!(f, "ClientMessage::PlayerRegistrationRequest for {}", message.player_id)
+      ClientMessage::PlayerRegistration(message) => {
+        write!(f, "ClientMessage::PlayerRegistration for {}", message.player_id)
       }
-      ClientMessage::PlayerRegistration(message, client_id) => {
+      ClientMessage::Input(action) => {
+        write!(f, "ClientMessage::{:?}", action)
+      }
+    }
+  }
+}
+
+/// An event for an application to process after having received a [`ClientMessage`]. Contains the client ID of the
+/// sender for the server to identify which client sent the message.
+#[derive(Event, Serialize, Deserialize)]
+pub enum ClientEvent {
+  PlayerRegistration(PlayerRegistrationMessage, ClientId),
+  Input(SerialisableInputMessage, ClientId),
+}
+
+impl Debug for ClientEvent {
+  fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+    match self {
+      ClientEvent::PlayerRegistration(message, client_id) => {
         write!(
           f,
-          "ClientMessage::PlayerRegistration for {} with client ID [{}]",
+          "ClientMessage::PlayerRegistration for {} with ID {}",
           message.player_id, client_id
         )
       }
-      ClientMessage::InputRequest(action) => {
-        write!(f, "ClientMessage::{:?}", action)
-      }
-      ClientMessage::Input(action, client_id) => {
-        write!(f, "ClientMessage::{:?} with client ID [{}]", action, client_id)
+      ClientEvent::Input(action, client_id) => {
+        write!(f, "ClientMessage::{:?} for client with ID {}", action, client_id)
       }
     }
   }

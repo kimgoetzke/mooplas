@@ -24,11 +24,11 @@ mod tests {
   mod online {
     use super::*;
     use crate::prelude::PlayerId;
-    use crate::shared::structs::{ClientMessage, NetworkRole, PlayerRegistrationMessage, ServerMessage};
+    use crate::shared::structs::{ClientMessage, NetworkRole, PlayerRegistrationMessage, ServerEvent};
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {
-      let original = ClientMessage::PlayerRegistrationRequest(PlayerRegistrationMessage {
+      let original = ClientMessage::PlayerRegistration(PlayerRegistrationMessage {
         player_id: PlayerId(7),
         has_registered: true,
         is_anyone_registered: true,
@@ -42,7 +42,7 @@ mod tests {
     #[test]
     fn decode_from_bytes_rejects_garbage_bytes() {
       let bytes = vec![0xde, 0xad, 0xbe, 0xef];
-      let decoded: Result<ServerMessage, _> = decode_from_bytes(&bytes);
+      let decoded: Result<ServerEvent, _> = decode_from_bytes(&bytes);
       assert!(decoded.is_err());
     }
   }
