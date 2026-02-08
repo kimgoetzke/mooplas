@@ -1,4 +1,5 @@
 use bevy::prelude::{Component, Event, Message, Resource};
+use bevy_renet::renet::DefaultChannel;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
@@ -7,6 +8,42 @@ use std::fmt::{Debug, Display, Formatter};
 pub enum NetworkingType {
   Wasm,
   Native,
+}
+
+pub enum ChannelType {
+  Unreliable,
+  ReliableOrdered,
+  ReliableUnordered,
+}
+
+impl From<DefaultChannel> for ChannelType {
+  fn from(value: DefaultChannel) -> Self {
+    match value {
+      DefaultChannel::Unreliable => ChannelType::Unreliable,
+      DefaultChannel::ReliableOrdered => ChannelType::ReliableOrdered,
+      DefaultChannel::ReliableUnordered => ChannelType::ReliableUnordered,
+    }
+  }
+}
+
+impl From<ChannelType> for DefaultChannel {
+  fn from(value: ChannelType) -> Self {
+    match value {
+      ChannelType::Unreliable => DefaultChannel::Unreliable,
+      ChannelType::ReliableOrdered => DefaultChannel::ReliableOrdered,
+      ChannelType::ReliableUnordered => DefaultChannel::ReliableUnordered,
+    }
+  }
+}
+
+impl From<ChannelType> for u8 {
+  fn from(channel: ChannelType) -> Self {
+    match channel {
+      ChannelType::Unreliable => 0,
+      ChannelType::ReliableUnordered => 1,
+      ChannelType::ReliableOrdered => 2,
+    }
+  }
 }
 
 #[cfg(target_arch = "wasm32")]

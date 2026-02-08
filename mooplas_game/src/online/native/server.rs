@@ -11,11 +11,9 @@ use bevy::prelude::{
   StateTransitionEvent, Time, Timer, Transform, With, in_state, resource_exists,
 };
 use bevy::time::TimerMode;
-use bevy_renet::RenetServer;
-use bevy_renet::renet::DefaultChannel;
 use mooplas_networking::prelude::{
-  ClientMessage, Lobby, MooplasServerEvent, RenetServerVisualiser, ServerMessage, ServerNetworkingActive,
-  ServerRenetPlugin, ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
+  ChannelType, ClientId, ClientMessage, Lobby, MooplasServerEvent, NativeServer, RenetServerVisualiser, ServerMessage,
+  ServerNetworkingActive, ServerRenetPlugin, ServerVisualiserPlugin, decode_from_bytes, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -63,9 +61,10 @@ const CLIENT_MESSAGE_SERIALISATION: &'static str = "Failed to serialise client m
 #[derive(Resource)]
 struct ShutdownCountdown(Timer);
 
+/// The main observer system for server events.
 fn receive_server_events(
   server_event: On<MooplasServerEvent>,
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
@@ -79,12 +78,6 @@ fn receive_server_events(
       info!("Client with ID [{}] connected", client_id);
       visualiser.add_client(client_id);
 
-      // Notify all other clients about the new connection
-      let connected_message =
-        encode_to_bytes(&ServerMessage::ClientConnected { client_id: *client_id }).expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, connected_message);
-      lobby.connected.push(*client_id);
-
       // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
       // Send the current seed to the newly connected client
       let seed_message = encode_to_bytes(&ServerMessage::ClientInitialised {
@@ -92,7 +85,7 @@ fn receive_server_events(
         client_id: *client_id,
       })
       .expect("Failed to serialise seed message");
-      server.send_message(client_id.0, DefaultChannel::ReliableOrdered, seed_message);
+      server.send_message(client_id, ChannelType::ReliableOrdered, seed_message);
     }
     MooplasServerEvent::ClientDisconnected(client_id, reason) => {
       info!("Client with ID [{}] disconnected: {}", client_id, reason);
@@ -111,12 +104,6 @@ fn receive_server_events(
           &mut lobby,
         );
       }
-
-      // Notify all other clients about the disconnection itself
-      let message = encode_to_bytes(&ServerMessage::ClientDisconnected { client_id: *client_id })
-        .expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, message);
-      lobby.connected.retain(|&id| id != *client_id);
     }
   }
 
@@ -126,15 +113,15 @@ fn receive_server_events(
   }
 }
 
-/// Processes any incoming [`DefaultChannel::Unreliable`] messages from clients by applying them locally and
+/// Processes any incoming [`ChannelType::Unreliable`] messages from clients by applying them locally and
 /// broadcasting them to all other clients.
 fn receive_unreliable_client_inputs_system(
   lobby: Res<Lobby>,
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
   mut input_message: MessageWriter<InputMessage>,
 ) {
   for client_id in lobby.connected.iter() {
-    while let Some(message) = server.receive_message(client_id.0, DefaultChannel::Unreliable) {
+    while let Some(message) = server.receive_message(client_id.0, ChannelType::Unreliable) {
       if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::Input(action) => {
@@ -171,7 +158,7 @@ fn receive_unreliable_client_inputs_system(
 /// Broadcasts the authoritative state (position and rotation) of all snake heads to all clients.
 /// This runs every frame to ensure clients have up-to-date positions for interpolation.
 fn broadcast_player_states_system(
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
   snake_heads: Query<(&Transform, &PlayerId), With<SnakeHead>>,
 ) {
   let mut states = Vec::new();
@@ -186,23 +173,23 @@ fn broadcast_player_states_system(
   }
 
   if let Ok(message) = encode_to_bytes(&ServerMessage::UpdatePlayerStates { states }) {
-    server.broadcast_message(DefaultChannel::Unreliable, message);
+    server.broadcast_message(ChannelType::Unreliable, message);
   } else {
     warn!("Failed to serialise player states message");
   }
 }
 
-/// Processes any incoming [`DefaultChannel::ReliableOrdered`] messages from clients by applying them locally and
+/// Processes any incoming [`ChannelType::ReliableOrdered`] messages from clients by applying them locally and
 /// broadcasting them to all other clients.
 fn receive_ordered_client_messages_system(
   mut lobby: ResMut<Lobby>,
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
   for client_id in lobby.connected.clone() {
-    while let Some(message) = server.receive_message(client_id.0, DefaultChannel::ReliableOrdered) {
+    while let Some(message) = server.receive_message(client_id.0, ChannelType::ReliableOrdered) {
       if let Ok(client_message) = decode_from_bytes(&message) {
         match client_message {
           ClientMessage::PlayerRegistration(message) => {
@@ -236,11 +223,11 @@ fn receive_ordered_client_messages_system(
 
 /// Processes an individual player registration message from [`ClientId`].
 fn handle_player_registration_message_from_client(
-  server: &mut ResMut<RenetServer>,
+  server: &mut ResMut<NativeServer>,
   mut registered_players: &mut ResMut<RegisteredPlayers>,
   available_configs: &Res<AvailablePlayerConfigs>,
   mut player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
-  client_id: &mooplas_networking::prelude::ClientId,
+  client_id: &ClientId,
   player_id: mooplas_networking::prelude::PlayerId,
   has_registered: bool,
   lobby: &mut ResMut<Lobby>,
@@ -252,7 +239,7 @@ fn handle_player_registration_message_from_client(
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, message);
+    server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, message);
     utils::register_player_locally(
       &mut registered_players,
       &available_configs,
@@ -267,7 +254,7 @@ fn handle_player_registration_message_from_client(
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message_except(client_id.0, DefaultChannel::ReliableOrdered, message);
+    server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, message);
     utils::unregister_player_locally(
       &mut registered_players,
       &mut player_registration_message,
@@ -279,7 +266,7 @@ fn handle_player_registration_message_from_client(
 
 /// A system that handles local state change events and broadcasts them to all connected clients.
 fn broadcast_local_app_state_system(
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
   mut app_state_messages: MessageReader<StateTransitionEvent<AppState>>,
   winner: Res<WinnerInfo>,
 ) {
@@ -291,7 +278,7 @@ fn broadcast_local_app_state_system(
       };
       debug!("Broadcasting: {:?}", state_changed_message);
       if let Ok(message) = encode_to_bytes(&state_changed_message) {
-        server.broadcast_message(DefaultChannel::ReliableOrdered, message);
+        server.broadcast_message(ChannelType::ReliableOrdered, message);
       } else {
         warn!("{}: {:?}", CLIENT_MESSAGE_SERIALISATION, state_changed_message);
         return;
@@ -304,7 +291,7 @@ fn broadcast_local_app_state_system(
 /// clients.
 fn broadcast_local_player_registration_system(
   mut messages: MessageReader<PlayerRegistrationMessage>,
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
 ) {
   for message in messages.read() {
     if utils::should_message_be_skipped(&message, NetworkRole::Client) {
@@ -317,7 +304,7 @@ fn broadcast_local_player_registration_system(
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message(DefaultChannel::ReliableOrdered, message);
+      server.broadcast_message(ChannelType::ReliableOrdered, message);
     } else {
       debug!("Broadcasting: [{}] unregistered locally...", message.player_id);
       let message = encode_to_bytes(&ServerMessage::PlayerUnregistered {
@@ -325,7 +312,7 @@ fn broadcast_local_player_registration_system(
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
-      server.broadcast_message(DefaultChannel::ReliableOrdered, message);
+      server.broadcast_message(ChannelType::ReliableOrdered, message);
     }
   }
 }
@@ -335,12 +322,12 @@ fn broadcast_local_player_registration_system(
 fn process_and_broadcast_local_exit_lobby_message(
   mut messages: MessageReader<ExitLobbyMessage>,
   mut commands: Commands,
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
 ) {
   for _ in messages.read() {
     info!("Informing all clients about intention to shut down server and scheduling shutdown...");
     let exit_message = encode_to_bytes(&ServerMessage::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
-    server.broadcast_message(DefaultChannel::ReliableOrdered, exit_message);
+    server.broadcast_message(ChannelType::ReliableOrdered, exit_message);
     commands.insert_resource(ShutdownCountdown(Timer::new(
       Duration::from_millis(500),
       TimerMode::Once,
@@ -354,7 +341,7 @@ fn disconnect_all_clients_system(
   mut commands: Commands,
   mut countdown: ResMut<ShutdownCountdown>,
   time: Res<Time>,
-  mut server: ResMut<RenetServer>,
+  mut server: ResMut<NativeServer>,
   mut lobby: ResMut<Lobby>,
   mut registered_players: ResMut<RegisteredPlayers>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,

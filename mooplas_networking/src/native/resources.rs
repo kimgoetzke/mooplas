@@ -1,8 +1,9 @@
 use crate::prelude::{ClientId, PlayerId};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Commands, Deref, DerefMut, Resource};
-use bevy_renet::RenetClient;
 use bevy_renet::netcode::NetcodeClientTransport;
+use bevy_renet::renet::Bytes;
+use bevy_renet::{RenetClient, renet};
 use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -27,6 +28,24 @@ pub(crate) const SHOW_VISUALISERS_BY_DEFAULT: bool = true;
 
 /// The number of values to display in the renet visualiser graphs.
 pub(crate) const VISUALISER_DISPLAY_VALUES: usize = 200;
+
+#[derive(Resource, Deref, DerefMut, Debug)]
+pub struct NativeServer(pub renet::RenetServer);
+
+impl NativeServer {
+  pub fn broadcast_message_except<I: Into<u8>, B: Into<Bytes>>(
+    &mut self,
+    except_id: &ClientId,
+    channel_id: I,
+    message: B,
+  ) {
+    self.0.broadcast_message_except(except_id.0, channel_id, message)
+  }
+
+  pub fn send_message<I: Into<u8>, B: Into<Bytes>>(&mut self, client_id: &ClientId, channel_id: I, message: B) {
+    self.0.send_message(client_id.0, channel_id, message)
+  }
+}
 
 #[derive(Resource, Deref, DerefMut, Default)]
 pub struct RenetClientVisualiser(RenetClientVisualizer<{ VISUALISER_DISPLAY_VALUES }>);
