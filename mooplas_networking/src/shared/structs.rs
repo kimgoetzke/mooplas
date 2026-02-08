@@ -5,11 +5,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
-pub enum NetworkingType {
-  Wasm,
-  Native,
-}
-
+/// An enum representing the different types of channels that can be used for sending messages.
 #[derive(Debug)]
 pub enum ChannelType {
   Unreliable,
@@ -94,6 +90,7 @@ impl Display for ClientId {
   }
 }
 
+/// An event for the client-side code of an application.
 #[derive(Event, Debug, Serialize, Deserialize, Component)]
 pub enum ServerEvent {
   /// Sent by the server to all clients (except the one that just connected) when a new client has connected.
@@ -116,8 +113,7 @@ pub enum ServerEvent {
   ShutdownServer,
 }
 
-// Local serialisable input action message so this crate can compile independently.
-// Matches the shape used elsewhere in the project.
+// A message that is serialisable and communicates an input action.
 #[derive(Message, Clone, Copy, Debug, Serialize, Deserialize)]
 pub enum SerialisableInputMessage {
   Move(u8, f32),
@@ -146,7 +142,8 @@ pub enum NetworkRole {
   Client,
 }
 
-// A message sent by the client.
+/// A message sent by the client. This is how the client communicates to the server. Read by the networking code, not
+/// intended to be read by application code.
 #[derive(Serialize, Deserialize)]
 pub enum ClientMessage {
   PlayerRegistration(PlayerRegistrationMessage),
@@ -175,8 +172,8 @@ impl Debug for ClientMessage {
   }
 }
 
-/// An event for an application to process after having received a [`ClientMessage`]. Contains the client ID of the
-/// sender for the server to identify which client sent the message.
+/// An event for the server-side code of an application. Triggered by the networking code after having received a
+/// [`ClientMessage`]. For the consumption of the application code.
 #[derive(Event, Serialize, Deserialize)]
 pub enum ClientEvent {
   PlayerRegistration(PlayerRegistrationMessage, ClientId),
@@ -200,8 +197,9 @@ impl Debug for ClientEvent {
   }
 }
 
+/// This is how the networking code communicates errors to the application code.
 #[derive(Event, Debug)]
-pub enum MooplasNetworkingErrorEvent {
+pub enum NetworkingErrorEvent {
   RenetDisconnect(String),
   NetcodeDisconnect(String),
   NetcodeTransportError(String),
@@ -209,16 +207,10 @@ pub enum MooplasNetworkingErrorEvent {
   Other(String),
 }
 
-impl Error for MooplasNetworkingErrorEvent {}
+impl Error for NetworkingErrorEvent {}
 
-impl Display for MooplasNetworkingErrorEvent {
+impl Display for NetworkingErrorEvent {
   fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
     Debug::fmt(&self, fmt)
   }
-}
-
-#[derive(Event, Debug, PartialEq, Eq)]
-pub enum MooplasServerEvent {
-  ClientConnected(ClientId),
-  ClientDisconnected(ClientId, String),
 }

@@ -13,8 +13,8 @@ use bevy::prelude::{
 use bevy::time::TimerMode;
 use bevy_renet::RenetServer;
 use mooplas_networking::prelude::{
-  ChannelType, ClientEvent, ClientId, Lobby, MooplasServerEvent, RenetServerVisualiser, ServerEvent,
-  ServerNetworkingActive, ServerRenetPlugin, ServerVisualiserPlugin, encode_to_bytes,
+  ChannelType, ClientEvent, ClientId, Lobby, RenetServerVisualiser, ServerEvent, ServerNetworkingActive,
+  ServerRenetPlugin, ServerVisualiserPlugin, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -64,20 +64,27 @@ struct ShutdownCountdown(Timer);
 
 /// The main observer system for server events.
 fn receive_server_events(
-  server_event: On<MooplasServerEvent>,
-  mut server: ResMut<RenetServer>,
+  server_event: On<ServerEvent>,
+  server: Option<ResMut<RenetServer>>,
   mut lobby: ResMut<Lobby>,
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
-  mut visualiser: ResMut<RenetServerVisualiser>,
+  mut visualiser: Option<ResMut<RenetServerVisualiser>>,
 ) {
+  if server.is_none() {
+    return;
+  }
+
+  let mut server = server.expect("Failed to get mutable reference to the server");
   match server_event.event() {
-    MooplasServerEvent::ClientConnected(client_id) => {
+    ServerEvent::ClientConnected { client_id } => {
       info!("Client with ID [{}] connected", client_id);
-      visualiser.add_client(client_id);
+      if let Some(visualiser) = visualiser.as_mut() {
+        visualiser.add_client(client_id);
+      }
 
       // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
       // Send the current seed to the newly connected client
@@ -88,9 +95,11 @@ fn receive_server_events(
       .expect("Failed to serialise seed message");
       server.send_message(client_id.0, ChannelType::ReliableOrdered, seed_message);
     }
-    MooplasServerEvent::ClientDisconnected(client_id, reason) => {
-      info!("Client with ID [{}] disconnected: {}", client_id, reason);
-      visualiser.remove_client(client_id);
+    ServerEvent::ClientDisconnected { client_id } => {
+      info!("Client with ID [{}] disconnected", client_id);
+      if let Some(visualiser) = visualiser.as_mut() {
+        visualiser.remove_client(client_id);
+      }
 
       // Unregister any players associated with this client and notify other clients about it
       for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
@@ -106,6 +115,7 @@ fn receive_server_events(
         );
       }
     }
+    _ => { /* Ignored */ }
   }
 
   // TODO: Improve state transition logic

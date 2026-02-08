@@ -1,7 +1,7 @@
 use crate::native::Lobby;
 use crate::prelude::{
-  ChannelType, ClientMessage, MooplasServerEvent, PROTOCOL_ID, RenetServerVisualiser, ServerEvent,
-  ServerNetworkingActive, decode_from_bytes, encode_to_bytes,
+  ChannelType, ClientMessage, PROTOCOL_ID, RenetServerVisualiser, ServerEvent, ServerNetworkingActive,
+  decode_from_bytes, encode_to_bytes,
 };
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
@@ -70,12 +70,12 @@ pub fn create_new_renet_server_resources(
 /// Receives events from the [`RenetServer`], notifies other connected clients, then triggers corresponding
 /// [`MooplasServerEvent`] for the game to react to with custom logic.
 fn receive_renet_server_events(
-  server_event: On<RenetServerEvent>,
+  renet_server_event: On<RenetServerEvent>,
   mut commands: Commands,
   mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
 ) {
-  let mooplas_server_event = match **server_event {
+  let server_event: ServerEvent = match **renet_server_event {
     bevy_renet::renet::ServerEvent::ClientConnected { client_id } => {
       info!("Client with ID [{}] connected", client_id);
 
@@ -88,7 +88,9 @@ fn receive_renet_server_events(
       lobby.connected.push(client_id.into());
 
       // Return new event for an application to react to
-      MooplasServerEvent::ClientConnected(client_id.into())
+      ServerEvent::ClientConnected {
+        client_id: client_id.into(),
+      }
     }
     bevy_renet::renet::ServerEvent::ClientDisconnected { client_id, reason } => {
       info!("Client with ID [{}] disconnected: {}", client_id, reason);
@@ -102,10 +104,12 @@ fn receive_renet_server_events(
       lobby.connected.retain(|&id| id != client_id.into());
 
       // Return new event for an application to react to
-      MooplasServerEvent::ClientDisconnected(client_id.into(), reason.to_string())
+      ServerEvent::ClientDisconnected {
+        client_id: client_id.into(),
+      }
     }
   };
-  commands.trigger(mooplas_server_event);
+  commands.trigger(server_event);
 }
 
 /// Attempts to determine the server's public IP address. Returns [`None`] if unable to determine (falls back to bind

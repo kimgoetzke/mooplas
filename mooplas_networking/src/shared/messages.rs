@@ -1,4 +1,4 @@
-use crate::prelude::MooplasNetworkingErrorEvent;
+use crate::prelude::NetworkingErrorEvent;
 use bevy::app::{App, Plugin};
 use bevy::log::info;
 use bevy::prelude::{Commands, Message, On};
@@ -20,12 +20,12 @@ fn handle_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut 
   let netcode_transport_error = &(**error_event);
   info!("Netcode transport error occurred: [{}]...", netcode_transport_error);
   let error = match netcode_transport_error {
-    NetcodeTransportError::Renet(e) => MooplasNetworkingErrorEvent::RenetDisconnect(e.to_string()),
+    NetcodeTransportError::Renet(e) => NetworkingErrorEvent::RenetDisconnect(e.to_string()),
     NetcodeTransportError::Netcode(e) => match e {
-      NetcodeError::Disconnected(reason) => MooplasNetworkingErrorEvent::NetcodeDisconnect(reason.to_string()),
-      _ => MooplasNetworkingErrorEvent::NetcodeTransportError(e.to_string()),
+      NetcodeError::Disconnected(reason) => NetworkingErrorEvent::NetcodeDisconnect(reason.to_string()),
+      _ => NetworkingErrorEvent::NetcodeTransportError(e.to_string()),
     },
-    NetcodeTransportError::IO(e) => MooplasNetworkingErrorEvent::IoError(e.to_string()),
+    NetcodeTransportError::IO(e) => NetworkingErrorEvent::IoError(e.to_string()),
   };
   commands.trigger(error);
 }

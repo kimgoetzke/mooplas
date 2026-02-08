@@ -15,7 +15,7 @@ use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, On, Plugin, Res, ResMut, in_state,
 };
 use mooplas_networking::prelude::{
-  MooplasNetworkingErrorEvent, NetworkingMessagesPlugin, NetworkingResourcesPlugin, create_client, create_server,
+  NetworkingErrorEvent, NetworkingMessagesPlugin, NetworkingResourcesPlugin, create_client, create_server,
   remove_all_resources,
 };
 
@@ -98,11 +98,11 @@ fn handle_connection_info_message(
 }
 
 #[allow(clippy::never_loop)]
-fn handle_netcode_transport_error_event(error_event: On<MooplasNetworkingErrorEvent>) {
+fn handle_netcode_transport_error_event(error_event: On<NetworkingErrorEvent>) {
   let error = error_event.event();
   if matches!(
     error,
-    &MooplasNetworkingErrorEvent::RenetDisconnect(_) | &MooplasNetworkingErrorEvent::NetcodeDisconnect(_)
+    &NetworkingErrorEvent::RenetDisconnect(_) | &NetworkingErrorEvent::NetcodeDisconnect(_)
   ) {
     return;
   }
