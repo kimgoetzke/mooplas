@@ -6,7 +6,7 @@ use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
 /// An enum representing the different types of channels that can be used for sending messages.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChannelType {
   Unreliable,
   ReliableOrdered,

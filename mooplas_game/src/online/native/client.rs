@@ -11,10 +11,9 @@ use bevy::prelude::{
   App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Query, Res, ResMut,
   State, Time, Transform, Update, With, Without, in_state, resource_exists,
 };
-use bevy_renet::RenetClient;
 use mooplas_networking::prelude::{
-  ChannelType, ClientMessage, ClientRenetPlugin, ClientVisualiserPlugin, PendingClientHandshake,
-  PlayerStateUpdateMessage, ServerEvent, encode_to_bytes, is_client_connected,
+  ChannelType, ClientMessage, ClientNetworkingActive, ClientRenetPlugin, ClientVisualiserPlugin, OutgoingClientMessage,
+  PendingClientHandshake, PlayerStateUpdateMessage, ServerEvent, encode_to_bytes, is_client_connected,
 };
 use std::time::Instant;
 
@@ -59,16 +58,16 @@ impl Plugin for ClientPlugin {
 /// emits a UI error message.
 pub fn client_handshake_system(
   mut commands: Commands,
-  client: Res<RenetClient>,
   handshake: Option<Res<PendingClientHandshake>>,
   mut ui_message: MessageWriter<UiNotification>,
+  client_networking_active: Option<Res<ClientNetworkingActive>>,
 ) {
   let handshake = match handshake {
     Some(h) => h,
     None => return,
   };
 
-  if client.is_connected() {
+  if client_networking_active.is_some() {
     commands.remove_resource::<PendingClientHandshake>();
     info!("Client handshake completed");
     return;
@@ -146,7 +145,7 @@ fn receive_server_message_event(
 /// A system that handles local player registration messages by sending them to the server.
 fn send_local_player_registration_system(
   mut messages: MessageReader<PlayerRegistrationMessage>,
-  mut client: ResMut<RenetClient>,
+  mut outgoing_messages: MessageWriter<OutgoingClientMessage>,
 ) {
   for player_registration_message in messages.read() {
     if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
@@ -154,22 +153,25 @@ fn send_local_player_registration_system(
     }
     let client_message = ClientMessage::PlayerRegistration(player_registration_message.into());
     debug!("Sending: [{:?}]", client_message);
-    let message = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
-    client.send_message(ChannelType::ReliableOrdered, message);
+    let payload = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
+    outgoing_messages.write(OutgoingClientMessage::Send {
+      channel: ChannelType::ReliableOrdered,
+      payload,
+    });
   }
 }
 
 /// A system that handles local exit lobby messages by disconnecting from the server and returning to the main menu.
 fn process_and_send_local_exit_lobby_message_system(
   mut messages: MessageReader<ExitLobbyMessage>,
-  mut client: ResMut<RenetClient>,
+  mut outgoing_messages: MessageWriter<OutgoingClientMessage>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
 ) {
   for message in messages.read() {
     debug!("Disconnecting from server (by force={})...", message.by_force);
     if !message.by_force {
-      client.disconnect();
+      outgoing_messages.write(OutgoingClientMessage::Disconnect);
     }
     toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     registered_players.clear();
@@ -181,7 +183,7 @@ fn process_and_send_local_exit_lobby_message_system(
 fn send_local_input_messages(
   mut messages: MessageReader<InputMessage>,
   registered_players: Res<RegisteredPlayers>,
-  mut client: ResMut<RenetClient>,
+  mut outgoing_messages: MessageWriter<OutgoingClientMessage>,
 ) {
   for message in messages.read() {
     let player_id = match message {
@@ -193,8 +195,11 @@ fn send_local_input_messages(
       .iter()
       .find(|player| player.id == *player_id && player.is_local())
     {
-      if let Ok(input_message) = encode_to_bytes(&ClientMessage::Input(message.into())) {
-        client.send_message(ChannelType::Unreliable, input_message);
+      if let Ok(payload) = encode_to_bytes(&ClientMessage::Input(message.into())) {
+        outgoing_messages.write(OutgoingClientMessage::Send {
+          channel: ChannelType::Unreliable,
+          payload,
+        });
       } else {
         warn!("Failed to serialise input action message: {:?}", message);
       }

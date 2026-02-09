@@ -1,4 +1,4 @@
-use crate::prelude::NetworkErrorEvent;
+use crate::prelude::{ChannelType, ClientId, NetworkErrorEvent};
 use bevy::app::{App, Plugin};
 use bevy::log::info;
 use bevy::prelude::{Commands, Message, On};
@@ -11,6 +11,8 @@ impl Plugin for NetworkingMessagesPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<PlayerStateUpdateMessage>()
+      .add_message::<OutgoingClientMessage>()
+      .add_message::<OutgoingServerMessage>()
       .add_observer(receive_netcode_transport_error_event);
   }
 }
@@ -50,4 +52,34 @@ impl PlayerStateUpdateMessage {
       rotation,
     }
   }
+}
+
+/// A request for the active client transport to send a payload to the server. This is intentionally transport-agnostic.
+/// Should be used by application client-side code.
+#[derive(Message, Clone, Debug, Serialize, Deserialize)]
+pub enum OutgoingClientMessage {
+  Send { channel: ChannelType, payload: Vec<u8> },
+  Disconnect,
+}
+
+/// A request for the active server transport to send/broadcast a payload to clients. This is intentionally
+/// transport-agnostic. Should be used by application server-side code.
+#[derive(Message, Clone, Debug, Serialize, Deserialize)]
+pub enum OutgoingServerMessage {
+  /// Broadcast to all connected clients.
+  Broadcast { channel: ChannelType, payload: Vec<u8> },
+  /// Broadcast to all connected clients except the provided client.
+  BroadcastExcept {
+    except_client_id: ClientId,
+    channel: ChannelType,
+    payload: Vec<u8>,
+  },
+  /// Send to a specific client.
+  Send {
+    client_id: ClientId,
+    channel: ChannelType,
+    payload: Vec<u8>,
+  },
+  /// Disconnect all connected clients.
+  DisconnectAll,
 }

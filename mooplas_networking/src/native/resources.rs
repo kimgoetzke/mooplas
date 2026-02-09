@@ -50,6 +50,11 @@ impl RenetServerVisualiser {
 #[derive(Resource, Default)]
 pub struct ServerNetworkingActive;
 
+/// Marker resource inserted when a Renet client is active. The intention is to use this for running systems
+/// conditionally e.g. `.run_if(resource_exists::<ClientNetworkingActive>)`.
+#[derive(Resource, Default)]
+pub struct ClientNetworkingActive;
+
 /// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]
 pub struct Lobby {

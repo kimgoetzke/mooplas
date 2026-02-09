@@ -8,7 +8,6 @@ edition = "2024"
 bevy = { version = "0.18.0", features = ["wayland"] }
 bevy-inspector-egui = { version = "0.36.0", optional = true }
 bevy_ui_text_input = { version = "0.7.0", optional = true }
-bevy_renet = { version = "4.0.0", optional = true }
 avian2d = "0.5.0"
 
 # Other dependencies
@@ -18,7 +17,7 @@ mooplas_networking = { path = "../mooplas_networking", features = ["native"], op
 
 [features]
 default = ["dev", "online"]
-online = ["bevy_renet", "bevy_ui_text_input", "mooplas_networking"]
+online = ["bevy_ui_text_input", "mooplas_networking"]
 dev = [
   # Improve compile times for dev builds by linking Bevy as a dynamic library
   "bevy/dynamic_linking",

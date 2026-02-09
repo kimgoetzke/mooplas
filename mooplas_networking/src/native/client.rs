@@ -1,8 +1,8 @@
-use crate::native::{PendingClientHandshake, RenetClientVisualiser};
-use crate::prelude::{ChannelType, PROTOCOL_ID, ServerEvent, decode_from_bytes};
+use crate::native::{ClientNetworkingActive, PendingClientHandshake, RenetClientVisualiser};
+use crate::prelude::{ChannelType, OutgoingClientMessage, PROTOCOL_ID, ServerEvent, decode_from_bytes};
 use bevy::app::Update;
 use bevy::log::*;
-use bevy::prelude::{Commands, IntoScheduleConfigs, Plugin, Res, ResMut};
+use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, Plugin, Res, ResMut};
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, DefaultChannel};
 use bevy_renet::{RenetClient, RenetClientPlugin};
@@ -14,10 +14,13 @@ pub struct ClientRenetPlugin;
 
 impl Plugin for ClientRenetPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
-    app.add_plugins((RenetClientPlugin, NetcodeClientPlugin)).add_systems(
-      Update,
-      receive_reliable_server_messages_system.run_if(is_client_connected),
-    );
+    app
+      .add_plugins((RenetClientPlugin, NetcodeClientPlugin))
+      .add_systems(
+        Update,
+        receive_reliable_server_messages_system.run_if(is_client_connected),
+      )
+      .add_systems(Update, send_outgoing_client_messages_system.run_if(is_client_connected));
   }
 }
 
@@ -29,6 +32,7 @@ pub fn create_client(commands: &mut Commands, server_address: SocketAddr) -> Res
       commands.insert_resource(transport);
       commands.insert_resource(PendingClientHandshake::new());
       commands.insert_resource(RenetClientVisualiser::default());
+      commands.insert_resource(ClientNetworkingActive::default());
       Ok(())
     }
     Err(e) => Err(e),
@@ -82,5 +86,22 @@ fn receive_reliable_server_messages_system(mut client: ResMut<RenetClient>, mut 
     let server_message: ServerEvent =
       decode_from_bytes(&unreliable_channel_message).expect("Failed to deserialise server message");
     commands.trigger(server_message);
+  }
+}
+
+/// A system that applies outgoing send/disconnect requests to the active [`RenetClient`].
+fn send_outgoing_client_messages_system(
+  mut outgoing_messages: MessageReader<OutgoingClientMessage>,
+  mut client: ResMut<RenetClient>,
+) {
+  for outgoing_message in outgoing_messages.read() {
+    match outgoing_message {
+      OutgoingClientMessage::Send { channel, payload } => {
+        client.send_message(*channel, payload.clone());
+      }
+      OutgoingClientMessage::Disconnect => {
+        client.disconnect();
+      }
+    }
   }
 }

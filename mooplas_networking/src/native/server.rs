@@ -1,11 +1,11 @@
 use crate::native::Lobby;
 use crate::prelude::{
-  ChannelType, ClientMessage, PROTOCOL_ID, RenetServerVisualiser, ServerEvent, ServerNetworkingActive,
-  decode_from_bytes, encode_to_bytes,
+  ChannelType, ClientMessage, OutgoingServerMessage, PROTOCOL_ID, RenetServerVisualiser, ServerEvent,
+  ServerNetworkingActive, decode_from_bytes, encode_to_bytes,
 };
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
-use bevy::prelude::{App, Commands, IntoScheduleConfigs, On, Res, ResMut, resource_exists};
+use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, On, Res, ResMut, resource_exists};
 use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
 use bevy_renet::renet::ConnectionConfig;
 use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
@@ -23,6 +23,10 @@ impl Plugin for ServerRenetPlugin {
       .add_systems(
         Update,
         receive_client_messages_system.run_if(resource_exists::<RenetServer>),
+      )
+      .add_systems(
+        Update,
+        send_outgoing_server_messages_system.run_if(resource_exists::<RenetServer>),
       );
   }
 }
@@ -162,6 +166,37 @@ fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lo
     while let Some(message) = server.receive_message(client_id.0, ChannelType::Unreliable) {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
       commands.trigger(client_message.to_event(*client_id));
+    }
+  }
+}
+
+/// A system that applies outgoing send/broadcast/disconnect requests to the active [`RenetServer`].
+fn send_outgoing_server_messages_system(
+  mut outgoing_messages: MessageReader<OutgoingServerMessage>,
+  mut server: ResMut<RenetServer>,
+) {
+  for outgoing_message in outgoing_messages.read() {
+    match outgoing_message {
+      OutgoingServerMessage::Broadcast { channel, payload } => {
+        server.broadcast_message(*channel, payload.clone());
+      }
+      OutgoingServerMessage::BroadcastExcept {
+        except_client_id,
+        channel,
+        payload,
+      } => {
+        server.broadcast_message_except(except_client_id.0, *channel, payload.clone());
+      }
+      OutgoingServerMessage::Send {
+        client_id,
+        channel,
+        payload,
+      } => {
+        server.send_message(client_id.0, *channel, payload.clone());
+      }
+      OutgoingServerMessage::DisconnectAll => {
+        server.disconnect_all();
+      }
     }
   }
 }

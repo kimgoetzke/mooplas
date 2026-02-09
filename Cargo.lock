@@ -3733,7 +3733,6 @@ dependencies = [
  "avian2d",
  "bevy",
  "bevy-inspector-egui",
- "bevy_renet",
  "bevy_ui_text_input",
  "mooplas_networking",
  "rand",
