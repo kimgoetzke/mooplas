@@ -1,4 +1,4 @@
-use crate::prelude::NetworkingErrorEvent;
+use crate::prelude::NetworkErrorEvent;
 use bevy::app::{App, Plugin};
 use bevy::log::info;
 use bevy::prelude::{Commands, Message, On};
@@ -11,21 +11,21 @@ impl Plugin for NetworkingMessagesPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<PlayerStateUpdateMessage>()
-      .add_observer(handle_netcode_transport_error_event);
+      .add_observer(receive_netcode_transport_error_event);
   }
 }
 
 #[allow(clippy::never_loop)]
-fn handle_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut commands: Commands) {
+fn receive_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut commands: Commands) {
   let netcode_transport_error = &(**error_event);
   info!("Netcode transport error occurred: [{}]...", netcode_transport_error);
   let error = match netcode_transport_error {
-    NetcodeTransportError::Renet(e) => NetworkingErrorEvent::RenetDisconnect(e.to_string()),
+    NetcodeTransportError::Renet(e) => NetworkErrorEvent::RenetDisconnect(e.to_string()),
     NetcodeTransportError::Netcode(e) => match e {
-      NetcodeError::Disconnected(reason) => NetworkingErrorEvent::NetcodeDisconnect(reason.to_string()),
-      _ => NetworkingErrorEvent::NetcodeTransportError(e.to_string()),
+      NetcodeError::Disconnected(reason) => NetworkErrorEvent::NetcodeDisconnect(reason.to_string()),
+      _ => NetworkErrorEvent::NetcodeTransportError(e.to_string()),
     },
-    NetcodeTransportError::IO(e) => NetworkingErrorEvent::IoError(e.to_string()),
+    NetcodeTransportError::IO(e) => NetworkErrorEvent::IoError(e.to_string()),
   };
   commands.trigger(error);
 }

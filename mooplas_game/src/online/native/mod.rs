@@ -15,7 +15,7 @@ use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, On, Plugin, Res, ResMut, in_state,
 };
 use mooplas_networking::prelude::{
-  NetworkingErrorEvent, NetworkingMessagesPlugin, NetworkingResourcesPlugin, create_client, create_server,
+  NetworkErrorEvent, NetworkingMessagesPlugin, NetworkingResourcesPlugin, create_client, create_server,
   remove_all_resources,
 };
 
@@ -34,7 +34,7 @@ impl Plugin for NativeOnlinePlugin {
           .run_if(in_state(AppState::Preparing))
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
       )
-      .add_observer(handle_netcode_transport_error_event);
+      .add_observer(receive_network_error_event);
     info!("Online multiplayer for native builds is enabled");
   }
 }
@@ -98,11 +98,11 @@ fn handle_connection_info_message(
 }
 
 #[allow(clippy::never_loop)]
-fn handle_netcode_transport_error_event(error_event: On<NetworkingErrorEvent>) {
+fn receive_network_error_event(error_event: On<NetworkErrorEvent>) {
   let error = error_event.event();
   if matches!(
     error,
-    &NetworkingErrorEvent::RenetDisconnect(_) | &NetworkingErrorEvent::NetcodeDisconnect(_)
+    &NetworkErrorEvent::RenetDisconnect(_) | &NetworkErrorEvent::NetcodeDisconnect(_)
   ) {
     return;
   }

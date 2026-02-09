@@ -5,12 +5,11 @@ use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
   PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
 };
-use bevy::app::Update;
 use bevy::log::*;
 use bevy::math::Quat;
 use bevy::prelude::{
   App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Query, Res, ResMut,
-  State, Time, Transform, With, Without, in_state, resource_exists,
+  State, Time, Transform, Update, With, Without, in_state, resource_exists,
 };
 use bevy_renet::RenetClient;
 use mooplas_networking::prelude::{
@@ -32,7 +31,7 @@ impl Plugin for ClientPlugin {
         Update,
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
       )
-      .add_observer(handle_server_message_event)
+      .add_observer(receive_server_message_event)
       .add_systems(
         Update,
         (
@@ -84,8 +83,8 @@ pub fn client_handshake_system(
   }
 }
 
-/// Processes any incoming [`DefaultChannel::ReliableOrdered`] server messages and acts on them, if required.
-fn handle_server_message_event(
+/// Processes any incoming server messages and acts on them, if required.
+fn receive_server_message_event(
   server_message: On<ServerEvent>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,

@@ -199,17 +199,17 @@ impl Debug for ClientEvent {
 
 /// This is how the networking code communicates errors to the application code.
 #[derive(Event, Debug)]
-pub enum NetworkingErrorEvent {
+pub enum NetworkErrorEvent {
   RenetDisconnect(String),
   NetcodeDisconnect(String),
   NetcodeTransportError(String),
   IoError(String),
-  Other(String),
+  OtherError(String),
 }
 
-impl Error for NetworkingErrorEvent {}
+impl Error for NetworkErrorEvent {}
 
-impl Display for NetworkingErrorEvent {
+impl Display for NetworkErrorEvent {
   fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
     Debug::fmt(&self, fmt)
   }
