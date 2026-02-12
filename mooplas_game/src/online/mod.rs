@@ -1,6 +1,7 @@
 use bevy::prelude::{App, Plugin};
 
 mod native;
+mod utils;
 mod wasm;
 
 /// Plugin that adds online multiplayer capabilities to the game.

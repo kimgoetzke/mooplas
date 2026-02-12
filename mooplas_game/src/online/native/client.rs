@@ -1,5 +1,5 @@
 use crate::online::native::structs::NetworkTransformInterpolation;
-use crate::online::native::utils;
+use crate::online::utils;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
   PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
