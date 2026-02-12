@@ -26,7 +26,7 @@ impl Plugin for ServerPlugin {
     app
       .add_plugins((ServerRenetPlugin, ServerVisualiserPlugin))
       .add_observer(receive_server_events)
-      .add_observer(receive_client_messages_system)
+      .add_observer(receive_client_events)
       .add_systems(
         Update,
         broadcast_local_app_state_system.run_if(resource_exists::<ServerNetworkingActive>),
@@ -122,36 +122,9 @@ fn receive_server_events(
   }
 }
 
-/// Broadcasts the authoritative state (position and rotation) of all snake heads to all clients.
-/// This runs every frame to ensure clients have up-to-date positions for interpolation.
-fn broadcast_player_states_system(
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
-  snake_heads: Query<(&Transform, &PlayerId), With<SnakeHead>>,
-) {
-  let mut states = Vec::new();
-  for (transform, player_id) in snake_heads.iter() {
-    let position = transform.translation;
-    let (_, _, rotation_z) = transform.rotation.to_euler(bevy::math::EulerRot::XYZ);
-    states.push((player_id.0, position.x, position.y, rotation_z));
-  }
-
-  if states.is_empty() {
-    return;
-  }
-
-  if let Ok(payload) = encode_to_bytes(&ServerEvent::UpdatePlayerStates { states }) {
-    outgoing_messages.write(OutgoingServerMessage::Broadcast {
-      channel: ChannelType::Unreliable,
-      payload,
-    });
-  } else {
-    warn!("Failed to serialise player states message");
-  }
-}
-
 /// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients,
 /// if necessary.
-fn receive_client_messages_system(
+fn receive_client_events(
   client_event: On<ClientEvent>,
   mut lobby: ResMut<Lobby>,
   mut registered_players: ResMut<RegisteredPlayers>,
@@ -185,6 +158,33 @@ fn receive_client_messages_system(
       }
       warn!("Received invalid input action on [Unreliable] channel: {:?}", message);
     }
+  }
+}
+
+/// Broadcasts the authoritative state (position and rotation) of all snake heads to all clients.
+/// This runs every frame to ensure clients have up-to-date positions for interpolation.
+fn broadcast_player_states_system(
+  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  snake_heads: Query<(&Transform, &PlayerId), With<SnakeHead>>,
+) {
+  let mut states = Vec::new();
+  for (transform, player_id) in snake_heads.iter() {
+    let position = transform.translation;
+    let (_, _, rotation_z) = transform.rotation.to_euler(bevy::math::EulerRot::XYZ);
+    states.push((player_id.0, position.x, position.y, rotation_z));
+  }
+
+  if states.is_empty() {
+    return;
+  }
+
+  if let Ok(payload) = encode_to_bytes(&ServerEvent::UpdatePlayerStates { states }) {
+    outgoing_messages.write(OutgoingServerMessage::Broadcast {
+      channel: ChannelType::Unreliable,
+      payload,
+    });
+  } else {
+    warn!("Failed to serialise player states message");
   }
 }
 
