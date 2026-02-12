@@ -345,3 +345,261 @@ fn disconnect_all_clients_system(
     next_app_state.set(AppState::Preparing);
   }
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::app_state::AppStatePlugin;
+  use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
+  use bevy::prelude::*;
+  use bevy::state::app::StatesPlugin;
+  use mooplas_networking::prelude::NetworkingMessagesPlugin;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((
+      StatesPlugin,
+      SharedMessagesPlugin,
+      SharedResourcesPlugin,
+      NetworkingMessagesPlugin,
+      AppStatePlugin,
+    ));
+    app
+  }
+
+  #[test]
+  fn broadcast_player_states_system_sends_state_updates_for_all_snake_heads() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_player_states_system);
+
+    // Spawn some snake heads with different player IDs
+    app
+      .world_mut()
+      .spawn((Transform::from_xyz(100.0, 200.0, 0.0), PlayerId(1), SnakeHead));
+    app
+      .world_mut()
+      .spawn((Transform::from_xyz(150.0, 250.0, 0.0), PlayerId(2), SnakeHead));
+    app.update();
+
+    // Check that a broadcast message with payload was sent on the expected channel
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(message_vec.len(), 1);
+    match &message_vec[0] {
+      OutgoingServerMessage::Broadcast { channel, payload } => {
+        assert!(matches!(channel, ChannelType::Unreliable));
+        assert!(!payload.is_empty());
+      }
+      _ => panic!("Expected broadcast message"),
+    }
+  }
+
+  #[test]
+  fn broadcast_player_states_system_does_not_send_when_no_snake_heads() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_player_states_system);
+    app.update();
+
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(message_vec.len(), 0);
+  }
+
+  #[test]
+  fn broadcast_local_player_registration_system_broadcasts_registration() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_local_player_registration_system);
+
+    // Simulate a player registering on the server
+    app
+      .world_mut()
+      .write_message(PlayerRegistrationMessage {
+        player_id: PlayerId(5),
+        has_registered: true,
+        is_anyone_registered: true,
+        network_role: Some(NetworkRole::Server),
+      })
+      .unwrap();
+    app.update();
+
+    // Check that a message with payload was broadcast on the expected channel
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(message_vec.len(), 1);
+    assert_that_message_was_broadcast(&message_vec);
+  }
+
+  //noinspection DuplicatedCode
+  #[test]
+  fn broadcast_local_player_registration_system_broadcasts_unregistration() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_local_player_registration_system);
+
+    // Simulate a player unregistering on the server
+    app
+      .world_mut()
+      .write_message(PlayerRegistrationMessage {
+        player_id: PlayerId(5),
+        has_registered: false,
+        is_anyone_registered: false,
+        network_role: Some(NetworkRole::Server),
+      })
+      .unwrap();
+    app.update();
+
+    // Check that a message with payload was broadcast on the expected channel
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(message_vec.len(), 1);
+    assert_that_message_was_broadcast(&message_vec);
+  }
+
+  #[test]
+  fn broadcast_local_player_registration_system_skips_client_role_messages() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_local_player_registration_system);
+
+    // Simulate a client registration message (which should be ignored by the server)
+    app
+      .world_mut()
+      .write_message(PlayerRegistrationMessage {
+        player_id: PlayerId(5),
+        has_registered: true,
+        is_anyone_registered: true,
+        network_role: Some(NetworkRole::Client),
+      })
+      .unwrap();
+    app.update();
+
+    // Check that no messages were broadcast
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(message_vec.len(), 0);
+  }
+
+  #[test]
+  fn broadcast_local_app_state_system_broadcasts_state_transitions() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_local_app_state_system);
+    app.update();
+
+    // Transition state and update
+    app
+      .world_mut()
+      .write_message(StateTransitionEvent {
+        exited: None,
+        entered: Some(AppState::Playing),
+        allow_same_state_transitions: false,
+      })
+      .unwrap();
+    app.update();
+
+    // Check that the correct message was broadcast
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<&OutgoingServerMessage> = messages.iter_current_update_messages().collect();
+    let playing_messages: Vec<_> = message_vec
+      .iter()
+      .filter(|m| match m {
+        OutgoingServerMessage::Broadcast { payload, .. } => {
+          let decoded = mooplas_networking::prelude::decode_from_bytes::<ServerEvent>(payload);
+          if let Ok(ServerEvent::StateChanged { new_state, .. }) = decoded {
+            new_state == "Playing"
+          } else {
+            false
+          }
+        }
+        _ => false,
+      })
+      .collect();
+
+    assert!(message_vec.len() >= 1, "Expected at least one message");
+    assert_eq!(playing_messages.len(), 1, "Expected exactly one state message");
+  }
+
+  #[test]
+  fn broadcast_local_app_state_system_ignores_transitions_without_entered_state() {
+    let mut app = setup();
+    app.add_systems(Update, broadcast_local_app_state_system);
+    app.update();
+
+    let before_count = {
+      let messages = app
+        .world_mut()
+        .get_resource_mut::<Messages<OutgoingServerMessage>>()
+        .expect("Messages<OutgoingServerMessage> missing");
+      messages.iter_current_update_messages().count()
+    };
+
+    app
+      .world_mut()
+      .write_message(StateTransitionEvent::<AppState> {
+        exited: Some(AppState::Preparing),
+        entered: None,
+        allow_same_state_transitions: false,
+      })
+      .unwrap();
+    app.update();
+
+    let after_count = {
+      let messages = app
+        .world_mut()
+        .get_resource_mut::<Messages<OutgoingServerMessage>>()
+        .expect("Messages<OutgoingServerMessage> missing");
+      messages.iter_current_update_messages().count()
+    };
+
+    assert_eq!(before_count, after_count, "No new messages should have been sent");
+  }
+
+  //noinspection DuplicatedCode
+  #[test]
+  fn process_and_broadcast_local_exit_lobby_message_broadcasts_shutdown() {
+    let mut app = setup();
+    app.add_systems(Update, process_and_broadcast_local_exit_lobby_message);
+
+    // Send exit lobby message and update
+    app.world_mut().write_message(ExitLobbyMessage::default()).unwrap();
+    app.update();
+
+    // Check that the expected message was broadcast
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .expect("Messages<OutgoingServerMessage> missing");
+    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(message_vec.len(), 1);
+    assert_that_message_was_broadcast(&message_vec);
+
+    // ...and that the shutdown countdown resource was created
+    assert!(app.world().contains_resource::<ShutdownCountdown>());
+  }
+
+  fn assert_that_message_was_broadcast(message_vec: &Vec<&OutgoingServerMessage>) {
+    match &message_vec[0] {
+      OutgoingServerMessage::Broadcast { channel, payload } => {
+        assert!(matches!(channel, ChannelType::ReliableOrdered));
+        assert!(!payload.is_empty());
+      }
+      _ => panic!("Expected broadcast message"),
+    }
+  }
+}
