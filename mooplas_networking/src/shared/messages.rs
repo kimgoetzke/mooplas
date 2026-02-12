@@ -10,6 +10,7 @@ pub struct NetworkingMessagesPlugin;
 impl Plugin for NetworkingMessagesPlugin {
   fn build(&self, app: &mut App) {
     app
+      .add_message::<ClientHandshakeOutcomeMessage>()
       .add_message::<PlayerStateUpdateMessage>()
       .add_message::<OutgoingClientMessage>()
       .add_message::<OutgoingServerMessage>()
@@ -30,6 +31,15 @@ fn receive_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut
     NetcodeTransportError::IO(e) => NetworkErrorEvent::IoError(e.to_string()),
   };
   commands.trigger(error);
+}
+
+/// A message sent on the client-side by the networking code after the client handshake process has completed. Contains
+/// the result of the handshake. Can optionally be used by the application client-side code to e.g. trigger UI error
+/// messages in case of failures.
+#[derive(Message, Debug)]
+pub struct ClientHandshakeOutcomeMessage {
+  pub has_succeeded: bool,
+  pub reason: Option<String>,
 }
 
 /// A message containing authoritative state updates for a player from the server. Used for server-to-client state

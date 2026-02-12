@@ -1,6 +1,5 @@
 use crate::online::native::structs::NetworkTransformInterpolation;
 use crate::online::native::utils;
-use crate::prelude::constants::CLIENT_HAND_SHAKE_TIMEOUT_SECS;
 use crate::prelude::{
   AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
   PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
@@ -12,10 +11,9 @@ use bevy::prelude::{
   State, Time, Transform, Update, With, Without, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
-  ChannelType, ClientMessage, ClientNetworkingActive, ClientRenetPlugin, ClientVisualiserPlugin, OutgoingClientMessage,
-  PendingClientHandshake, PlayerStateUpdateMessage, ServerEvent, encode_to_bytes, is_client_connected,
+  ChannelType, ClientHandshakeOutcomeMessage, ClientMessage, ClientNetworkingActive, ClientRenetPlugin,
+  ClientVisualiserPlugin, OutgoingClientMessage, PlayerStateUpdateMessage, ServerEvent, encode_to_bytes,
 };
-use std::time::Instant;
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
 /// running in client mode (i.e. someone else is the server). Mutually exclusive with the
@@ -26,10 +24,7 @@ impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_plugins((ClientRenetPlugin, ClientVisualiserPlugin))
-      .add_systems(
-        Update,
-        client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
-      )
+      .add_systems(Update, client_handshake_system.run_if(in_state(AppState::Preparing)))
       .add_observer(receive_server_message_event)
       .add_systems(
         Update,
@@ -38,7 +33,7 @@ impl Plugin for ClientPlugin {
           process_and_send_local_exit_lobby_message_system,
         )
           .run_if(in_state(AppState::Registering))
-          .run_if(is_client_connected),
+          .run_if(resource_exists::<ClientNetworkingActive>),
       )
       .add_systems(
         Update,
@@ -48,7 +43,7 @@ impl Plugin for ClientPlugin {
           apply_state_interpolation_system,
         )
           .run_if(in_state(AppState::Playing))
-          .run_if(is_client_connected),
+          .run_if(resource_exists::<ClientNetworkingActive>),
       );
   }
 }
@@ -57,28 +52,18 @@ impl Plugin for ClientPlugin {
 /// If the handshake did not complete in time, it cleans up the client transport and
 /// emits a UI error message.
 pub fn client_handshake_system(
-  mut commands: Commands,
-  handshake: Option<Res<PendingClientHandshake>>,
+  mut messages: MessageReader<ClientHandshakeOutcomeMessage>,
   mut ui_message: MessageWriter<UiNotification>,
-  client_networking_active: Option<Res<ClientNetworkingActive>>,
 ) {
-  let handshake = match handshake {
-    Some(h) => h,
-    None => return,
-  };
-
-  if client_networking_active.is_some() {
-    commands.remove_resource::<PendingClientHandshake>();
-    info!("Client handshake completed");
-    return;
-  }
-
-  let now = Instant::now();
-  if now > handshake.deadline {
-    let message = "Couldn't complete handshake with server - is there a typo in the connection string?".to_string();
-    error!("Timed out after {}s: {}", CLIENT_HAND_SHAKE_TIMEOUT_SECS, message);
-    ui_message.write(UiNotification::error(message));
-    handshake.clean_up_after_failure(&mut commands);
+  for message in messages.read() {
+    let reason = message
+      .reason
+      .as_ref()
+      .expect("Handshake outcome message should always contain a reason");
+    match message.has_succeeded {
+      true => ui_message.write(UiNotification::info(reason.to_string())),
+      false => ui_message.write(UiNotification::error(reason.to_string())),
+    };
   }
 }
 

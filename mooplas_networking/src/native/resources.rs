@@ -118,7 +118,7 @@ impl Lobby {
 /// created but did not complete the handshake in time.
 #[derive(Resource)]
 pub struct PendingClientHandshake {
-  pub deadline: Instant,
+  pub(crate) deadline: Instant,
 }
 
 impl PendingClientHandshake {
@@ -132,7 +132,8 @@ impl PendingClientHandshake {
     commands.remove_resource::<RenetClient>();
     commands.remove_resource::<NetcodeClientTransport>();
     commands.remove_resource::<PendingClientHandshake>();
-    commands.remove_resource::<RenetClientVisualiser>()
+    commands.remove_resource::<RenetClientVisualiser>();
+    commands.remove_resource::<ClientNetworkingActive>();
   }
 }
 

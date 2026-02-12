@@ -1,13 +1,18 @@
 use crate::native::{ClientNetworkingActive, PendingClientHandshake, RenetClientVisualiser};
-use crate::prelude::{ChannelType, OutgoingClientMessage, PROTOCOL_ID, ServerEvent, decode_from_bytes};
+use crate::prelude::{
+  CLIENT_HAND_SHAKE_TIMEOUT_SECS, ChannelType, ClientHandshakeOutcomeMessage, OutgoingClientMessage, PROTOCOL_ID,
+  ServerEvent, decode_from_bytes,
+};
 use bevy::app::Update;
 use bevy::log::*;
-use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, Plugin, Res, ResMut};
+use bevy::prelude::{
+  Commands, IntoScheduleConfigs, MessageReader, MessageWriter, Plugin, Res, ResMut, resource_exists,
+};
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, DefaultChannel};
 use bevy_renet::{RenetClient, RenetClientPlugin};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 /// A Bevy plugin that adds the necessary Renet plugins. Required to run any client code on native.
 pub struct ClientRenetPlugin;
@@ -18,12 +23,24 @@ impl Plugin for ClientRenetPlugin {
       .add_plugins((RenetClientPlugin, NetcodeClientPlugin))
       .add_systems(
         Update,
+        client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
+      )
+      .add_systems(
+        Update,
         receive_reliable_server_messages_system.run_if(is_client_connected),
       )
       .add_systems(Update, send_outgoing_client_messages_system.run_if(is_client_connected));
   }
 }
 
+/// Creates client resources with a specific server address and inserts them into the world. Returns an error if the
+/// resources could not be created e.g. due to a socket binding failure.
+///
+/// Creates the temporary [`PendingClientHandshake`] resource which is used to track the progress of the client
+/// handshake process.
+///
+/// If successful, you can use [`ClientNetworkingActive`] as a marker to check if the client is active and connected
+/// going forward.
 pub fn create_client(commands: &mut Commands, server_address: SocketAddr) -> Result<(), Box<dyn std::error::Error>> {
   match create_new_renet_client_resources(server_address) {
     Ok((client, transport)) => {
@@ -32,7 +49,6 @@ pub fn create_client(commands: &mut Commands, server_address: SocketAddr) -> Res
       commands.insert_resource(transport);
       commands.insert_resource(PendingClientHandshake::new());
       commands.insert_resource(RenetClientVisualiser::default());
-      commands.insert_resource(ClientNetworkingActive::default());
       Ok(())
     }
     Err(e) => Err(e),
@@ -61,10 +77,44 @@ fn create_new_renet_client_resources(
 }
 
 /// Returns true if the [`RenetClient`] resource exists i.e. the client is connected to a server.
-pub fn is_client_connected(client: Option<Res<RenetClient>>) -> bool {
+fn is_client_connected(client: Option<Res<RenetClient>>) -> bool {
   match client {
     Some(client) => client.is_connected(),
     None => false,
+  }
+}
+
+pub fn client_handshake_system(
+  mut commands: Commands,
+  handshake: Option<Res<PendingClientHandshake>>,
+  client: Option<Res<RenetClient>>,
+  mut client_handshake_outcome_message: MessageWriter<ClientHandshakeOutcomeMessage>,
+) {
+  let handshake = match handshake {
+    Some(h) => h,
+    None => return,
+  };
+
+  if is_client_connected(client) {
+    commands.remove_resource::<PendingClientHandshake>();
+    commands.insert_resource(ClientNetworkingActive::default());
+    client_handshake_outcome_message.write(ClientHandshakeOutcomeMessage {
+      has_succeeded: true,
+      reason: Some("Successfully completed handshake with server".to_string()),
+    });
+    info!("Client handshake completed");
+    return;
+  }
+
+  let now = Instant::now();
+  if now > handshake.deadline {
+    let message = "Couldn't complete handshake with server - is there a typo in the connection string?".to_string();
+    error!("Timed out after {}s: {}", CLIENT_HAND_SHAKE_TIMEOUT_SECS, message);
+    client_handshake_outcome_message.write(ClientHandshakeOutcomeMessage {
+      has_succeeded: false,
+      reason: Some(message),
+    });
+    handshake.clean_up_after_failure(&mut commands);
   }
 }
 

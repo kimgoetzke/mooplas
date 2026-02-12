@@ -12,4 +12,4 @@ pub use server::*;
 pub use server_visualiser::ServerVisualiserPlugin;
 pub use utils::*;
 
-pub const PROTOCOL_ID: u64 = 1000;
+pub(crate) const PROTOCOL_ID: u64 = 1000;
