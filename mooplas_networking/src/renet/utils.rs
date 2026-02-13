@@ -1,4 +1,4 @@
-use crate::native::{RenetClientVisualiser, RenetServerVisualiser};
+use crate::renet::{RenetClientVisualiser, RenetServerVisualiser};
 use bevy::prelude::Commands;
 use bevy_renet::netcode::{NetcodeClientTransport, NetcodeServerTransport};
 use bevy_renet::{RenetClient, RenetServer};

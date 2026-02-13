@@ -1,14 +1,14 @@
 mod native;
+mod renet;
 mod shared;
 mod wasm;
 
 pub mod prelude {
-  pub use crate::native::*;
+  #[cfg(feature = "native")]
+  pub use crate::renet::*;
+
+  #[cfg(feature = "wasm")]
+  pub use crate::wasm::*;
+
   pub use crate::shared::*;
 }
-
-#[cfg(feature = "wasm")]
-pub use wasm::*;
-
-// #[cfg(feature = "native")]
-// pub use native::*;
