@@ -9,7 +9,7 @@ use bevy::log::*;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::{IntoScheduleConfigs, KeyCode, NextState, OnEnter, Res, ResMut, Resource, Update, in_state};
 use rand::prelude::StdRng;
-use rand::{Rng, SeedableRng};
+use rand::{RngExt, SeedableRng};
 
 /// A plugin that initialises the game by loading resources and generation data such as spawn points.
 pub struct InitialisationPlugin;

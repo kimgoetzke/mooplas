@@ -11,7 +11,7 @@ bevy_ui_text_input = { version = "0.7.0", optional = true }
 avian2d = "0.5.0"
 
 # Other dependencies
-rand = "0.9.2"
+rand = "0.10.0"
 serde = { version = "1.0.228", features = ["derive"] }
 mooplas_networking = { path = "../mooplas_networking", features = ["native"], optional = true }
 
