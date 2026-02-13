@@ -11,7 +11,7 @@ use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::prelude::{
-  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, On, Plugin, Res, ResMut, in_state,
+  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Res, ResMut, in_state,
 };
 use mooplas_networking::prelude::{
   NetworkErrorEvent, NetworkingMessagesPlugin, NetworkingResourcesPlugin, create_client, create_server,
@@ -96,13 +96,25 @@ fn handle_connection_info_message(
   }
 }
 
+// TODO: Implement an error state with visual feedback incl. clean up of game, state change, and UI notification
 #[allow(clippy::never_loop)]
-fn receive_network_error_event(error_event: On<NetworkErrorEvent>) {
+fn receive_network_error_event(
+  error_event: On<NetworkErrorEvent>,
+  mut commands: Commands,
+  mut next_state: ResMut<NextState<AppState>>,
+) {
   let error = error_event.event();
   if matches!(
     error,
     &NetworkErrorEvent::RenetDisconnect(_) | &NetworkErrorEvent::NetcodeDisconnect(_)
   ) {
+    info!(
+      "Connection lost: [{}] - returning to [{:?}]...",
+      error,
+      MenuName::PlayOnlineMenu
+    );
+    remove_all_resources(&mut commands);
+    next_state.set(AppState::GameOver);
     return;
   }
   error!("Networking error occurred: [{}], panicking now...", error);
