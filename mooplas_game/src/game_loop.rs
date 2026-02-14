@@ -213,18 +213,18 @@ fn pause_game_system(mut time: ResMut<Time<Virtual>>) {
 fn transition_to_game_over_system(
   registered_players: ResMut<RegisteredPlayers>,
   mut winner: ResMut<WinnerInfo>,
-  mut next: ResMut<NextState<AppState>>,
+  mut next_app_state: ResMut<NextState<AppState>>,
 ) {
   let alive_players: Vec<&RegisteredPlayer> = registered_players.players.iter().filter(|p| p.alive).collect();
   match (registered_players.count(), alive_players.len()) {
     (_, 0) => {
       winner.clear();
-      next.set(AppState::GameOver);
+      next_app_state.set(AppState::GameOver);
       info!("Game over: No winner this round.");
     }
     (registered_players, 1) if registered_players > 1 => {
       winner.set(alive_players[0].id);
-      next.set(AppState::GameOver);
+      next_app_state.set(AppState::GameOver);
       info!("Game over: [{:?}] wins the round", alive_players[0].id);
     }
     _ => {}

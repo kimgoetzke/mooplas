@@ -96,12 +96,13 @@ fn handle_connection_info_message(
   }
 }
 
-// TODO: Implement an error state with visual feedback incl. clean up of game, state change, and UI notification
+// TODO: Implement an visual feedback for the user when connection is lost
 #[allow(clippy::never_loop)]
 fn receive_network_error_event(
   error_event: On<NetworkErrorEvent>,
   mut commands: Commands,
-  mut next_state: ResMut<NextState<AppState>>,
+  mut next_app_state: ResMut<NextState<AppState>>,
+  mut network_role: ResMut<NetworkRole>,
 ) {
   let error = error_event.event();
   if matches!(
@@ -109,12 +110,13 @@ fn receive_network_error_event(
     &NetworkErrorEvent::RenetDisconnect(_) | &NetworkErrorEvent::NetcodeDisconnect(_)
   ) {
     info!(
-      "Connection lost: [{}] - returning to [{:?}]...",
+      "Connection lost: [{}] - removing networking resources and setting state to [{:?}]...",
       error,
-      MenuName::PlayOnlineMenu
+      AppState::GameOver
     );
     remove_all_resources(&mut commands);
-    next_state.set(AppState::GameOver);
+    next_app_state.set(AppState::GameOver);
+    *network_role = NetworkRole::None;
     return;
   }
   error!("Networking error occurred: [{}], panicking now...", error);
