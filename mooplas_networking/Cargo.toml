@@ -31,6 +31,7 @@ web-sys = { version = "0.3.38", features = [
   "EventTarget",
 ], optional = true }
 crossbeam-channel = { version = "0.5.15", optional = true }
+bevy_matchbox = { version = "0.14", features = ["signaling"] }
 
 [features]
 default = ["native"]

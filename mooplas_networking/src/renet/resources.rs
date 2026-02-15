@@ -1,4 +1,4 @@
-use crate::prelude::{ClientId, PlayerId};
+use crate::prelude::{ClientId, ClientNetworkingActive, PlayerId};
 use bevy::app::{App, Plugin};
 use bevy::log::debug;
 use bevy::prelude::{Commands, Deref, DerefMut, Resource};
@@ -44,16 +44,6 @@ impl RenetServerVisualiser {
     self.0.remove_client(client_id.0);
   }
 }
-
-/// Marker resource inserted when a Renet server is active. The intention is to use this for running systems
-/// conditionally e.g. `.run_if(resource_exists::<ServerNetworkingActive>)`.
-#[derive(Resource, Default)]
-pub struct ServerNetworkingActive;
-
-/// Marker resource inserted when a Renet client is active. The intention is to use this for running systems
-/// conditionally e.g. `.run_if(resource_exists::<ClientNetworkingActive>)`.
-#[derive(Resource, Default)]
-pub struct ClientNetworkingActive;
 
 /// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]

@@ -35,3 +35,13 @@ impl NetworkRole {
     *self == NetworkRole::None
   }
 }
+
+/// Marker resource inserted when a Renet server is active. The intention is to use this for running systems
+/// conditionally e.g. `.run_if(resource_exists::<ServerNetworkingActive>)`.
+#[derive(Resource, Default)]
+pub struct ServerNetworkingActive;
+
+/// Marker resource inserted when a Renet client is active. The intention is to use this for running systems
+/// conditionally e.g. `.run_if(resource_exists::<ClientNetworkingActive>)`.
+#[derive(Resource, Default)]
+pub struct ClientNetworkingActive;

@@ -44,12 +44,6 @@ impl From<ChannelType> for u8 {
   }
 }
 
-#[cfg(target_arch = "wasm32")]
-pub type RawClientId = u64;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type RawClientId = bevy_renet::renet::ClientId;
-
 /// A component identifying a player. Used to link player entities together.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[cfg(not(target_arch = "wasm32"))]
@@ -72,6 +66,12 @@ impl Into<u8> for PlayerId {
     self.0
   }
 }
+
+#[cfg(target_arch = "wasm32")]
+pub type RawClientId = u64;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub type RawClientId = bevy_renet::renet::ClientId;
 
 /// A stable, non-generic client ID wrapper used by messages and APIs. The inner
 /// representation varies by target via `RawClientId`.

@@ -1,8 +1,8 @@
 use crate::prelude::{
-  CLIENT_HAND_SHAKE_TIMEOUT_SECS, ChannelType, ClientHandshakeOutcomeMessage, OutgoingClientMessage, PROTOCOL_ID,
-  ServerEvent, decode_from_bytes,
+  CLIENT_HAND_SHAKE_TIMEOUT_SECS, ChannelType, ClientHandshakeOutcomeMessage, ClientNetworkingActive,
+  OutgoingClientMessage, PROTOCOL_ID, ServerEvent, decode_from_bytes,
 };
-use crate::renet::{ClientNetworkingActive, PendingClientHandshake, RenetClientVisualiser};
+use crate::renet::{PendingClientHandshake, RenetClientVisualiser};
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::prelude::{
