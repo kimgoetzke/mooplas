@@ -1,9 +1,10 @@
 use crate::prelude::ClientNetworkingActive;
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
-use bevy::prelude::{IntoScheduleConfigs, ResMut, resource_exists};
+use bevy::prelude::{IntoScheduleConfigs, ResMut, Resource, resource_exists};
 use bevy::time::common_conditions::on_timer;
 use bevy_matchbox::MatchboxSocket;
+use bevy_matchbox::matchbox_socket::PeerId;
 use std::time::Duration;
 
 pub struct ClientPlugin;
@@ -24,21 +25,25 @@ impl Plugin for ClientPlugin {
   }
 }
 
+#[derive(Resource)]
+pub struct HostConnectionInfo {
+  pub host_id: PeerId,
+}
+
 const CHANNEL_ID: usize = 0;
 
 fn send_message(mut socket: ResMut<MatchboxSocket>) {
   let peers: Vec<_> = socket.connected_peers().collect();
-
-  for peer in peers {
-    let message = "Hello";
-    info!("Sending message: {message:?} to {peer}");
-    socket.channel_mut(CHANNEL_ID).send(message.as_bytes().into(), peer);
+  for peer_id in peers {
+    let message = format!("Hello, I'm client [{peer_id}]");
+    info!("Sending message: {message:?} to {peer_id}");
+    socket.channel_mut(CHANNEL_ID).send(message.as_bytes().into(), peer_id);
   }
 }
 
 fn receive_messages(mut socket: ResMut<MatchboxSocket>) {
-  for (peer, state) in socket.update_peers() {
-    info!("{peer}: {state:?}");
+  for (peer_id, state) in socket.update_peers() {
+    info!("[{peer_id}]: {state:?}");
   }
 
   for (_id, message) in socket.channel_mut(CHANNEL_ID).receive() {

@@ -1,46 +1,65 @@
+use crate::prelude::Lobby;
 use crate::shared::ServerNetworkingActive;
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
 use core::time::Duration;
+use crossbeam_channel::{Receiver, unbounded};
 use std::net::{Ipv4Addr, SocketAddrV4};
+
+/// Resource to receive client connection events from callbacks
+#[derive(Resource)]
+pub struct ClientConnectionReceiver(pub Receiver<PeerId>);
 
 pub struct HostPlugin;
 
 impl Plugin for HostPlugin {
   fn build(&self, app: &mut App) {
-    app
-      .add_systems(
-        Update,
-        receive_messages.run_if(resource_exists::<ServerNetworkingActive>),
-      )
-      .add_systems(
-        Update,
-        send_message
-          .run_if(resource_exists::<ServerNetworkingActive>)
-          .run_if(on_timer(Duration::from_secs(5))),
-      );
+    app.add_systems(
+      Update,
+      (receive_messages, handle_client_connection_system).run_if(resource_exists::<ServerNetworkingActive>),
+    );
+    app.add_systems(
+      Update,
+      send_message
+        .run_if(resource_exists::<ServerNetworkingActive>)
+        .run_if(on_timer(Duration::from_secs(5))),
+    );
   }
 }
 
 pub fn start_signaling_server(commands: &mut Commands) {
   info!("Starting signaling server");
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 3536);
+  let (sender, receiver) = unbounded::<PeerId>();
   let signaling_server = MatchboxServer::from(
     SignalingServer::client_server_builder(addr)
       .on_connection_request(|connection| {
         info!("Connecting: {connection:?}");
         Ok(true)
       })
-      .on_id_assignment(|(socket, id)| info!("{socket} received {id}"))
-      .on_host_connected(|id| info!("Host joined: {id}"))
-      .on_host_disconnected(|id| info!("Host left: {id}"))
-      .on_client_connected(|id| info!("Client joined: {id}"))
-      .on_client_disconnected(|id| info!("Client left: {id}"))
+      .on_id_assignment(|(socket, id)| info!("Socket [{socket}] received ID [{id}]"))
+      .on_host_connected(|id| info!("Host joined and has ID [{id}]"))
+      .on_host_disconnected(|id| info!("Host [{id}] left"))
+      .on_client_connected(move |id| {
+        info!("Client connected with ID [{id}]");
+        if let Err(e) = sender.send(id) {
+          error!("Failed to send client connection event: {e}");
+        }
+      })
+      .on_client_disconnected(|id| info!("Client [{id}] left"))
       .cors()
       .trace()
       .build(),
   );
   commands.insert_resource(signaling_server);
+  commands.insert_resource(ClientConnectionReceiver(receiver));
+}
+
+fn handle_client_connection_system(receiver: Res<ClientConnectionReceiver>, mut lobby: ResMut<Lobby>) {
+  while let Ok(peer_id) = receiver.0.try_recv() {
+    info!("Processing client connection for peer [{peer_id}] in Bevy system");
+    // lobby.connected.push(peer_id);
+  }
 }
 
 fn send_message(mut socket: ResMut<MatchboxSocket>) {
@@ -53,8 +72,8 @@ fn send_message(mut socket: ResMut<MatchboxSocket>) {
 }
 
 fn receive_messages(mut socket: ResMut<MatchboxSocket>) {
-  for (peer, state) in socket.update_peers() {
-    info!("{peer}: {state:?}");
+  for (peer_id, state) in socket.update_peers() {
+    info!("[{peer_id}]: {state:?}");
   }
 
   for (_id, message) in socket.channel_mut(0).receive() {

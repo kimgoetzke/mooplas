@@ -4,7 +4,8 @@ use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, MessageWriter, ResMut, in_state};
 use mooplas_networking::prelude::{
-  ClientNetworkingActive, ClientPlugin, HostPlugin, NetworkRole, ServerNetworkingActive,
+  ClientNetworkingActive, ClientPlugin, HostPlugin, Lobby, NetworkRole, ServerNetworkingActive,
+  remove_all_matchbox_resources,
 };
 
 // TODO: Implement a transport for WASM targets
@@ -24,6 +25,7 @@ fn handle_toggle_menu_message(
   mut commands: Commands,
   mut messages: MessageReader<ToggleMenuMessage>,
   mut network_role: ResMut<NetworkRole>,
+  mut lobby: ResMut<Lobby>,
   mut connection_info_message: MessageWriter<ConnectionInfoMessage>,
 ) {
   for message in messages.read() {
@@ -33,7 +35,7 @@ fn handle_toggle_menu_message(
       MenuName::JoinGameMenu => *network_role = NetworkRole::Client,
     }
     match *network_role {
-      NetworkRole::None => {}
+      NetworkRole::None => remove_all_matchbox_resources(&mut commands),
       NetworkRole::Server => {
         debug!("Creating server...");
         mooplas_networking::prelude::start_signaling_server(&mut commands);

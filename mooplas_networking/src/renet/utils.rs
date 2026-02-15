@@ -6,7 +6,7 @@ use bevy_renet::{RenetClient, RenetServer};
 use crate::prelude::{ClientNetworkingActive, PendingClientHandshake, ServerNetworkingActive};
 
 /// Cleans up all networking resources for native platforms.
-pub fn remove_all_resources(commands: &mut Commands) {
+pub fn remove_all_renet_resources(commands: &mut Commands) {
   commands.remove_resource::<RenetServer>();
   commands.remove_resource::<NetcodeServerTransport>();
   commands.remove_resource::<RenetServerVisualiser>();

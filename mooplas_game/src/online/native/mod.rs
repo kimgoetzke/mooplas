@@ -14,8 +14,8 @@ use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Res, ResMut, in_state,
 };
 use mooplas_networking::prelude::{
-  NativeNetworkingMessagesPlugin, NativeNetworkingResourcesPlugin, NetworkErrorEvent, NetworkRole, create_client,
-  create_server, remove_all_resources,
+  NativeNetworkingMessagesPlugin, NetworkErrorEvent, NetworkRole, create_client, create_server,
+  remove_all_renet_resources,
 };
 
 /// Plugin that adds online multiplayer capabilities for native builds to the game.
@@ -24,7 +24,7 @@ pub struct NativeOnlinePlugin;
 impl Plugin for NativeOnlinePlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((NativeNetworkingResourcesPlugin, NativeNetworkingMessagesPlugin))
+      .add_plugins(NativeNetworkingMessagesPlugin)
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
@@ -51,7 +51,7 @@ fn handle_toggle_menu_message(
       MenuName::JoinGameMenu => *network_role = NetworkRole::Client,
     }
     match *network_role {
-      NetworkRole::None => remove_all_resources(&mut commands),
+      NetworkRole::None => remove_all_renet_resources(&mut commands),
       NetworkRole::Server => match create_server(&mut commands) {
         Ok(connection_string) => {
           debug!("Server started with connection string [{}]", connection_string);
@@ -114,7 +114,7 @@ fn receive_network_error_event(
       error,
       AppState::GameOver
     );
-    remove_all_resources(&mut commands);
+    remove_all_renet_resources(&mut commands);
     next_app_state.set(AppState::GameOver);
     *network_role = NetworkRole::None;
     return;
