@@ -3,7 +3,7 @@ use crate::prelude::constants::{
   ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT, TEXT_COLOUR,
 };
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, ExitLobbyMessage, NetworkRole, PlayerId, RegisteredPlayers, Settings,
+  AvailablePlayerConfig, AvailablePlayerConfigs, ExitLobbyMessage, PlayerId, RegisteredPlayers, Settings,
   TouchControlsToggledMessage, WinnerInfo,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
@@ -20,6 +20,7 @@ use bevy::prelude::{
 };
 use bevy::text::LineHeight;
 use bevy::ui::{BackgroundColor, PositionType, percent};
+use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
 pub struct InGameUiPlugin;

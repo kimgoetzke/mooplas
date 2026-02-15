@@ -6,7 +6,7 @@ mod structs;
 
 use crate::online::native::client::ClientPlugin;
 use crate::online::native::server::ServerPlugin;
-use crate::prelude::{AppState, MenuName, NetworkRole, ToggleMenuMessage, UiNotification};
+use crate::prelude::{AppState, MenuName, ToggleMenuMessage, UiNotification};
 use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
 use bevy::log::*;
@@ -14,8 +14,8 @@ use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Res, ResMut, in_state,
 };
 use mooplas_networking::prelude::{
-  NetworkErrorEvent, NetworkingMessagesPlugin, NetworkingResourcesPlugin, create_client, create_server,
-  remove_all_resources,
+  NativeNetworkingMessagesPlugin, NativeNetworkingResourcesPlugin, NetworkErrorEvent, NetworkRole, create_client,
+  create_server, remove_all_resources,
 };
 
 /// Plugin that adds online multiplayer capabilities for native builds to the game.
@@ -24,7 +24,7 @@ pub struct NativeOnlinePlugin;
 impl Plugin for NativeOnlinePlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((NetworkingResourcesPlugin, NetworkingMessagesPlugin))
+      .add_plugins((NativeNetworkingResourcesPlugin, NativeNetworkingMessagesPlugin))
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(

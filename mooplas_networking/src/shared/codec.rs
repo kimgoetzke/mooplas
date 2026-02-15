@@ -24,7 +24,8 @@ mod tests {
   mod online {
     use super::*;
     use crate::prelude::PlayerId;
-    use crate::shared::structs::{ClientMessage, NetworkRole, PlayerRegistrationMessage, ServerEvent};
+    use crate::shared::resources::NetworkRole;
+    use crate::shared::structs::{ClientMessage, PlayerRegistrationMessage, ServerEvent};
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {

@@ -1,4 +1,5 @@
-use bevy::prelude::{Component, Event, Message, Resource};
+use crate::prelude::NetworkRole;
+use bevy::prelude::{Component, Event, Message};
 use bevy_renet::renet::DefaultChannel;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -130,16 +131,6 @@ pub struct PlayerRegistrationMessage {
   pub is_anyone_registered: bool,
   /// Whether this message originated from the server or the client. Used to prevent echoing.
   pub network_role: Option<NetworkRole>,
-}
-
-/// A resource that indicates the current network role of this application instance. Only relevant in online
-/// multiplayer mode.
-#[derive(Resource, Debug, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize)]
-pub enum NetworkRole {
-  #[default]
-  None,
-  Server,
-  Client,
 }
 
 /// A message sent by the client. This is how the client communicates to the server. Read by the networking code, not

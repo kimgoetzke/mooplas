@@ -1,13 +1,11 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
-#[allow(unused_imports)]
 use bevy::log::*;
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
-use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::time::SystemTime;
 
@@ -26,8 +24,7 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<SpawnPoints>()
       .init_resource::<AvailablePlayerConfigs>()
       .init_resource::<RegisteredPlayers>()
-      .init_resource::<WinnerInfo>()
-      .init_resource::<NetworkRole>();
+      .init_resource::<WinnerInfo>();
   }
 }
 
@@ -252,32 +249,6 @@ impl WinnerInfo {
   }
 }
 
-/// A resource that indicates the current network role of this application instance. Only relevant in online
-/// multiplayer mode.
-#[derive(Resource, Debug, PartialEq, Eq, Clone, Copy, Default, Serialize, Deserialize)]
-pub(crate) enum NetworkRole {
-  #[default]
-  None,
-  Server,
-  Client,
-}
-
-impl NetworkRole {
-  /// Checks if the current role is `Server`.
-  pub fn is_server(&self) -> bool {
-    *self == NetworkRole::Server
-  }
-
-  /// Checks if the current role is `Client`.
-  pub fn is_client(&self) -> bool {
-    *self == NetworkRole::Client
-  }
-
-  pub fn is_none(&self) -> bool {
-    *self == NetworkRole::None
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
@@ -334,7 +305,6 @@ mod tests {
     assert!(world.contains_resource::<AvailablePlayerConfigs>());
     assert!(world.contains_resource::<RegisteredPlayers>());
     assert!(world.contains_resource::<WinnerInfo>());
-    assert!(world.contains_resource::<NetworkRole>());
   }
 
   #[test]

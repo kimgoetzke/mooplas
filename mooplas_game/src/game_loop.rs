@@ -1,13 +1,14 @@
 use crate::prelude::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, NetworkRole, PlayerId,
-  PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
+  AppState, AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
 };
 use crate::shared::{InputMessage, Player};
 use avian2d::prelude::Collisions;
 use bevy::app::{App, Plugin};
 use bevy::ecs::entity::Entity;
 use bevy::prelude::*;
+use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages the main game loop.
 pub struct GameLoopPlugin;
@@ -274,6 +275,8 @@ mod tests {
     app.add_plugins((StatesPlugin, crate::app_state::AppStatePlugin));
     // Add shared messages and resources as they are required by the game loop systems
     app.add_plugins((SharedMessagesPlugin, SharedResourcesPlugin));
+    // Add a NetworkRole resource so systems that require it can run
+    app.init_resource::<NetworkRole>();
     app
   }
 

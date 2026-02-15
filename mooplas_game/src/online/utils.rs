@@ -1,7 +1,8 @@
-use crate::prelude::{AvailablePlayerConfigs, NetworkRole, PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
+use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
 use crate::shared::RegisteredPlayer;
 use bevy::log::*;
 use bevy::prelude::{MessageWriter, Res, ResMut};
+use mooplas_networking::prelude::NetworkRole;
 
 pub(crate) fn register_player_locally(
   registered_players: &mut ResMut<RegisteredPlayers>,

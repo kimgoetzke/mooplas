@@ -1,7 +1,7 @@
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, ContinueMessage, InputMessage, NetworkRole, PlayerId, PlayerInput,
-  RegisteredPlayers, Settings, SnakeHead, TouchControlsToggledMessage, has_registered_players,
+  AppState, AvailablePlayerConfigs, ContinueMessage, InputMessage, PlayerId, PlayerInput, RegisteredPlayers, Settings,
+  SnakeHead, TouchControlsToggledMessage, has_registered_players,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -13,6 +13,7 @@ use bevy::prelude::{
   IntoScheduleConfigs, KeyCode, MessageReader, MessageWriter, MonitorSelection, Query, Res, ResMut, Single, Time,
   Transform, Window, With, in_state,
 };
+use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages all player controls and input handling.
 pub struct ControlsPlugin;
@@ -206,7 +207,8 @@ mod tests {
         SharedMessagesPlugin,
         SharedResourcesPlugin,
       ))
-      .init_resource::<ButtonInput<KeyCode>>();
+      .init_resource::<ButtonInput<KeyCode>>()
+      .init_resource::<NetworkRole>();
     app
   }
 

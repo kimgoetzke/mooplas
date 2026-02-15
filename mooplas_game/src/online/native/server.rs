@@ -1,7 +1,7 @@
 use crate::online::utils;
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, InputMessage, MenuName, NetworkRole, PlayerId, PlayerRegistrationMessage,
-  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
+  AppState, AvailablePlayerConfigs, InputMessage, MenuName, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
+  Seed, SnakeHead, ToggleMenuMessage,
 };
 use crate::shared::{ExitLobbyMessage, WinnerInfo};
 use bevy::app::{App, Plugin, Update};
@@ -12,7 +12,7 @@ use bevy::prelude::{
 };
 use bevy::time::TimerMode;
 use mooplas_networking::prelude::{
-  ChannelType, ClientEvent, ClientId, Lobby, OutgoingServerMessage, RenetServerVisualiser, ServerEvent,
+  ChannelType, ClientEvent, ClientId, Lobby, NetworkRole, OutgoingServerMessage, RenetServerVisualiser, ServerEvent,
   ServerNetworkingActive, ServerRenetPlugin, ServerVisualiserPlugin, encode_to_bytes,
 };
 use std::time::Duration;
@@ -353,7 +353,7 @@ mod tests {
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::prelude::*;
   use bevy::state::app::StatesPlugin;
-  use mooplas_networking::prelude::NetworkingMessagesPlugin;
+  use mooplas_networking::prelude::NativeNetworkingMessagesPlugin;
 
   fn setup() -> App {
     let mut app = App::new();
@@ -362,7 +362,7 @@ mod tests {
       StatesPlugin,
       SharedMessagesPlugin,
       SharedResourcesPlugin,
-      NetworkingMessagesPlugin,
+      NativeNetworkingMessagesPlugin,
       AppStatePlugin,
     ));
     app

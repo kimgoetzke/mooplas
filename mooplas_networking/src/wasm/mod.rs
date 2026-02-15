@@ -64,7 +64,7 @@ pub fn create_peer(incoming_tx: Sender<NetworkMessage>, outgoing_rx: Receiver<Ne
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::{ClientId, ServerEvent};
+  use crate::prelude::{ClientId, RawClientId, ServerEvent};
   use crossbeam_channel::unbounded;
 
   #[test]
@@ -75,7 +75,7 @@ mod tests {
       incoming: from_rx,
       outgoing: to_tx,
     };
-    let expected_client_id = ClientId(7.0);
+    let expected_client_id = ClientId(7.0 as RawClientId);
     assert!(
       channel
         .outgoing

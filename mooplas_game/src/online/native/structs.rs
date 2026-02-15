@@ -1,4 +1,4 @@
-use crate::prelude::{InputMessage, NetworkRole, PlayerId, PlayerRegistrationMessage};
+use crate::prelude::{InputMessage, PlayerId, PlayerRegistrationMessage};
 use bevy::math::{Quat, Vec2};
 use bevy::prelude::Component;
 use mooplas_networking::prelude::SerialisableInputMessage;
@@ -54,11 +54,7 @@ impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerReg
       player_id: value.player_id.into(),
       has_registered: value.has_registered,
       is_anyone_registered: value.is_anyone_registered,
-      network_role: value.network_role.map(|role| match role {
-        NetworkRole::None => mooplas_networking::prelude::NetworkRole::None,
-        NetworkRole::Server => mooplas_networking::prelude::NetworkRole::Server,
-        NetworkRole::Client => mooplas_networking::prelude::NetworkRole::Client,
-      }),
+      network_role: value.network_role,
     }
   }
 }
@@ -69,11 +65,7 @@ impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegi
       player_id: self.player_id.into(),
       has_registered: self.has_registered,
       is_anyone_registered: self.is_anyone_registered,
-      network_role: self.network_role.map(|role| match role {
-        mooplas_networking::prelude::NetworkRole::None => NetworkRole::None,
-        mooplas_networking::prelude::NetworkRole::Server => NetworkRole::Server,
-        mooplas_networking::prelude::NetworkRole::Client => NetworkRole::Client,
-      }),
+      network_role: self.network_role,
     }
   }
 }

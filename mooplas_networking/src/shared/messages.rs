@@ -5,9 +5,9 @@ use bevy::prelude::{Commands, Message, On};
 use bevy_renet::netcode::{NetcodeError, NetcodeErrorEvent, NetcodeTransportError};
 use serde::{Deserialize, Serialize};
 
-pub struct NetworkingMessagesPlugin;
+pub struct NativeNetworkingMessagesPlugin;
 
-impl Plugin for NetworkingMessagesPlugin {
+impl Plugin for NativeNetworkingMessagesPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_message::<ClientHandshakeOutcomeMessage>()

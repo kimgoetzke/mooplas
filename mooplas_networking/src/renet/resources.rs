@@ -10,9 +10,9 @@ use std::fmt::Debug;
 use std::time::{Duration, Instant};
 
 /// A plugin that registers and initialises shared resources used in either the client or server, or both.
-pub struct NetworkingResourcesPlugin;
+pub struct NativeNetworkingResourcesPlugin;
 
-impl Plugin for NetworkingResourcesPlugin {
+impl Plugin for NativeNetworkingResourcesPlugin {
   fn build(&self, app: &mut App) {
     app.init_resource::<Lobby>();
   }

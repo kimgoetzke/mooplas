@@ -1,8 +1,8 @@
 use crate::online::native::structs::NetworkTransformInterpolation;
 use crate::online::utils;
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, NetworkRole, PlayerId,
-  PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
+  AppState, AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, UiNotification, WinnerInfo,
 };
 use bevy::log::*;
 use bevy::math::Quat;
@@ -12,7 +12,7 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::{
   ChannelType, ClientHandshakeOutcomeMessage, ClientMessage, ClientNetworkingActive, ClientRenetPlugin,
-  ClientVisualiserPlugin, OutgoingClientMessage, PlayerStateUpdateMessage, ServerEvent, encode_to_bytes,
+  ClientVisualiserPlugin, NetworkRole, OutgoingClientMessage, PlayerStateUpdateMessage, ServerEvent, encode_to_bytes,
 };
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
@@ -250,14 +250,18 @@ mod tests {
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::math::Vec3;
   use bevy::prelude::*;
-  use mooplas_networking::prelude::NetworkingMessagesPlugin;
+  use mooplas_networking::prelude::NativeNetworkingMessagesPlugin;
   use std::time::Duration;
 
   fn setup() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     // Add shared messages and resources as they are required by the game loop systems
-    app.add_plugins((SharedMessagesPlugin, SharedResourcesPlugin, NetworkingMessagesPlugin));
+    app.add_plugins((
+      SharedMessagesPlugin,
+      SharedResourcesPlugin,
+      NativeNetworkingMessagesPlugin,
+    ));
     app
   }
 
