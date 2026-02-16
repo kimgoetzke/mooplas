@@ -75,7 +75,7 @@ mod tests {
       incoming: from_rx,
       outgoing: to_tx,
     };
-    let expected_client_id = ClientId(7.0 as RawClientId);
+    let expected_client_id = test_client_id();
     assert!(
       channel
         .outgoing
@@ -91,5 +91,20 @@ mod tests {
       }
       _ => panic!("Unexpected message type"),
     }
+  }
+
+  fn test_client_id() -> ClientId {
+    #[cfg(feature = "renet")]
+    {
+      return ClientId::from(7_u64);
+    }
+
+    #[cfg(feature = "matchbox")]
+    {
+      return ClientId::default();
+    }
+
+    #[allow(unreachable_code)]
+    ClientId::default()
   }
 }

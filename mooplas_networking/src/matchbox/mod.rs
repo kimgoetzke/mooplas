@@ -17,11 +17,9 @@ pub fn start_socket(commands: &mut Commands) {
 }
 
 #[cfg(feature = "matchbox")]
-#[cfg(not(feature = "renet"))]
 pub type RawClientId = PeerId;
 
 #[cfg(feature = "matchbox")]
-#[cfg(not(feature = "renet"))]
 impl Default for ClientId {
   fn default() -> Self {
     ClientId(PeerId(Uuid::from_u128(0)))

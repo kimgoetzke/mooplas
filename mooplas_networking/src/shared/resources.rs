@@ -167,7 +167,7 @@ mod tests {
   #[test]
   fn validate_registration_returns_true_for_registered_player() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::from(6u64);
+    let client_id = test_client_id(6);
     let player_id = PlayerId(42);
     lobby.register_player(client_id, player_id);
     assert!(lobby.validate_registration(&client_id, &player_id));
@@ -176,7 +176,7 @@ mod tests {
   #[test]
   fn validate_registration_returns_false_for_unregistered_player() {
     let lobby = Lobby::default();
-    let client_id = ClientId::from(6u64);
+    let client_id = test_client_id(6);
     let player_id = PlayerId(42);
     assert!(!lobby.validate_registration(&client_id, &player_id));
   }
@@ -184,8 +184,8 @@ mod tests {
   #[test]
   fn validate_registration_returns_false_for_different_client() {
     let mut lobby = Lobby::default();
-    let registered_client = ClientId::default();
-    let other_client = ClientId::from(1u64);
+    let registered_client = test_client_id(1);
+    let other_client = test_client_id(2);
     let registered_player = PlayerId(42);
     lobby.register_player(registered_client, registered_player);
     assert!(!lobby.validate_registration(&other_client, &registered_player));
@@ -212,5 +212,22 @@ mod tests {
     lobby.unregister_player(client_id, player_id_1);
     assert!(!lobby.validate_registration(&client_id, &player_id_1));
     assert!(lobby.validate_registration(&client_id, &player_id_2));
+  }
+
+  fn test_client_id(value: u128) -> ClientId {
+    #[cfg(feature = "renet")]
+    {
+      return ClientId::from(value as u64);
+    }
+
+    #[cfg(feature = "matchbox")]
+    {
+      use bevy_matchbox::matchbox_socket::PeerId;
+      use uuid::Uuid;
+      return ClientId(PeerId(Uuid::from_u128(value)));
+    }
+
+    #[allow(unreachable_code)]
+    ClientId::default()
   }
 }
