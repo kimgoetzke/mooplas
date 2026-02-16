@@ -1,7 +1,8 @@
 use crate::prelude::{
-  ChannelType, ClientMessage, Lobby, OutgoingServerMessage, PROTOCOL_ID, RenetServerVisualiser, ServerEvent,
-  ServerNetworkingActive, decode_from_bytes, encode_to_bytes,
+  ChannelType, ClientMessage, Lobby, OutgoingServerMessage, ServerEvent, ServerNetworkingActive, decode_from_bytes,
+  encode_to_bytes,
 };
+use crate::renet::{PROTOCOL_ID, RenetServerVisualiser};
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, On, Res, ResMut, resource_exists};

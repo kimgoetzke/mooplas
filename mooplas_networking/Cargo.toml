@@ -32,9 +32,10 @@ web-sys = { version = "0.3.38", features = [
 ], optional = true }
 crossbeam-channel = { version = "0.5.15", optional = true }
 bevy_matchbox = { version = "0.14", features = ["signaling"], optional = true }
+uuid = { version = "1.20.0", features = ["v4"] }
 
 [features]
 default = ["matchbox"]
 matchbox = ["crossbeam-channel", "bevy_matchbox"]
-native = ["bevy_renet", "renet_visualizer", "ureq", "bevy-inspector-egui"]
+renet = ["bevy_renet", "renet_visualizer", "bevy-inspector-egui", "ureq"]
 wasm = ["wasm-bindgen", "wasm-bindgen-futures", "web-sys", "crossbeam-channel"]

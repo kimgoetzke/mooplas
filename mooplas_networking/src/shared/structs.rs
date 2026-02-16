@@ -1,10 +1,15 @@
 use crate::prelude::NetworkRole;
 use bevy::prelude::{Component, Event, Message};
-use bevy_renet::renet::DefaultChannel;
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+
+#[cfg(feature = "matchbox")]
+use crate::matchbox::RawClientId;
+
+#[cfg(feature = "renet")]
+use crate::renet::RawClientId;
 
 /// An enum representing the different types of channels that can be used for sending messages.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -12,26 +17,6 @@ pub enum ChannelType {
   Unreliable,
   ReliableOrdered,
   ReliableUnordered,
-}
-
-impl From<DefaultChannel> for ChannelType {
-  fn from(value: DefaultChannel) -> Self {
-    match value {
-      DefaultChannel::Unreliable => ChannelType::Unreliable,
-      DefaultChannel::ReliableOrdered => ChannelType::ReliableOrdered,
-      DefaultChannel::ReliableUnordered => ChannelType::ReliableUnordered,
-    }
-  }
-}
-
-impl From<ChannelType> for DefaultChannel {
-  fn from(value: ChannelType) -> Self {
-    match value {
-      ChannelType::Unreliable => DefaultChannel::Unreliable,
-      ChannelType::ReliableOrdered => DefaultChannel::ReliableOrdered,
-      ChannelType::ReliableUnordered => DefaultChannel::ReliableUnordered,
-    }
-  }
 }
 
 impl From<ChannelType> for u8 {
@@ -67,18 +52,14 @@ impl Into<u8> for PlayerId {
   }
 }
 
-#[cfg(target_arch = "wasm32")]
-pub type RawClientId = u64;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub type RawClientId = bevy_renet::renet::ClientId;
-
 /// A stable, non-generic client ID wrapper used by messages and APIs. The inner
 /// representation varies by target via `RawClientId`.
-#[derive(Default, Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Hash)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(transparent)]
 pub struct ClientId(pub RawClientId);
 
+#[cfg(feature = "renet")]
+#[cfg(not(feature = "matchbox"))]
 impl From<u64> for ClientId {
   fn from(value: u64) -> Self {
     ClientId(value)

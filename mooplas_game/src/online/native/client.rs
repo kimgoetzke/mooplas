@@ -250,18 +250,14 @@ mod tests {
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::math::Vec3;
   use bevy::prelude::*;
-  use mooplas_networking::prelude::NativeNetworkingMessagesPlugin;
+  use mooplas_networking::prelude::NetworkingMessagesPlugin;
   use std::time::Duration;
 
   fn setup() -> App {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
     // Add shared messages and resources as they are required by the game loop systems
-    app.add_plugins((
-      SharedMessagesPlugin,
-      SharedResourcesPlugin,
-      NativeNetworkingMessagesPlugin,
-    ));
+    app.add_plugins((SharedMessagesPlugin, SharedResourcesPlugin, NetworkingMessagesPlugin));
     app
   }
 

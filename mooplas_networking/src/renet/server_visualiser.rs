@@ -1,5 +1,4 @@
-use crate::prelude::SHOW_VISUALISERS_BY_DEFAULT;
-use crate::renet::RenetServerVisualiser;
+use crate::renet::{RenetServerVisualiser, SHOW_VISUALISERS_BY_DEFAULT};
 use bevy::app::Update;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::log::warn;

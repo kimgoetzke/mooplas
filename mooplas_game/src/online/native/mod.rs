@@ -14,8 +14,8 @@ use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Res, ResMut, in_state,
 };
 use mooplas_networking::prelude::{
-  NativeNetworkingMessagesPlugin, NetworkErrorEvent, NetworkRole, create_client, create_server,
-  remove_all_renet_resources,
+  NetworkErrorEvent, NetworkRole, NetworkingMessagesPlugin, RenetNetworkingMessagesPlugin, create_client,
+  create_server, remove_all_renet_resources,
 };
 
 /// Plugin that adds online multiplayer capabilities for native builds to the game.
@@ -24,7 +24,7 @@ pub struct NativeOnlinePlugin;
 impl Plugin for NativeOnlinePlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins(NativeNetworkingMessagesPlugin)
+      .add_plugins((NetworkingMessagesPlugin, RenetNetworkingMessagesPlugin))
       .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(

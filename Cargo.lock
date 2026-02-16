@@ -4831,6 +4831,7 @@ dependencies = [
  "renet_visualizer",
  "serde",
  "ureq",
+ "uuid",
  "wasm-bindgen",
  "wasm-bindgen-futures",
  "web-sys",

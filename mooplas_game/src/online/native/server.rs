@@ -353,7 +353,7 @@ mod tests {
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::prelude::*;
   use bevy::state::app::StatesPlugin;
-  use mooplas_networking::prelude::NativeNetworkingMessagesPlugin;
+  use mooplas_networking::prelude::NetworkingMessagesPlugin;
 
   fn setup() -> App {
     let mut app = App::new();
@@ -362,7 +362,7 @@ mod tests {
       StatesPlugin,
       SharedMessagesPlugin,
       SharedResourcesPlugin,
-      NativeNetworkingMessagesPlugin,
+      NetworkingMessagesPlugin,
       AppStatePlugin,
     ));
     app
