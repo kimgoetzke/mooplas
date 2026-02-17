@@ -1,5 +1,5 @@
 <component name="ProjectRunConfigurationManager">
-  <configuration default="false" name="Run Online Game with Dev &amp; Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command" activateToolWindowBeforeRun="false" singleton="false">
+  <configuration default="false" name="Run Online Game with Renet, Dev &amp; Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command" activateToolWindowBeforeRun="false" singleton="false">
     <option name="buildProfileId" value="dev" />
     <option name="command" value="run --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online_renet,dev" />
     <option name="workingDirectory" value="file://$PROJECT_DIR$" />
