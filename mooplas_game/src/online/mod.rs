@@ -1,8 +1,12 @@
 use bevy::prelude::{App, Plugin};
 use mooplas_networking::prelude::NetworkingResourcesPlugin;
 
-mod native;
 mod utils;
+
+#[cfg(feature = "online_renet")]
+mod native;
+
+#[cfg(feature = "online_matchbox")]
 mod wasm;
 
 /// Plugin that adds online multiplayer capabilities to the game.
@@ -12,10 +16,10 @@ impl Plugin for OnlinePlugin {
   fn build(&self, app: &mut App) {
     app.add_plugins(NetworkingResourcesPlugin);
 
-    #[cfg(not(target_arch = "wasm32"))]
+    #[cfg(feature = "online_renet")]
     app.add_plugins(native::NativeOnlinePlugin);
 
-    #[cfg(target_arch = "wasm32")]
+    #[cfg(feature = "online_matchbox")]
     app.add_plugins(wasm::WasmOnlinePlugin);
   }
 }

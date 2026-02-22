@@ -20,9 +20,6 @@ mod prelude {
 #[cfg(feature = "dev")]
 use crate::debug::DebugPlugin;
 
-#[cfg(feature = "online")]
-use crate::online::OnlinePlugin;
-
 use crate::animation::AnimationPlugin;
 use crate::app_state::AppStatePlugin;
 use crate::camera::CameraPlugin;
@@ -31,6 +28,7 @@ use crate::game_loop::GameLoopPlugin;
 use crate::game_world::GameWorldPlugin;
 use crate::initialisation::InitialisationPlugin;
 use crate::loading::LoadingPlugin;
+use crate::online::OnlinePlugin;
 use crate::player::PlayerPlugin;
 use crate::prelude::*;
 use crate::ui::UiPlugin;
@@ -57,10 +55,8 @@ fn main() {
       UiPlugin,
       ControlsPlugin,
       AnimationPlugin,
+      OnlinePlugin,
     ));
-
-  #[cfg(feature = "online")]
-  app.add_plugins(OnlinePlugin);
 
   #[cfg(feature = "dev")]
   app.add_plugins(DebugPlugin);

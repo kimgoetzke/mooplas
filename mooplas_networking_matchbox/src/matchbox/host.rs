@@ -1,9 +1,8 @@
-use crate::prelude::Lobby;
-use crate::shared::ServerNetworkingActive;
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
 use core::time::Duration;
 use crossbeam_channel::{Receiver, unbounded};
+use mooplas_networking::prelude::{Lobby, ServerNetworkingActive};
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 /// Resource to receive client connection events from callbacks

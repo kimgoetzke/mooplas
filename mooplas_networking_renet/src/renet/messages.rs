@@ -1,8 +1,8 @@
-use crate::prelude::NetworkErrorEvent;
 use bevy::app::{App, Plugin};
 use bevy::log::info;
 use bevy::prelude::{Commands, Message, On};
 use bevy_renet::netcode::{NetcodeError, NetcodeErrorEvent, NetcodeTransportError};
+use mooplas_networking::prelude::NetworkErrorEvent;
 
 pub struct RenetNetworkingMessagesPlugin;
 

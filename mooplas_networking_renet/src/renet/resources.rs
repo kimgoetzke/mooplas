@@ -1,7 +1,7 @@
-use crate::prelude::{ClientId, ClientNetworkingActive};
 use bevy::prelude::{Commands, Deref, DerefMut, Resource};
 use bevy_renet::RenetClient;
 use bevy_renet::netcode::NetcodeClientTransport;
+use mooplas_networking::prelude::{ClientId, ClientNetworkingActive};
 use renet_visualizer::{RenetClientVisualizer, RenetServerVisualizer};
 use std::time::{Duration, Instant};
 

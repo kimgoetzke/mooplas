@@ -1,10 +1,10 @@
-use crate::prelude::ClientNetworkingActive;
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{IntoScheduleConfigs, ResMut, Resource, resource_exists};
 use bevy::time::common_conditions::on_timer;
 use bevy_matchbox::MatchboxSocket;
 use bevy_matchbox::matchbox_socket::PeerId;
+use mooplas_networking::prelude::ClientNetworkingActive;
 use std::time::Duration;
 
 pub struct ClientPlugin;

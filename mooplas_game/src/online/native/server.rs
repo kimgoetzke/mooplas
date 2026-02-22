@@ -12,9 +12,10 @@ use bevy::prelude::{
 };
 use bevy::time::TimerMode;
 use mooplas_networking::prelude::{
-  ChannelType, ClientEvent, ClientId, Lobby, NetworkRole, OutgoingServerMessage, RenetServerVisualiser, ServerEvent,
-  ServerNetworkingActive, ServerRenetPlugin, ServerVisualiserPlugin, encode_to_bytes,
+  ChannelType, ClientEvent, ClientId, Lobby, NetworkRole, OutgoingServerMessage, ServerEvent, ServerNetworkingActive,
+  encode_to_bytes,
 };
+use mooplas_networking_renet::prelude::{RenetServerVisualiser, ServerRenetPlugin, ServerVisualiserPlugin};
 use std::time::Duration;
 
 /// A plugin that adds server-side online multiplayer capabilities to the game. Only active when the game is running in

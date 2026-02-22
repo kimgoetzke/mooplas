@@ -13,13 +13,15 @@ avian2d = "0.5.0"
 # Other dependencies
 rand = "0.10.0"
 serde = { version = "1.0.228", features = ["derive"] }
-mooplas_networking = { path = "../mooplas_networking", default-features = false, optional = true }
+mooplas_networking = { path = "../mooplas_networking_shared", default-features = false }
+mooplas_networking_renet = { path = "../mooplas_networking_renet", optional = true }
+mooplas_networking_matchbox = { path = "../mooplas_networking_matchbox", optional = true }
 
 [features]
-default = ["dev", "online_renet"]
-online = ["bevy_ui_text_input", "mooplas_networking"]
-online_renet = ["online", "mooplas_networking/renet"]
-online_matchbox = ["online", "mooplas_networking/matchbox"]
+default = ["dev", "online"]
+online = []
+online_renet = ["bevy_ui_text_input", "mooplas_networking_renet"]
+online_matchbox = ["bevy_ui_text_input", "mooplas_networking_matchbox"]
 dev = [
   # Improve compile times for dev builds by linking Bevy as a dynamic library
   "bevy/dynamic_linking",

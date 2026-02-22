@@ -113,10 +113,16 @@ impl Lobby {
 mod tests {
   use super::*;
 
+  impl ClientId {
+    fn default_test() -> Self {
+      ClientId(0)
+    }
+  }
+
   #[test]
   fn registers_player_for_client_id() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let player_id = PlayerId(42);
     lobby.register_player(client_id, player_id);
     assert_eq!(lobby.registered.get(&client_id), Some(&vec![player_id]));
@@ -125,7 +131,7 @@ mod tests {
   #[test]
   fn unregisters_player_for_client_id() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let player_id = PlayerId(42);
     lobby.register_player(client_id, player_id);
     lobby.unregister_player(client_id, player_id);
@@ -135,7 +141,7 @@ mod tests {
   #[test]
   fn unregisters_player_does_not_remove_other_players() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let player_id1 = PlayerId(42);
     let player_id2 = PlayerId(43);
     lobby.register_player(client_id, player_id1);
@@ -147,7 +153,7 @@ mod tests {
   #[test]
   fn get_registered_players_cloned_returns_empty_vec_for_unknown_client() {
     let lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let players = lobby.get_registered_players_cloned(&client_id);
     assert!(players.is_empty());
   }
@@ -155,7 +161,7 @@ mod tests {
   #[test]
   fn get_registered_players_cloned_returns_all_players_for_client() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let player_id1 = PlayerId(42);
     let player_id2 = PlayerId(43);
     lobby.register_player(client_id, player_id1);
@@ -194,7 +200,7 @@ mod tests {
   #[test]
   fn validate_registration_returns_false_for_different_player() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let registered_player = PlayerId(42);
     let other_player = PlayerId(43);
     lobby.register_player(client_id, registered_player);
@@ -204,7 +210,7 @@ mod tests {
   #[test]
   fn validate_registration_returns_false_after_player_is_unregistered() {
     let mut lobby = Lobby::default();
-    let client_id = ClientId::default();
+    let client_id = ClientId::default_test();
     let player_id_1 = PlayerId(42);
     let player_id_2 = PlayerId(43);
     lobby.register_player(client_id, player_id_1);
@@ -215,19 +221,6 @@ mod tests {
   }
 
   fn test_client_id(value: u128) -> ClientId {
-    #[cfg(feature = "renet")]
-    {
-      return ClientId::from(value as u64);
-    }
-
-    #[cfg(feature = "matchbox")]
-    {
-      use bevy_matchbox::matchbox_socket::PeerId;
-      use uuid::Uuid;
-      return ClientId(PeerId(Uuid::from_u128(value)));
-    }
-
-    #[allow(unreachable_code)]
-    ClientId::default()
+    ClientId::from(value as u64)
   }
 }

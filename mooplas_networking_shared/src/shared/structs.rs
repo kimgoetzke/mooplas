@@ -5,12 +5,6 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
 
-#[cfg(feature = "matchbox")]
-use crate::matchbox::RawClientId;
-
-#[cfg(feature = "renet")]
-use crate::renet::RawClientId;
-
 /// An enum representing the different types of channels that can be used for sending messages.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub enum ChannelType {
@@ -25,6 +19,28 @@ impl From<ChannelType> for u8 {
       ChannelType::Unreliable => 0,
       ChannelType::ReliableUnordered => 1,
       ChannelType::ReliableOrdered => 2,
+    }
+  }
+}
+
+#[cfg(feature = "renet")]
+impl From<bevy_renet::renet::DefaultChannel> for ChannelType {
+  fn from(value: bevy_renet::renet::DefaultChannel) -> Self {
+    match value {
+      bevy_renet::renet::DefaultChannel::Unreliable => ChannelType::Unreliable,
+      bevy_renet::renet::DefaultChannel::ReliableOrdered => ChannelType::ReliableOrdered,
+      bevy_renet::renet::DefaultChannel::ReliableUnordered => ChannelType::ReliableUnordered,
+    }
+  }
+}
+
+#[cfg(feature = "renet")]
+impl From<ChannelType> for bevy_renet::renet::DefaultChannel {
+  fn from(value: ChannelType) -> Self {
+    match value {
+      ChannelType::Unreliable => bevy_renet::renet::DefaultChannel::Unreliable,
+      ChannelType::ReliableOrdered => bevy_renet::renet::DefaultChannel::ReliableOrdered,
+      ChannelType::ReliableUnordered => bevy_renet::renet::DefaultChannel::ReliableUnordered,
     }
   }
 }
@@ -52,14 +68,14 @@ impl Into<u8> for PlayerId {
   }
 }
 
+pub type RawClientId = u64;
+
 /// A stable, non-generic client ID wrapper used by messages and APIs. The inner
 /// representation varies by target via `RawClientId`.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(transparent)]
 pub struct ClientId(pub RawClientId);
 
-#[cfg(feature = "renet")]
-#[cfg(not(feature = "matchbox"))]
 impl From<u64> for ClientId {
   fn from(value: u64) -> Self {
     ClientId(value)

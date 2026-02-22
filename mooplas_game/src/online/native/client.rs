@@ -11,9 +11,10 @@ use bevy::prelude::{
   State, Time, Transform, Update, With, Without, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
-  ChannelType, ClientHandshakeOutcomeMessage, ClientMessage, ClientNetworkingActive, ClientRenetPlugin,
-  ClientVisualiserPlugin, NetworkRole, OutgoingClientMessage, PlayerStateUpdateMessage, ServerEvent, encode_to_bytes,
+  ChannelType, ClientMessage, ClientNetworkingActive, NetworkRole, OutgoingClientMessage, PlayerStateUpdateMessage,
+  ServerEvent, encode_to_bytes,
 };
+use mooplas_networking_renet::prelude::{ClientHandshakeOutcomeMessage, ClientRenetPlugin, ClientVisualiserPlugin};
 
 /// A plugin that adds client-side online multiplayer capabilities to the game. Only active when the application is
 /// running in client mode (i.e. someone else is the server). Mutually exclusive with the

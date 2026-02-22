@@ -1,7 +1,9 @@
 [workspace]
 members = [
   "mooplas_game",
-  "mooplas_networking"
+  "mooplas_networking_shared",
+  "mooplas_networking_renet",
+  "mooplas_networking_matchbox"
 ]
 resolver = "2" # Important! Bevy/WGPU needs this!
 

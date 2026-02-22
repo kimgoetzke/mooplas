@@ -2,12 +2,12 @@ mod client;
 mod host;
 mod utils;
 
-use crate::prelude::ClientId;
 use bevy::prelude::Commands;
 use bevy_matchbox::MatchboxSocket;
 use bevy_matchbox::matchbox_socket::PeerId;
 pub use client::*;
 pub use host::*;
+use mooplas_networking::prelude::ClientId;
 pub use utils::*;
 use uuid::Uuid;
 
@@ -16,12 +16,10 @@ pub fn start_socket(commands: &mut Commands) {
   commands.insert_resource(socket);
 }
 
-#[cfg(feature = "matchbox")]
 pub type RawClientId = PeerId;
 
-#[cfg(feature = "matchbox")]
-impl Default for ClientId {
-  fn default() -> Self {
-    ClientId(PeerId(Uuid::from_u128(0)))
-  }
-}
+// impl Default for RawClientId {
+//   fn default() -> Self {
+//     PeerId(Uuid::from_u128(0)) as RawClientId
+//   }
+// }

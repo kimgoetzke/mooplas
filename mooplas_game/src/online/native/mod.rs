@@ -1,5 +1,3 @@
-#![cfg(feature = "online")]
-
 mod client;
 mod server;
 mod structs;
@@ -13,9 +11,9 @@ use bevy::log::*;
 use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Res, ResMut, in_state,
 };
-use mooplas_networking::prelude::{
-  NetworkErrorEvent, NetworkRole, NetworkingMessagesPlugin, RenetNetworkingMessagesPlugin, create_client,
-  create_server, remove_all_renet_resources,
+use mooplas_networking::prelude::{NetworkErrorEvent, NetworkRole, NetworkingMessagesPlugin};
+use mooplas_networking_renet::prelude::{
+  RenetNetworkingMessagesPlugin, create_client, create_server, remove_all_renet_resources,
 };
 
 /// Plugin that adds online multiplayer capabilities for native builds to the game.

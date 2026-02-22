@@ -1,0 +1,17 @@
+[package]
+name = "mooplas_networking_matchbox"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Dependencies linked to Bevy version
+bevy = { version = "0.18.0", default-features = false, features = [
+  "bevy_core_pipeline",
+  "bevy_log",
+] }
+
+# Other dependencies
+mooplas_networking = { path = "../mooplas_networking_shared", default-features = false }
+crossbeam-channel = { version = "0.5.15" }
+bevy_matchbox = { version = "0.14", features = ["signaling"] }
+uuid = { version = "1.20.0", features = ["v4"] }

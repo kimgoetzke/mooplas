@@ -1,7 +1,4 @@
-use crate::prelude::{
-  ChannelType, ClientHandshakeOutcomeMessage, ClientNetworkingActive, OutgoingClientMessage, ServerEvent,
-  decode_from_bytes,
-};
+use crate::prelude::ClientHandshakeOutcomeMessage;
 use crate::renet::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, PROTOCOL_ID, PendingClientHandshake, RenetClientVisualiser};
 use bevy::app::Update;
 use bevy::log::*;
@@ -11,6 +8,9 @@ use bevy::prelude::{
 use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClientTransport};
 use bevy_renet::renet::{ConnectionConfig, DefaultChannel};
 use bevy_renet::{RenetClient, RenetClientPlugin};
+use mooplas_networking::prelude::{
+  ChannelType, ClientNetworkingActive, OutgoingClientMessage, ServerEvent, decode_from_bytes,
+};
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::{Instant, SystemTime};
 

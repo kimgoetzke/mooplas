@@ -1,5 +1,6 @@
 use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
+#[cfg(feature = "online")]
 use bevy::log::*;
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 #[cfg(feature = "dev")]
@@ -233,6 +234,7 @@ impl WinnerInfo {
     self.winner
   }
 
+  #[allow(unused)]
   /// Gets the winner's ID, if there is one.
   pub fn get_as_u8(&self) -> Option<u8> {
     self.winner.map(|player_id| player_id.0)

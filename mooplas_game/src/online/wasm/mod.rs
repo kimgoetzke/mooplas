@@ -3,9 +3,9 @@ use crate::prelude::{ConnectionInfoMessage, MenuName, ToggleMenuMessage};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, MessageWriter, ResMut, in_state};
-use mooplas_networking::prelude::{
-  ClientNetworkingActive, ClientPlugin, HostPlugin, Lobby, NetworkRole, ServerNetworkingActive,
-  remove_all_matchbox_resources,
+use mooplas_networking::prelude::{ClientNetworkingActive, Lobby, NetworkRole, ServerNetworkingActive};
+use mooplas_networking_matchbox::prelude::{
+  ClientPlugin, HostPlugin, remove_all_matchbox_resources, start_signaling_server, start_socket,
 };
 
 // TODO: Implement a transport for WASM targets
@@ -38,13 +38,13 @@ fn handle_toggle_menu_message(
       NetworkRole::None => remove_all_matchbox_resources(&mut commands),
       NetworkRole::Server => {
         debug!("Creating server...");
-        mooplas_networking::prelude::start_signaling_server(&mut commands);
-        mooplas_networking::prelude::start_socket(&mut commands);
+        start_signaling_server(&mut commands);
+        start_socket(&mut commands);
         commands.insert_resource(ServerNetworkingActive);
       }
       NetworkRole::Client => {
         debug!("Waiting for connection info to create client...");
-        mooplas_networking::prelude::start_socket(&mut commands);
+        start_socket(&mut commands);
         commands.insert_resource(ClientNetworkingActive);
       }
     }
