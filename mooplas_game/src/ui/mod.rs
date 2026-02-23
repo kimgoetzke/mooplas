@@ -15,9 +15,13 @@ use bevy_ui_text_input::TextInputPlugin;
 use in_game_ui::InGameUiPlugin;
 use touch_controls_ui::TouchControlsUiPlugin;
 
-mod host_game_menu;
-mod in_game_ui;
+#[cfg(feature = "online")]
 mod join_game_menu;
+
+#[cfg(feature = "online")]
+mod host_game_menu;
+
+mod in_game_ui;
 mod main_menu;
 mod play_online_menu;
 mod shared;

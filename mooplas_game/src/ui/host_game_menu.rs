@@ -1,5 +1,3 @@
-#![cfg(feature = "online")]
-
 use crate::app_state::AppState;
 use crate::prelude::constants::{ACCENT_COLOUR, BUTTON_ALPHA_DEFAULT, DEFAULT_FONT, NORMAL_FONT, TEXT_COLOUR};
 use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName};
