@@ -64,7 +64,7 @@ pub fn create_peer(incoming_tx: Sender<NetworkMessage>, outgoing_rx: Receiver<Ne
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::{ClientId, RawClientId, ServerEvent};
+  use crate::prelude::{ClientId, ServerEvent};
   use crossbeam_channel::unbounded;
 
   #[test]
@@ -96,15 +96,15 @@ mod tests {
   fn test_client_id() -> ClientId {
     #[cfg(feature = "renet")]
     {
-      return ClientId::from(7_u64);
+      return ClientId::from_renet_u64(7);
     }
 
     #[cfg(feature = "matchbox")]
     {
-      return ClientId::default();
+      return ClientId::nil();
     }
 
     #[allow(unreachable_code)]
-    ClientId::default()
+    ClientId::nil()
   }
 }

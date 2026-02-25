@@ -16,4 +16,13 @@ pub use utils::*;
 
 pub(crate) const PROTOCOL_ID: u64 = 1000;
 
-pub type RawClientId = bevy_renet::renet::ClientId;
+use bevy_renet::renet::ClientId as RenetClientId;
+use mooplas_networking::prelude::ClientId;
+
+pub fn client_id_from_renet_id(value: RenetClientId) -> ClientId {
+  ClientId::from_renet_u64(value)
+}
+
+pub fn renet_id_from_client_id(value: ClientId) -> RenetClientId {
+  value.to_renet_u64()
+}

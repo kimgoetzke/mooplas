@@ -87,7 +87,7 @@ impl Lobby {
       if player_ids.contains(player_id) {
         Some(*client_id)
       } else {
-        debug!("Player ID {} not found for client ID {}", player_id.0, client_id.0);
+        debug!("Player ID {} not found for client ID {}", player_id.0, client_id);
         None
       }
     })
@@ -115,7 +115,7 @@ mod tests {
 
   impl ClientId {
     fn default_test() -> Self {
-      ClientId(0)
+      ClientId::nil()
     }
   }
 
@@ -221,6 +221,6 @@ mod tests {
   }
 
   fn test_client_id(value: u128) -> ClientId {
-    ClientId::from(value as u64)
+    ClientId::from_renet_u64(value as u64)
   }
 }

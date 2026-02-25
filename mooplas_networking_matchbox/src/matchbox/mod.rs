@@ -9,17 +9,16 @@ pub use client::*;
 pub use host::*;
 use mooplas_networking::prelude::ClientId;
 pub use utils::*;
-use uuid::Uuid;
 
 pub fn start_socket(commands: &mut Commands) {
   let socket = MatchboxSocket::new_reliable("ws://localhost:3536/hello");
   commands.insert_resource(socket);
 }
 
-pub type RawClientId = PeerId;
+pub fn client_id_from_peer_id(peer_id: PeerId) -> ClientId {
+  ClientId::from_uuid(peer_id.0)
+}
 
-// impl Default for RawClientId {
-//   fn default() -> Self {
-//     PeerId(Uuid::from_u128(0)) as RawClientId
-//   }
-// }
+pub fn peer_id_from_client_id(client_id: ClientId) -> PeerId {
+  PeerId(client_id.as_uuid())
+}

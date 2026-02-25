@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::fmt;
 use std::fmt::{Debug, Display, Formatter};
+use uuid::Uuid;
 
 /// An enum representing the different types of channels that can be used for sending messages.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
@@ -68,17 +69,44 @@ impl Into<u8> for PlayerId {
   }
 }
 
-pub type RawClientId = u64;
-
-/// A stable, non-generic client ID wrapper used by messages and APIs. The inner
-/// representation varies by target via `RawClientId`.
+/// A stable, transport-agnostic client ID wrapper used by messages and APIs.
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy, Hash)]
 #[serde(transparent)]
-pub struct ClientId(pub RawClientId);
+pub struct ClientId(Uuid);
 
-impl From<u64> for ClientId {
-  fn from(value: u64) -> Self {
-    ClientId(value)
+impl ClientId {
+  /// Creates a [`ClientId`] from a UUID.
+  pub fn from_uuid(value: Uuid) -> Self {
+    Self(value)
+  }
+
+  /// Returns the UUID backing this [`ClientId`].
+  pub fn as_uuid(&self) -> Uuid {
+    self.0
+  }
+
+  /// Creates a deterministic, stable UUID for a renet u64 client ID.
+  pub fn from_renet_u64(value: u64) -> Self {
+    let mut bytes = [0_u8; 16];
+    bytes[8..].copy_from_slice(&value.to_be_bytes());
+    Self(Uuid::from_bytes(bytes))
+  }
+
+  /// Extracts a renet u64 client ID from the backing UUID.
+  pub fn to_renet_u64(self) -> u64 {
+    let bytes = self.0.as_bytes();
+    u64::from_be_bytes(bytes[8..].try_into().expect("Expected 8 bytes"))
+  }
+
+  /// Returns a nil/zero UUID client ID. Useful for tests and defaults.
+  pub fn nil() -> Self {
+    Self(Uuid::from_u128(0))
+  }
+}
+
+impl From<Uuid> for ClientId {
+  fn from(value: Uuid) -> Self {
+    Self::from_uuid(value)
   }
 }
 

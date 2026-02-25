@@ -1,3 +1,4 @@
+use crate::renet::renet_id_from_client_id;
 use bevy::prelude::{Commands, Deref, DerefMut, Resource};
 use bevy_renet::RenetClient;
 use bevy_renet::netcode::NetcodeClientTransport;
@@ -24,11 +25,11 @@ pub struct RenetServerVisualiser(RenetServerVisualizer<{ VISUALISER_DISPLAY_VALU
 
 impl RenetServerVisualiser {
   pub fn add_client(&mut self, client_id: &ClientId) {
-    self.0.add_client(client_id.0);
+    self.0.add_client(renet_id_from_client_id(*client_id));
   }
 
   pub fn remove_client(&mut self, client_id: &ClientId) {
-    self.0.remove_client(client_id.0);
+    self.0.remove_client(renet_id_from_client_id(*client_id));
   }
 }
 

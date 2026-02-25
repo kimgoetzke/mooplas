@@ -1,4 +1,5 @@
 use crate::renet::{PROTOCOL_ID, RenetServerVisualiser};
+use crate::renet::{client_id_from_renet_id, renet_id_from_client_id};
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, On, Res, ResMut, resource_exists};
@@ -85,15 +86,15 @@ fn receive_renet_server_events(
 
       // Notify all other clients of the new connection
       let connected_message = encode_to_bytes(&ServerEvent::ClientConnected {
-        client_id: client_id.into(),
+        client_id: client_id_from_renet_id(client_id),
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
       server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, connected_message);
-      lobby.connected.push(client_id.into());
+      lobby.connected.push(client_id_from_renet_id(client_id));
 
       // Return new event for an application to react to
       ServerEvent::ClientConnected {
-        client_id: client_id.into(),
+        client_id: client_id_from_renet_id(client_id),
       }
     }
     bevy_renet::renet::ServerEvent::ClientDisconnected { client_id, reason } => {
@@ -101,15 +102,15 @@ fn receive_renet_server_events(
 
       // Notify all other clients about the disconnection itself
       let message = encode_to_bytes(&ServerEvent::ClientDisconnected {
-        client_id: client_id.into(),
+        client_id: client_id_from_renet_id(client_id),
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
       server.broadcast_message_except(client_id, ChannelType::ReliableOrdered, message);
-      lobby.connected.retain(|&id| id != client_id.into());
+      lobby.connected.retain(|&id| id != client_id_from_renet_id(client_id));
 
       // Return new event for an application to react to
       ServerEvent::ClientDisconnected {
-        client_id: client_id.into(),
+        client_id: client_id_from_renet_id(client_id),
       }
     }
   };
@@ -152,7 +153,8 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
 /// processed by an application.
 fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lobby>, mut commands: Commands) {
   for client_id in lobby.connected.iter() {
-    while let Some(message) = server.receive_message(client_id.0, ChannelType::ReliableOrdered) {
+    while let Some(message) = server.receive_message(renet_id_from_client_id(*client_id), ChannelType::ReliableOrdered)
+    {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
       trace!(
         "Received [{:?}] message from client [{}]: {:?}",
@@ -163,7 +165,7 @@ fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lo
       commands.trigger(client_message.to_event(*client_id));
     }
 
-    while let Some(message) = server.receive_message(client_id.0, ChannelType::Unreliable) {
+    while let Some(message) = server.receive_message(renet_id_from_client_id(*client_id), ChannelType::Unreliable) {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
       commands.trigger(client_message.to_event(*client_id));
     }
@@ -185,14 +187,14 @@ fn send_outgoing_server_messages_system(
         channel,
         payload,
       } => {
-        server.broadcast_message_except(except_client_id.0, *channel, payload.clone());
+        server.broadcast_message_except(renet_id_from_client_id(*except_client_id), *channel, payload.clone());
       }
       OutgoingServerMessage::Send {
         client_id,
         channel,
         payload,
       } => {
-        server.send_message(client_id.0, *channel, payload.clone());
+        server.send_message(renet_id_from_client_id(*client_id), *channel, payload.clone());
       }
       OutgoingServerMessage::DisconnectAll => {
         server.disconnect_all();

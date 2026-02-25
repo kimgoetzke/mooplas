@@ -1,3 +1,4 @@
+use crate::matchbox::client_id_from_peer_id;
 use bevy::{prelude::*, time::common_conditions::on_timer};
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
 use core::time::Duration;
@@ -57,7 +58,7 @@ pub fn start_signaling_server(commands: &mut Commands) {
 fn handle_client_connection_system(receiver: Res<ClientConnectionReceiver>, mut lobby: ResMut<Lobby>) {
   while let Ok(peer_id) = receiver.0.try_recv() {
     info!("Processing client connection for peer [{peer_id}] in Bevy system");
-    // lobby.connected.push(peer_id);
+    lobby.connected.push(client_id_from_peer_id(peer_id));
   }
 }
 

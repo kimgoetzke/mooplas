@@ -279,7 +279,7 @@ fn broadcast_local_player_registration_system(
     if message.has_registered {
       debug!("Broadcasting: [{}] registered locally...", message.player_id);
       let payload = encode_to_bytes(&ServerEvent::PlayerRegistered {
-        client_id: 0.into(),
+        client_id: ClientId::from_renet_u64(0),
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -290,7 +290,7 @@ fn broadcast_local_player_registration_system(
     } else {
       debug!("Broadcasting: [{}] unregistered locally...", message.player_id);
       let payload = encode_to_bytes(&ServerEvent::PlayerUnregistered {
-        client_id: 0.into(),
+        client_id: ClientId::from_renet_u64(0),
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
