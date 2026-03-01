@@ -19,9 +19,9 @@ mooplas_networking_matchbox = { path = "../mooplas_networking_matchbox", optiona
 
 [features]
 default = ["dev", "online"]
-online = []
-online_renet = ["bevy_ui_text_input", "mooplas_networking_renet"]
-online_matchbox = ["bevy_ui_text_input", "mooplas_networking_matchbox"]
+online = ["bevy_ui_text_input"]
+online_renet = ["mooplas_networking_renet"]
+online_matchbox = ["mooplas_networking_matchbox"]
 dev = [
   # Improve compile times for dev builds by linking Bevy as a dynamic library
   "bevy/dynamic_linking",

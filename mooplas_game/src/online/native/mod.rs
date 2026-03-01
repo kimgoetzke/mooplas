@@ -1,6 +1,5 @@
 mod client;
 mod server;
-mod structs;
 
 use crate::online::native::client::ClientPlugin;
 use crate::online::native::server::ServerPlugin;

@@ -1,6 +1,5 @@
 mod client;
 mod server;
-mod structs;
 
 use crate::app_state::AppState;
 use crate::online::wasm::client::ClientPlugin;
