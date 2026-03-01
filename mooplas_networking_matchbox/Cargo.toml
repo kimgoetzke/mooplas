@@ -12,5 +12,6 @@ bevy = { version = "0.18.0", default-features = false, features = [
 
 # Other dependencies
 mooplas_networking = { path = "../mooplas_networking_shared", default-features = false }
+rand = { version = "0.10.0" }
 crossbeam-channel = { version = "0.5.15" }
 bevy_matchbox = { version = "0.14", features = ["signaling"] }

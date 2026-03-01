@@ -1,37 +1,37 @@
-use crate::matchbox::client_id_from_peer_id;
-use bevy::{prelude::*, time::common_conditions::on_timer};
+use crate::prelude::client_id_from_peer_id;
+use bevy::prelude::*;
+use bevy_matchbox::matchbox_socket::Packet;
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
-use core::time::Duration;
-use crossbeam_channel::{Receiver, unbounded};
-use mooplas_networking::prelude::{Lobby, ServerNetworkingActive};
+use crossbeam_channel::Receiver;
+use mooplas_networking::prelude::{
+  ChannelType, ClientMessage, Lobby, OutgoingServerMessage, ServerEvent, ServerNetworkingActive, decode_from_bytes,
+};
 use std::net::{Ipv4Addr, SocketAddrV4};
 
-/// Resource to receive client connection events from callbacks
+/// Resource to receive client events from callbacks
 #[derive(Resource)]
-pub struct ClientConnectionReceiver(pub Receiver<PeerId>);
+pub struct ClientConnectionReceiver(pub Receiver<ServerEvent>);
 
-pub struct HostPlugin;
+pub struct ServerMatchboxPlugin;
 
-impl Plugin for HostPlugin {
+impl Plugin for ServerMatchboxPlugin {
   fn build(&self, app: &mut App) {
-    app.add_systems(
-      Update,
-      (receive_messages, handle_client_connection_system).run_if(resource_exists::<ServerNetworkingActive>),
-    );
-    app.add_systems(
-      Update,
-      send_message
-        .run_if(resource_exists::<ServerNetworkingActive>)
-        .run_if(on_timer(Duration::from_secs(5))),
-    );
+    app
+      .add_systems(
+        Update,
+        receive_messages.run_if(resource_exists::<ServerNetworkingActive>),
+      )
+      .add_systems(
+        Update,
+        send_outgoing_server_messages_system.run_if(resource_exists::<ServerNetworkingActive>),
+      );
   }
 }
 
 pub fn start_signaling_server(commands: &mut Commands) {
   info!("Starting signaling server");
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 3536);
-  let (sender, receiver) = unbounded::<PeerId>();
-  let signaling_server = MatchboxServer::from(
+  let matchbox_server = MatchboxServer::from(
     SignalingServer::client_server_builder(addr)
       .on_connection_request(|connection| {
         info!("Connecting: {connection:?}");
@@ -40,46 +40,103 @@ pub fn start_signaling_server(commands: &mut Commands) {
       .on_id_assignment(|(socket, id)| info!("Socket [{socket}] received ID [{id}]"))
       .on_host_connected(|id| info!("Host joined and has ID [{id}]"))
       .on_host_disconnected(|id| info!("Host [{id}] left"))
-      .on_client_connected(move |id| {
-        info!("Client connected with ID [{id}]");
-        if let Err(e) = sender.send(id) {
-          error!("Failed to send client connection event: {e}");
-        }
-      })
-      .on_client_disconnected(|id| info!("Client [{id}] left"))
+      .on_client_connected(move |id| trace!("Client connected with ID [{id}]"))
+      .on_client_disconnected(|id| trace!("Client [{id}] left"))
       .cors()
       .trace()
       .build(),
   );
-  commands.insert_resource(signaling_server);
-  commands.insert_resource(ClientConnectionReceiver(receiver));
+
+  commands.insert_resource(matchbox_server);
 }
 
-fn handle_client_connection_system(receiver: Res<ClientConnectionReceiver>, mut lobby: ResMut<Lobby>) {
-  while let Ok(peer_id) = receiver.0.try_recv() {
-    info!("Processing client connection for peer [{peer_id}] in Bevy system");
-    lobby.connected.push(client_id_from_peer_id(peer_id));
-  }
-}
-
-fn send_message(mut socket: ResMut<MatchboxSocket>) {
-  let peers: Vec<_> = socket.connected_peers().collect();
-  for peer in peers {
-    let message = "Hello, I'm the host";
-    info!("Sending message: {message:?} to {peer}");
-    socket.channel_mut(0).send(message.as_bytes().into(), peer);
-  }
-}
-
-fn receive_messages(mut socket: ResMut<MatchboxSocket>) {
+fn receive_messages(mut socket: ResMut<MatchboxSocket>, mut commands: Commands, mut lobby: ResMut<Lobby>) {
   for (peer_id, state) in socket.update_peers() {
     info!("[{peer_id}]: {state:?}");
+    let client_id = client_id_from_peer_id(peer_id);
+    let server_event: ServerEvent = match state {
+      PeerState::Connected => {
+        trace!("Client with ID [{client_id}] connected");
+        lobby.connected.push(client_id);
+        ServerEvent::ClientConnected { client_id }
+      }
+      PeerState::Disconnected => {
+        trace!("Client with ID [{client_id}] disconnected");
+        lobby.connected.retain(|&id| id != client_id);
+        ServerEvent::ClientDisconnected { client_id }
+      }
+    };
+
+    // Trigger an event for an application to react to
+    commands.trigger(server_event);
   }
 
-  for (_id, message) in socket.channel_mut(0).receive() {
-    match std::str::from_utf8(&message) {
-      Ok(message) => info!("Received message: {message:?}"),
-      Err(e) => error!("Failed to convert message to string: {e}"),
+  for (peer_id, message) in socket.channel_mut(ChannelType::ReliableOrdered.into()).receive() {
+    let client_id = client_id_from_peer_id(peer_id);
+    let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
+    trace!(
+      "Received [{:?}] message from client [{client_id}]: {:?}",
+      ChannelType::ReliableOrdered,
+      client_message
+    );
+    commands.trigger(client_message.to_event(client_id));
+  }
+
+  for (peer_id, message) in socket.channel_mut(ChannelType::Unreliable.into()).receive() {
+    let client_id = client_id_from_peer_id(peer_id);
+    let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
+    trace!(
+      "Received [{:?}] message from client [{client_id}]: {:?}",
+      ChannelType::Unreliable,
+      client_message
+    );
+    commands.trigger(client_message.to_event(client_id));
+  }
+}
+
+/// A system that applies outgoing send/broadcast/disconnect requests using the [`MatchboxSocket`].
+fn send_outgoing_server_messages_system(
+  mut outgoing_messages: MessageReader<OutgoingServerMessage>,
+  mut socket: ResMut<MatchboxSocket>,
+) {
+  for outgoing_message in outgoing_messages.read() {
+    match outgoing_message {
+      OutgoingServerMessage::Broadcast { channel, payload } => {
+        let packet = Packet::from(payload.as_slice());
+        let peers: Vec<PeerId> = socket.connected_peers().collect();
+        for peer_id in peers {
+          socket.channel_mut((*channel).into()).send(packet.clone(), peer_id);
+        }
+      }
+      OutgoingServerMessage::BroadcastExcept {
+        except_client_id,
+        channel,
+        payload,
+      } => {
+        let packet = Packet::from(payload.as_slice());
+        let peers: Vec<PeerId> = socket
+          .connected_peers()
+          .filter(|&peer_id| client_id_from_peer_id(peer_id) != *except_client_id)
+          .collect();
+        for peer_id in peers {
+          socket.channel_mut((*channel).into()).send(packet.clone(), peer_id);
+        }
+      }
+      OutgoingServerMessage::Send {
+        client_id,
+        channel,
+        payload,
+      } => {
+        let packet = Packet::from(payload.as_slice());
+        let peer: PeerId = socket
+          .connected_peers()
+          .find(|&peer_id| client_id_from_peer_id(peer_id) == *client_id)
+          .expect("Client ID not found among connected peers");
+        socket.channel_mut((*channel).into()).send(packet, peer);
+      }
+      OutgoingServerMessage::DisconnectAll => {
+        socket.close();
+      }
     }
   }
 }

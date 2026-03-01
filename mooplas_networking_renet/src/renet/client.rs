@@ -25,10 +25,7 @@ impl Plugin for ClientRenetPlugin {
         Update,
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
       )
-      .add_systems(
-        Update,
-        receive_reliable_server_messages_system.run_if(is_client_connected),
-      )
+      .add_systems(Update, receive_server_messages_system.run_if(is_client_connected))
       .add_systems(Update, send_outgoing_client_messages_system.run_if(is_client_connected));
   }
 }
@@ -120,7 +117,7 @@ pub fn client_handshake_system(
 
 /// A system that reads all messages from the server on all channels, deserialises them and triggers them as events for
 /// an application to read and respond to.
-fn receive_reliable_server_messages_system(mut client: ResMut<RenetClient>, mut commands: Commands) {
+fn receive_server_messages_system(mut client: ResMut<RenetClient>, mut commands: Commands) {
   while let Some(reliable_ordered_channel_message) = client.receive_message(DefaultChannel::ReliableOrdered) {
     let server_message: ServerEvent =
       decode_from_bytes(&reliable_ordered_channel_message).expect("Failed to deserialise server message");

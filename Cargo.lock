@@ -4839,6 +4839,7 @@ dependencies = [
  "bevy_matchbox",
  "crossbeam-channel",
  "mooplas_networking",
+ "rand 0.10.0",
 ]
 
 [[package]]

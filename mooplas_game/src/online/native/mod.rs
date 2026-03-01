@@ -22,8 +22,8 @@ pub struct NativeOnlinePlugin;
 impl Plugin for NativeOnlinePlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_plugins((NetworkingMessagesPlugin, RenetNetworkingMessagesPlugin))
-      .add_plugins((ClientPlugin, ServerPlugin))
+      .add_plugins(RenetNetworkingMessagesPlugin)
+      .add_plugins((ClientPlugin, ServerPlugin, NetworkingMessagesPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,

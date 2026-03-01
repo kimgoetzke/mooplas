@@ -24,6 +24,16 @@ impl From<ChannelType> for u8 {
   }
 }
 
+impl From<ChannelType> for usize {
+  fn from(channel: ChannelType) -> Self {
+    match channel {
+      ChannelType::Unreliable => 0,
+      ChannelType::ReliableUnordered => 1,
+      ChannelType::ReliableOrdered => 2,
+    }
+  }
+}
+
 #[cfg(feature = "renet")]
 impl From<bevy_renet::renet::DefaultChannel> for ChannelType {
   fn from(value: bevy_renet::renet::DefaultChannel) -> Self {
