@@ -1,0 +1,18 @@
+[package]
+name = "mooplas_networking_renet"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Dependencies linked to Bevy version
+bevy = { version = "0.18.0", default-features = false, features = [
+  "bevy_core_pipeline",
+  "bevy_log",
+] }
+bevy-inspector-egui = { version = "0.36.0" }
+bevy_renet = { version = "4.0.0" }
+renet_visualizer = { version = "2.0.0" }
+
+# Other dependencies
+mooplas_networking = { path = "../mooplas_networking_shared", default-features = false, features = ["renet"] }
+ureq = { version = "3.1.4" }
