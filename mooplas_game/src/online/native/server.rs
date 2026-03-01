@@ -1,4 +1,4 @@
-use crate::online::server::handle_player_registration_message_from_client;
+use crate::online::shared_server::handle_player_registration_message_from_client;
 use crate::prelude::{AppState, AvailablePlayerConfigs, PlayerRegistrationMessage, RegisteredPlayers, Seed};
 use bevy::app::{App, Plugin};
 use bevy::log::*;

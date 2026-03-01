@@ -1,4 +1,5 @@
-use crate::online::server::ServerPlugin;
+use crate::online::shared_client::SharedClientPlugin;
+use crate::online::shared_server::SharedServerPlugin;
 use bevy::prelude::{App, Plugin};
 use mooplas_networking::prelude::NetworkingResourcesPlugin;
 
@@ -6,6 +7,6 @@ pub struct NetworkingPlugin;
 
 impl Plugin for NetworkingPlugin {
   fn build(&self, app: &mut App) {
-    app.add_plugins((NetworkingResourcesPlugin, ServerPlugin));
+    app.add_plugins((NetworkingResourcesPlugin, SharedServerPlugin, SharedClientPlugin));
   }
 }

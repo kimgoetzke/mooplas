@@ -51,7 +51,7 @@ fn receive_server_events(
 
       // Unregister any players associated with this client and notify other clients about it
       for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
-        crate::online::server::handle_player_registration_message_from_client(
+        crate::online::shared_server::handle_player_registration_message_from_client(
           &mut outgoing_messages,
           &mut registered_players,
           &available_configs,

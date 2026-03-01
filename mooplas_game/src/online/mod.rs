@@ -10,7 +10,10 @@ mod structs;
 mod networking;
 
 #[cfg(feature = "online")]
-mod server;
+mod shared_server;
+
+#[cfg(feature = "online")]
+mod shared_client;
 
 #[cfg(feature = "online_renet")]
 mod native;

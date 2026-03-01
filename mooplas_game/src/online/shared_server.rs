@@ -15,9 +15,9 @@ use mooplas_networking::prelude::{
 };
 use std::time::Duration;
 
-pub struct ServerPlugin;
+pub struct SharedServerPlugin;
 
-impl Plugin for ServerPlugin {
+impl Plugin for SharedServerPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_observer(receive_client_events)
