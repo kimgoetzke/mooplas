@@ -5,7 +5,7 @@ use crate::prelude::{
   TouchControlsToggledMessage,
 };
 use crate::shared::{InputMessage, RegisteredPlayers};
-use crate::ui::{
+use crate::ui::ui::{
   set_interaction_on_cancel, set_interaction_on_hover, set_interaction_on_hover_exit, set_interaction_on_press,
   set_interaction_on_release,
 };

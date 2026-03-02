@@ -18,7 +18,7 @@ mod prelude {
 }
 
 #[cfg(feature = "dev")]
-use crate::debug::DebugPlugin;
+use debug::DebugPlugin;
 
 use crate::animation::AnimationPlugin;
 use crate::app_state::AppStatePlugin;
@@ -31,10 +31,10 @@ use crate::loading::LoadingPlugin;
 use crate::online::OnlinePlugin;
 use crate::player::PlayerPlugin;
 use crate::prelude::*;
-use crate::ui::UiPlugin;
 use avian2d::PhysicsPlugins;
 use avian2d::prelude::Gravity;
 use bevy::prelude::*;
+use ui::UiPlugin;
 
 fn main() {
   let mut app = App::new();

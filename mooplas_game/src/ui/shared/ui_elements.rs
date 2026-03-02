@@ -130,11 +130,11 @@ pub fn spawn_button(
 ) -> Entity {
   parent
     .spawn(button(button_type, asset_server, button_text, button_width, font_size))
-    .observe(ui::set_interaction_on_hover)
-    .observe(ui::set_interaction_on_hover_exit)
-    .observe(ui::set_interaction_on_press)
-    .observe(ui::set_interaction_on_release)
-    .observe(ui::set_interaction_on_cancel)
+    .observe(ui::ui::set_interaction_on_hover)
+    .observe(ui::ui::set_interaction_on_hover_exit)
+    .observe(ui::ui::set_interaction_on_press)
+    .observe(ui::ui::set_interaction_on_release)
+    .observe(ui::ui::set_interaction_on_cancel)
     .id()
 }
 
