@@ -3,6 +3,7 @@ use crate::online::shared_server::SharedServerPlugin;
 use bevy::prelude::{App, Plugin};
 use mooplas_networking::prelude::{NetworkingMessagesPlugin, NetworkingResourcesPlugin};
 
+/// Plugin that adds online multiplayer capabilities that are shared across all online multiplayer implementations.
 pub struct NetworkingPlugin;
 
 impl Plugin for NetworkingPlugin {

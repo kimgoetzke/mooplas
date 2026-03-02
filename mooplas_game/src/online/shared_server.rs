@@ -15,6 +15,8 @@ use mooplas_networking::prelude::{
 };
 use std::time::Duration;
 
+/// A plugin that contains systems related to processing and broadcasting messages on the server, which are shared
+/// between different server implementations.
 pub struct SharedServerPlugin;
 
 impl Plugin for SharedServerPlugin {

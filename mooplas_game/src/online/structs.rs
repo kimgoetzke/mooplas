@@ -6,7 +6,7 @@ use mooplas_networking::prelude::SerialisableInputMessage;
 /// A component for interpolating network-synchronised transforms, controlled by the server. Used in an attempt to
 /// smoothly transition from current transform's position/rotation to target position/rotation at a defined speed.
 #[derive(Component)]
-pub struct NetworkTransformInterpolation {
+pub(crate) struct NetworkTransformInterpolation {
   /// The position to interpolate towards.
   pub target_position: Vec2,
   /// The rotation to interpolate towards.

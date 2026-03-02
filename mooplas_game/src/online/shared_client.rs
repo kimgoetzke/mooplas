@@ -17,6 +17,8 @@ use mooplas_networking::prelude::{
   ServerEvent, encode_to_bytes,
 };
 
+/// A plugin that adds shared client-side online multiplayer capabilities to the game. Contains systems that are shared
+/// between different client implementations.
 pub struct SharedClientPlugin;
 
 impl Plugin for SharedClientPlugin {
