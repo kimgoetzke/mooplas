@@ -7,6 +7,7 @@ use bevy::prelude::{Reflect, ReflectResource, Resource};
 use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
+use mooplas_networking::prelude::NetworkRole;
 use std::fmt::Display;
 use std::time::SystemTime;
 
@@ -25,7 +26,8 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<SpawnPoints>()
       .init_resource::<AvailablePlayerConfigs>()
       .init_resource::<RegisteredPlayers>()
-      .init_resource::<WinnerInfo>();
+      .init_resource::<WinnerInfo>()
+      .init_resource::<NetworkRole>();
   }
 }
 

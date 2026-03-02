@@ -1,5 +1,6 @@
 use crate::prelude::ClientHandshakeOutcomeMessage;
-use crate::renet::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, PROTOCOL_ID, PendingClientHandshake, RenetClientVisualiser};
+use crate::renet::constants::PROTOCOL_ID;
+use crate::renet::{CLIENT_HAND_SHAKE_TIMEOUT_SECS, PendingClientHandshake, RenetClientVisualiser};
 use bevy::app::Update;
 use bevy::log::*;
 use bevy::prelude::{
@@ -14,7 +15,7 @@ use mooplas_networking::prelude::{
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::{Instant, SystemTime};
 
-/// A Bevy plugin that adds the necessary Renet plugins. Required to run any client code on native.
+/// A Bevy plugin that adds client-side online multiplayer capabilities.
 pub struct ClientRenetPlugin;
 
 impl Plugin for ClientRenetPlugin {

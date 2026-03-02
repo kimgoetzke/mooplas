@@ -7,7 +7,7 @@ use mooplas_networking::prelude::{ChannelType, Lobby, OutgoingServerMessage, Ser
 use mooplas_networking_renet::prelude::{RenetServerVisualiser, ServerRenetPlugin, ServerVisualiserPlugin};
 
 /// A plugin that adds server-side online multiplayer capabilities to the game. Only active when the game is running in
-/// server mode. Mutually exclusive with the [`crate::online::wasm::ServerPlugin`].
+/// server mode. Mutually exclusive with the [`crate::online::matchbox::ServerPlugin`].
 pub struct ServerPlugin;
 
 impl Plugin for ServerPlugin {

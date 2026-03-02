@@ -10,7 +10,7 @@ pub struct NetworkingResourcesPlugin;
 
 impl Plugin for NetworkingResourcesPlugin {
   fn build(&self, app: &mut App) {
-    app.init_resource::<NetworkRole>().init_resource::<Lobby>();
+    app.init_resource::<Lobby>();
   }
 }
 

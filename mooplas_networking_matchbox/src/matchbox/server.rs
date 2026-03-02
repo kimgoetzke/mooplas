@@ -12,6 +12,7 @@ use std::net::{Ipv4Addr, SocketAddrV4};
 #[derive(Resource)]
 pub struct ClientConnectionReceiver(pub Receiver<ServerEvent>);
 
+/// A Bevy plugin that adds server-side online multiplayer capabilities using Matchbox.
 pub struct ServerMatchboxPlugin;
 
 impl Plugin for ServerMatchboxPlugin {
@@ -28,6 +29,7 @@ impl Plugin for ServerMatchboxPlugin {
   }
 }
 
+/// A system that starts the Matchbox signaling server and inserts the [`MatchboxServer`] resource.
 pub fn start_signaling_server(commands: &mut Commands) {
   info!("Starting signaling server");
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 3536);
@@ -40,7 +42,7 @@ pub fn start_signaling_server(commands: &mut Commands) {
       .on_id_assignment(|(socket, id)| info!("Socket [{socket}] received ID [{id}]"))
       .on_host_connected(|id| info!("Host joined and has ID [{id}]"))
       .on_host_disconnected(|id| info!("Host [{id}] left"))
-      .on_client_connected(move |id| trace!("Client connected with ID [{id}]"))
+      .on_client_connected(move |id| trace!("Client with ID [{id}] connected"))
       .on_client_disconnected(|id| trace!("Client [{id}] left"))
       .cors()
       .trace()
@@ -50,9 +52,10 @@ pub fn start_signaling_server(commands: &mut Commands) {
   commands.insert_resource(matchbox_server);
 }
 
+/// A system that receives incoming messages and connection events from the [`MatchboxSocket`] and triggers
+/// corresponding events for the application to react to. Also updates the [`Lobby`] resource with connected clients.
 fn receive_messages(mut socket: ResMut<MatchboxSocket>, mut commands: Commands, mut lobby: ResMut<Lobby>) {
   for (peer_id, state) in socket.update_peers() {
-    info!("[{peer_id}]: {state:?}");
     let client_id = client_id_from_peer_id(peer_id);
     let server_event: ServerEvent = match state {
       PeerState::Connected => {
@@ -85,11 +88,6 @@ fn receive_messages(mut socket: ResMut<MatchboxSocket>, mut commands: Commands, 
   for (peer_id, message) in socket.channel_mut(ChannelType::Unreliable.into()).receive() {
     let client_id = client_id_from_peer_id(peer_id);
     let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-    trace!(
-      "Received [{:?}] message from client [{client_id}]: {:?}",
-      ChannelType::Unreliable,
-      client_message
-    );
     commands.trigger(client_message.to_event(client_id));
   }
 }

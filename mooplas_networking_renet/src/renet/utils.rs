@@ -1,8 +1,19 @@
 use crate::renet::{PendingClientHandshake, RenetClientVisualiser, RenetServerVisualiser};
 use bevy::prelude::Commands;
 use bevy_renet::netcode::{NetcodeClientTransport, NetcodeServerTransport};
+use bevy_renet::renet::ClientId as RenetClientId;
 use bevy_renet::{RenetClient, RenetServer};
-use mooplas_networking::prelude::{ClientNetworkingActive, ServerNetworkingActive};
+use mooplas_networking::prelude::{ClientId, ClientNetworkingActive, ServerNetworkingActive};
+
+/// Give it a [`RenetClientId`] and it'll return a [`ClientId`].
+pub fn client_id_from_renet_id(value: RenetClientId) -> ClientId {
+  ClientId::from_renet_u64(value)
+}
+
+/// Give it a [`ClientId`] and it'll return a [`RenetClientId`].
+pub fn renet_id_from_client_id(value: ClientId) -> RenetClientId {
+  value.to_renet_u64()
+}
 
 /// Cleans up all networking resources for native platforms.
 pub fn remove_all_renet_resources(commands: &mut Commands) {

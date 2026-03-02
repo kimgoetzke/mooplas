@@ -1,7 +1,7 @@
 mod client;
-mod host;
+mod server;
 mod utils;
 
 pub use client::*;
-pub use host::*;
+pub use server::*;
 pub use utils::*;

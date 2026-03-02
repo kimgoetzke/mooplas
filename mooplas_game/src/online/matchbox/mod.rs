@@ -2,34 +2,36 @@ mod client;
 mod server;
 
 use crate::app_state::AppState;
-use crate::online::wasm::client::ClientPlugin;
-use crate::online::wasm::server::ServerPlugin;
+use crate::online::matchbox::client::ClientPlugin;
+use crate::online::matchbox::server::ServerPlugin;
 use crate::prelude::{ConnectionInfoMessage, MenuName, ToggleMenuMessage, UiNotification};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
-use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, MessageWriter, Res, ResMut, in_state};
-use mooplas_networking::prelude::{
-  ClientNetworkingActive, NetworkRole, NetworkingMessagesPlugin, ServerNetworkingActive,
+use bevy::prelude::{
+  Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Res, ResMut, in_state,
 };
+use mooplas_networking::prelude::{ClientNetworkingActive, NetworkErrorEvent, NetworkRole, ServerNetworkingActive};
 use mooplas_networking_matchbox::prelude::{
   generate_room_url, remove_all_matchbox_resources, start_signaling_server, start_socket,
 };
 
-/// Plugin that adds online multiplayer capabilities for WASM targets to the game.
-pub struct WasmOnlinePlugin;
+/// Plugin that adds online multiplayer capabilities for WASM targets using websocket/`bevy_matchbox` to the game.
+/// Mutually exclusive with the [`crate::online::renet::RenetOnlinePlugin`].
+pub struct MatchboxOnlinePlugin;
 
-impl Plugin for WasmOnlinePlugin {
+impl Plugin for MatchboxOnlinePlugin {
   fn build(&self, app: &mut App) {
-    info!("Online multiplayer for WebAssembly builds is enabled");
+    info!("Online multiplayer using [bevy_matchbox] is enabled");
     app
-      .add_plugins((ServerPlugin, ClientPlugin, NetworkingMessagesPlugin))
+      .add_plugins((ServerPlugin, ClientPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,
         handle_connection_info_message
           .run_if(in_state(AppState::Preparing))
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
-      );
+      )
+      .add_observer(receive_network_error_event);
   }
 }
 
@@ -96,4 +98,29 @@ fn handle_connection_info_message(
       }
     }
   }
+}
+
+// TODO: Implement an visual feedback for the user when connection is lost
+// TODO: Handle network disconnect errors for Matchbox
+#[allow(clippy::never_loop)]
+fn receive_network_error_event(
+  error_event: On<NetworkErrorEvent>,
+  mut commands: Commands,
+  mut next_app_state: ResMut<NextState<AppState>>,
+  mut network_role: ResMut<NetworkRole>,
+) {
+  let error = error_event.event();
+  if matches!(error, &NetworkErrorEvent::NetcodeDisconnect(_)) {
+    info!(
+      "Connection lost: [{}] - removing networking resources and setting state to [{:?}]...",
+      error,
+      AppState::GameOver
+    );
+    remove_all_matchbox_resources(&mut commands);
+    next_app_state.set(AppState::GameOver);
+    *network_role = NetworkRole::None;
+    return;
+  }
+  error!("Networking error occurred: [{}], panicking now...", error);
+  panic!("{}", error);
 }

@@ -1,4 +1,5 @@
-use crate::renet::{PROTOCOL_ID, RenetServerVisualiser};
+use crate::renet::RenetServerVisualiser;
+use crate::renet::constants::PROTOCOL_ID;
 use crate::renet::{client_id_from_renet_id, renet_id_from_client_id};
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
@@ -13,7 +14,7 @@ use mooplas_networking::prelude::{
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
 
-/// A Bevy plugin that adds the necessary Renet plugins. Required to run any server code on native.
+/// A Bevy plugin that adds server-side online multiplayer capabilities.
 pub struct ServerRenetPlugin;
 
 impl Plugin for ServerRenetPlugin {

@@ -4,6 +4,7 @@ use bevy::prelude::{Commands, Message, On};
 use bevy_renet::netcode::{NetcodeError, NetcodeErrorEvent, NetcodeTransportError};
 use mooplas_networking::prelude::NetworkErrorEvent;
 
+/// A plugin that adds messages related to the Renet networking implementation.
 pub struct RenetNetworkingMessagesPlugin;
 
 impl Plugin for RenetNetworkingMessagesPlugin {
@@ -14,6 +15,17 @@ impl Plugin for RenetNetworkingMessagesPlugin {
   }
 }
 
+/// A message sent on the client-side by the networking code after the client handshake process has completed. Contains
+/// the result of the handshake. Can optionally be used by the application client-side code to e.g. trigger UI error
+/// messages in case of failures.
+#[derive(Message, Debug)]
+pub struct ClientHandshakeOutcomeMessage {
+  pub has_succeeded: bool,
+  pub reason: Option<String>,
+}
+
+/// An observer that listens for errors emitted by the Renet transport and triggers a more generic
+/// [`NetworkErrorEvent`] that can be handled by the application code.
 #[allow(clippy::never_loop)]
 fn receive_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut commands: Commands) {
   let netcode_transport_error = &(**error_event);
@@ -27,13 +39,4 @@ fn receive_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut
     NetcodeTransportError::IO(e) => NetworkErrorEvent::IoError(e.to_string()),
   };
   commands.trigger(error);
-}
-
-/// A message sent on the client-side by the networking code after the client handshake process has completed. Contains
-/// the result of the handshake. Can optionally be used by the application client-side code to e.g. trigger UI error
-/// messages in case of failures.
-#[derive(Message, Debug)]
-pub struct ClientHandshakeOutcomeMessage {
-  pub has_succeeded: bool,
-  pub reason: Option<String>,
 }

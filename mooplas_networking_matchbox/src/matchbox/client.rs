@@ -7,9 +7,10 @@ use mooplas_networking::prelude::{
   ChannelType, ClientNetworkingActive, OutgoingClientMessage, ServerEvent, decode_from_bytes,
 };
 
-pub struct ClientMatchboxPlugin;
+/// A Bevy plugin that adds client-side online multiplayer capabilities.
+pub struct MatchboxClientPlugin;
 
-impl Plugin for ClientMatchboxPlugin {
+impl Plugin for MatchboxClientPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_systems(
@@ -60,10 +61,6 @@ fn send_outgoing_client_messages_system(
         let packet = Packet::from(payload.as_slice());
         let peers: Vec<_> = socket.connected_peers().collect();
         for peer_id in peers {
-          match channel {
-            ChannelType::Unreliable => {}
-            _ => info!("Sending message: {payload:?} to [{peer_id}]"),
-          }
           socket.channel_mut((*channel).into()).send(packet.clone(), peer_id);
         }
       }

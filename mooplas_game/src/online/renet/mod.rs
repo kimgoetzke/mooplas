@@ -1,8 +1,8 @@
 mod client;
 mod server;
 
-use crate::online::native::client::ClientPlugin;
-use crate::online::native::server::ServerPlugin;
+use crate::online::renet::client::ClientPlugin;
+use crate::online::renet::server::ServerPlugin;
 use crate::prelude::{AppState, MenuName, ToggleMenuMessage, UiNotification};
 use crate::shared::ConnectionInfoMessage;
 use bevy::app::Update;
@@ -10,19 +10,21 @@ use bevy::log::*;
 use bevy::prelude::{
   App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Res, ResMut, in_state,
 };
-use mooplas_networking::prelude::{NetworkErrorEvent, NetworkRole, NetworkingMessagesPlugin};
+use mooplas_networking::prelude::{NetworkErrorEvent, NetworkRole};
 use mooplas_networking_renet::prelude::{
   RenetNetworkingMessagesPlugin, create_client, create_server, remove_all_renet_resources,
 };
 
-/// Plugin that adds online multiplayer capabilities for native builds to the game.
-pub struct NativeOnlinePlugin;
+/// Plugin that adds online multiplayer capabilities for native builds using UDP/`bevy_renet` to the game.
+/// /// Mutually exclusive with the [`crate::online::matchbox::MatchboxOnlinePlugin`].
+pub struct RenetOnlinePlugin;
 
-impl Plugin for NativeOnlinePlugin {
+impl Plugin for RenetOnlinePlugin {
   fn build(&self, app: &mut App) {
+    info!("Online multiplayer using [bevy_renet] is enabled");
     app
       .add_plugins(RenetNetworkingMessagesPlugin)
-      .add_plugins((ClientPlugin, ServerPlugin, NetworkingMessagesPlugin))
+      .add_plugins((ClientPlugin, ServerPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,
@@ -31,7 +33,6 @@ impl Plugin for NativeOnlinePlugin {
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
       )
       .add_observer(receive_network_error_event);
-    info!("Online multiplayer for native builds is enabled");
   }
 }
 
