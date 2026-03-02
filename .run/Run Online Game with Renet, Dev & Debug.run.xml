@@ -1,0 +1,22 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Run Online Game with Renet, Dev &amp; Debug" type="CargoCommandRunConfiguration" factoryName="Cargo Command" activateToolWindowBeforeRun="false" singleton="false">
+    <option name="buildProfileId" value="dev" />
+    <option name="command" value="run --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online,online_renet,dev" />
+    <option name="workingDirectory" value="file://$PROJECT_DIR$" />
+    <envs>
+      <env name="RUST_LOG" value="mooplas_game=debug,mooplas_networking=debug" />
+    </envs>
+    <option name="emulateTerminal" value="true" />
+    <option name="channel" value="DEFAULT" />
+    <option name="requiredFeatures" value="true" />
+    <option name="allFeatures" value="false" />
+    <option name="withSudo" value="false" />
+    <option name="buildTarget" value="REMOTE" />
+    <option name="backtrace" value="SHORT" />
+    <option name="isRedirectInput" value="false" />
+    <option name="redirectInputPath" value="" />
+    <method v="2">
+      <option name="CARGO.BUILD_TASK_PROVIDER" enabled="true" />
+    </method>
+  </configuration>
+</component>

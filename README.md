@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
+  <img src="mooplas_game/assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
 </p>
 
 This repository contains a basic multiplayer game inspired
@@ -24,19 +24,19 @@ of the project was to explore network programming when real-time movement is inv
 
 Online multiplayer:
 
-![Demo GIF](assets/ignore/demo/demo.gif)
+![Demo GIF](mooplas_game/assets/ignore/demo/demo.gif)
 
 Menu:
 
-![Screenshot 4](assets/ignore/demo/screenshot-4.png)
+![Screenshot 4](mooplas_game/assets/ignore/demo/screenshot-4.png)
 
 Lobby with touch controls enabled:
 
-![Screenshots 2](assets/ignore/demo/screenshot-2.png)
+![Screenshots 2](mooplas_game/assets/ignore/demo/screenshot-2.png)
 
 In-game:
 
-![Screenshots 3](assets/ignore/demo/screenshot-3.png)
+![Screenshots 3](mooplas_game/assets/ignore/demo/screenshot-3.png)
 
 ## How to develop
 
