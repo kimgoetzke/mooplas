@@ -32,9 +32,9 @@ impl Plugin for OnlinePlugin {
     app.add_plugins(NetworkingPlugin);
 
     #[cfg(feature = "online_renet")]
-    app.add_plugins(renet::RenetOnlinePlugin);
+    app.add_plugins(renet::RenetPlugin);
 
     #[cfg(feature = "online_matchbox")]
-    app.add_plugins(matchbox::MatchboxOnlinePlugin);
+    app.add_plugins(matchbox::MatchboxPlugin);
   }
 }
