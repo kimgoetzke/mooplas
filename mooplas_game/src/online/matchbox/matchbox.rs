@@ -1,6 +1,4 @@
 use crate::app_state::AppState;
-use crate::online::matchbox::client::ClientPlugin;
-use crate::online::matchbox::server::ServerPlugin;
 use crate::prelude::{ConnectionInfoMessage, MenuName, ToggleMenuMessage, UiNotification};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::{debug, error, info};
@@ -9,7 +7,8 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::{ClientNetworkingActive, NetworkErrorEvent, NetworkRole, ServerNetworkingActive};
 use mooplas_networking_matchbox::prelude::{
-  generate_room_url, remove_all_matchbox_resources, start_signaling_server, start_socket,
+  MatchboxClientPlugin, ServerMatchboxPlugin, generate_room_url, remove_all_matchbox_resources, start_signaling_server,
+  start_socket,
 };
 
 /// Plugin that adds online multiplayer capabilities for WASM targets using websocket/`bevy_matchbox` to the game.
@@ -20,7 +19,7 @@ impl Plugin for MatchboxPlugin {
   fn build(&self, app: &mut App) {
     info!("Online multiplayer using [bevy_matchbox] is enabled");
     app
-      .add_plugins((ServerPlugin, ClientPlugin))
+      .add_plugins((ServerMatchboxPlugin, MatchboxClientPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,

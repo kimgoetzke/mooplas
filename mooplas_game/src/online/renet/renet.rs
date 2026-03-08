@@ -1,6 +1,5 @@
 use crate::app_state::AppState;
 use crate::online::renet::client::ClientPlugin;
-use crate::online::renet::server::ServerPlugin;
 use crate::prelude::{ConnectionInfoMessage, MenuName, ToggleMenuMessage, UiNotification};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::{debug, error, info, warn};
@@ -9,7 +8,8 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::{NetworkErrorEvent, NetworkRole};
 use mooplas_networking_renet::prelude::{
-  RenetNetworkingMessagesPlugin, create_client, create_server, remove_all_renet_resources,
+  RenetNetworkingMessagesPlugin, ServerRenetPlugin, ServerVisualiserPlugin, create_client, create_server,
+  remove_all_renet_resources,
 };
 
 /// Plugin that adds online multiplayer capabilities for native builds using UDP/`bevy_renet` to the game.
@@ -21,7 +21,7 @@ impl Plugin for RenetPlugin {
     info!("Online multiplayer using [bevy_renet] is enabled");
     app
       .add_plugins(RenetNetworkingMessagesPlugin)
-      .add_plugins((ClientPlugin, ServerPlugin))
+      .add_plugins((ClientPlugin, ServerRenetPlugin, ServerVisualiserPlugin))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,

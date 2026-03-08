@@ -1,5 +1,5 @@
 use crate::online::shared_client::SharedClientPlugin;
-use crate::online::shared_server::SharedServerPlugin;
+use crate::online::shared_server::ServerPlugin;
 use bevy::prelude::{App, Plugin};
 use mooplas_networking::prelude::{NetworkingMessagesPlugin, NetworkingResourcesPlugin};
 
@@ -11,7 +11,7 @@ impl Plugin for NetworkingPlugin {
     app.add_plugins((
       NetworkingResourcesPlugin,
       NetworkingMessagesPlugin,
-      SharedServerPlugin,
+      ServerPlugin,
       SharedClientPlugin,
     ));
   }

@@ -17,9 +17,9 @@ use std::time::Duration;
 
 /// A plugin that contains systems related to processing and broadcasting messages on the server, which are shared
 /// between different server implementations.
-pub struct SharedServerPlugin;
+pub struct ServerPlugin;
 
-impl Plugin for SharedServerPlugin {
+impl Plugin for ServerPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_observer(receive_client_events)
