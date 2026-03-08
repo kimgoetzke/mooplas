@@ -117,7 +117,7 @@ fn spawn_menu(
           ..default()
         })
         .with_children(|parent| {
-          // TODO: Replace bevy_ui_text_input, so I can upgrade to Bevy 0.18 and copy & paste works more reliably
+          // TODO: Replace bevy_ui_text_input because copy & paste doesn't work reliably enough across systems
           // Input field
           let input_field_entity = parent
             .spawn((

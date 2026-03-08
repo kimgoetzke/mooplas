@@ -119,7 +119,7 @@ fn spawn_menu(
             TextShadow::default(),
           ));
 
-          // TODO: Replace bevy_ui_text_input, so I can upgrade to Bevy 0.18 and copy & paste works more reliably
+          // TODO: Replace bevy_ui_text_input because copy & paste doesn't work reliably enough across systems
           // Text input field to copy the host address from
           parent.spawn((
             Name::new("Input Field"),

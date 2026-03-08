@@ -2,7 +2,7 @@ use crate::app_state::AppState;
 use crate::online::utils;
 use crate::prelude::{
   AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, PlayerId, PlayerRegistrationMessage,
-  RegisteredPlayers, SnakeHead, ToggleMenuMessage, WinnerInfo,
+  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, WinnerInfo,
 };
 use bevy::log::{debug, info, warn};
 use bevy::prelude::{
@@ -23,6 +23,7 @@ impl Plugin for SharedServerPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_observer(receive_client_events)
+      .add_observer(receive_server_events)
       .add_systems(
         Update,
         broadcast_local_app_state_system.run_if(resource_exists::<ServerNetworkingActive>),
@@ -93,6 +94,60 @@ fn receive_client_events(
       }
       warn!("Received invalid input action on [Unreliable] channel: {:?}", message);
     }
+  }
+}
+
+/// The main observer system for server events.
+fn receive_server_events(
+  server_event: On<ServerEvent>,
+  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  mut lobby: ResMut<Lobby>,
+  mut next_state: ResMut<NextState<AppState>>,
+  seed: Res<Seed>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
+) {
+  match server_event.event() {
+    ServerEvent::ClientConnected { client_id } => {
+      info!("Client with ID [{}] connected", client_id);
+
+      // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
+      // Send the current seed to the newly connected client
+      let seed_message = encode_to_bytes(&ServerEvent::ClientInitialised {
+        seed: seed.get(),
+        client_id: *client_id,
+      })
+      .expect("Failed to serialise seed message");
+      outgoing_messages.write(OutgoingServerMessage::Send {
+        client_id: *client_id,
+        channel: ChannelType::ReliableOrdered,
+        payload: seed_message,
+      });
+    }
+    ServerEvent::ClientDisconnected { client_id } => {
+      info!("Client with ID [{}] disconnected", client_id);
+
+      // Unregister any players associated with this client and notify other clients about it
+      for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
+        handle_player_registration_message_from_client(
+          &mut outgoing_messages,
+          &mut registered_players,
+          &available_configs,
+          &mut player_registration_message,
+          &client_id,
+          *player_id,
+          false,
+          &mut lobby,
+        );
+      }
+    }
+    _ => { /* Ignored */ }
+  }
+
+  // TODO: Improve state transition logic
+  if lobby.connected.len() > 0 {
+    next_state.set(AppState::Initialising);
   }
 }
 

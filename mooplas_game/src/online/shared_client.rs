@@ -61,12 +61,8 @@ fn receive_server_message_event(
   mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
 ) {
   match server_message.event() {
-    ServerEvent::ClientConnected { client_id } => {
-      info!("A client with ID [{:?}] connected", client_id);
-    }
-    ServerEvent::ClientDisconnected { client_id } => {
-      info!("A client with ID [{:?}] disconnected", client_id);
-    }
+    ServerEvent::ClientConnected { client_id } => info!("[{:?}] connected", client_id),
+    ServerEvent::ClientDisconnected { client_id } => info!("[{:?}] disconnected", client_id),
     ServerEvent::ClientInitialised { seed: server_seed, .. } => {
       seed.set(*server_seed);
     }

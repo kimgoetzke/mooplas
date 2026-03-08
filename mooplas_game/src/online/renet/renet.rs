@@ -91,7 +91,7 @@ fn handle_connection_info_message(
   }
 }
 
-// TODO: Implement an visual feedback for the user when connection is lost
+// TODO: Implement visual feedback for the user when connection is lost
 #[allow(clippy::never_loop)]
 fn receive_network_error_event(
   error_event: On<NetworkErrorEvent>,
