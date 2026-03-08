@@ -2,9 +2,9 @@ use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, ResMut, Resource, resource_exists};
 use bevy_matchbox::MatchboxSocket;
-use bevy_matchbox::matchbox_socket::{Packet, PeerId};
+use bevy_matchbox::matchbox_socket::{ChannelError, Packet, PeerId};
 use mooplas_networking::prelude::{
-  ChannelType, ClientNetworkingActive, OutgoingClientMessage, ServerEvent, decode_from_bytes,
+  ChannelType, ClientNetworkingActive, NetworkErrorEvent, OutgoingClientMessage, ServerEvent, decode_from_bytes,
 };
 
 /// A Bevy plugin that adds client-side online multiplayer capabilities.
@@ -30,8 +30,20 @@ pub struct HostConnectionInfo {
 }
 
 fn receive_server_messages_system(mut socket: ResMut<MatchboxSocket>, mut commands: Commands) {
-  for (peer_id, state) in socket.update_peers() {
-    info!("[{peer_id}]: {state:?}");
+  match socket.try_update_peers() {
+    Ok(result) => {
+      for (peer_id, state) in result {
+        info!("[{peer_id}]: {state:?}");
+      }
+    }
+    Err(channel_error) => {
+      let error = match channel_error {
+        ChannelError::Closed => NetworkErrorEvent::Disconnect("Connection closed".to_string()),
+        _ => NetworkErrorEvent::OtherError(channel_error.to_string()),
+      };
+
+      commands.trigger(error);
+    }
   }
 
   for (_id, message) in socket.channel_mut(ChannelType::ReliableOrdered.into()).receive() {

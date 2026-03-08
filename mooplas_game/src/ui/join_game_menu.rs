@@ -224,14 +224,14 @@ fn handle_submit_text_messages(
   mut ui_message: MessageWriter<UiNotification>,
 ) {
   for message in messages.read() {
-    // Let user know we're trying to connect
-    ui_message.write(UiNotification::info("Attempting to connect...".to_string()));
-
     // Ignore empty submissions
     if message.text.is_empty() {
       debug!("Received empty connection string submission, ignoring button press...");
       continue;
     }
+
+    // Let user know we're trying to connect
+    ui_message.write(UiNotification::info("Attempting to connect...".to_string()));
 
     // Ignore if connect button is disabled
     if **connect_button_interaction == CustomInteraction::Disabled {

@@ -36,9 +36,9 @@ fn receive_netcode_transport_error_event(error_event: On<NetcodeErrorEvent>, mut
 
 fn map_netcode_transport_error_to_network_error(netcode_transport_error: &NetcodeTransportError) -> NetworkErrorEvent {
   match netcode_transport_error {
-    NetcodeTransportError::Renet(e) => NetworkErrorEvent::RenetDisconnect(e.to_string()),
+    NetcodeTransportError::Renet(e) => NetworkErrorEvent::Disconnect(e.to_string()),
     NetcodeTransportError::Netcode(e) => match e {
-      NetcodeError::Disconnected(reason) => NetworkErrorEvent::NetcodeDisconnect(reason.to_string()),
+      NetcodeError::Disconnected(reason) => NetworkErrorEvent::Disconnect(reason.to_string()),
       _ => NetworkErrorEvent::NetcodeTransportError(e.to_string()),
     },
     NetcodeTransportError::IO(e) => NetworkErrorEvent::IoError(e.to_string()),
@@ -54,21 +54,21 @@ mod tests {
   #[test]
   fn map_netcode_transport_error_to_network_error_maps_netcode_disconnected_to_netcode_disconnect_event() {
     use bevy_renet::netcode::NetcodeDisconnectReason;
-    let net_err = NetcodeTransportError::Netcode(NetcodeError::Disconnected(
+    let netcode_transport_error = NetcodeTransportError::Netcode(NetcodeError::Disconnected(
       NetcodeDisconnectReason::DisconnectedByServer,
     ));
-    let res = map_netcode_transport_error_to_network_error(&net_err);
-    match res {
-      NetworkErrorEvent::NetcodeDisconnect(s) => assert!(s.contains("server") || s.contains("terminated")),
-      _ => panic!("Expected NetworkErrorEvent::NetcodeDisconnect"),
+    let network_error_event = map_netcode_transport_error_to_network_error(&netcode_transport_error);
+    match network_error_event {
+      NetworkErrorEvent::Disconnect(s) => assert!(s.contains("server") || s.contains("terminated")),
+      _ => panic!("Expected NetworkErrorEvent::Disconnect"),
     }
   }
 
   #[test]
   fn map_netcode_transport_error_to_network_error_maps_io_error_to_io_error_event() {
-    let io_err = NetcodeTransportError::IO(std::io::Error::new(std::io::ErrorKind::Other, "io"));
-    let res = map_netcode_transport_error_to_network_error(&io_err);
-    match res {
+    let netcode_transport_error = NetcodeTransportError::IO(std::io::Error::new(std::io::ErrorKind::Other, "io"));
+    let network_error_event = map_netcode_transport_error_to_network_error(&netcode_transport_error);
+    match network_error_event {
       NetworkErrorEvent::IoError(s) => assert!(s.contains("io")),
       _ => panic!("Expected NetworkErrorEvent::IoError"),
     }

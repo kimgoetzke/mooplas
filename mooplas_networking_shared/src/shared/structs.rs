@@ -226,8 +226,7 @@ impl Debug for ClientEvent {
 /// This is how the networking code communicates errors to the application code.
 #[derive(Event, Debug)]
 pub enum NetworkErrorEvent {
-  RenetDisconnect(String),
-  NetcodeDisconnect(String),
+  Disconnect(String),
   NetcodeTransportError(String),
   IoError(String),
   OtherError(String),

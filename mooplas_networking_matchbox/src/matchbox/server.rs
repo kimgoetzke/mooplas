@@ -1,10 +1,11 @@
 use crate::prelude::client_id_from_peer_id;
 use bevy::prelude::*;
-use bevy_matchbox::matchbox_socket::Packet;
+use bevy_matchbox::matchbox_socket::{ChannelError, Packet};
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
 use crossbeam_channel::Receiver;
 use mooplas_networking::prelude::{
-  ChannelType, ClientMessage, Lobby, OutgoingServerMessage, ServerEvent, ServerNetworkingActive, decode_from_bytes,
+  ChannelType, ClientMessage, Lobby, NetworkErrorEvent, OutgoingServerMessage, ServerEvent, ServerNetworkingActive,
+  decode_from_bytes,
 };
 use std::net::{Ipv4Addr, SocketAddrV4};
 
@@ -55,23 +56,36 @@ pub fn start_signaling_server(commands: &mut Commands) {
 /// A system that receives incoming messages and connection events from the [`MatchboxSocket`] and triggers
 /// corresponding events for the application to react to. Also updates the [`Lobby`] resource with connected clients.
 fn receive_messages(mut socket: ResMut<MatchboxSocket>, mut commands: Commands, mut lobby: ResMut<Lobby>) {
-  for (peer_id, state) in socket.update_peers() {
-    let client_id = client_id_from_peer_id(peer_id);
-    let server_event: ServerEvent = match state {
-      PeerState::Connected => {
-        trace!("Client with ID [{client_id}] connected");
-        lobby.connected.push(client_id);
-        ServerEvent::ClientConnected { client_id }
-      }
-      PeerState::Disconnected => {
-        trace!("Client with ID [{client_id}] disconnected");
-        lobby.connected.retain(|&id| id != client_id);
-        ServerEvent::ClientDisconnected { client_id }
-      }
-    };
+  match socket.try_update_peers() {
+    Ok(result) => {
+      for (peer_id, state) in result {
+        let client_id = client_id_from_peer_id(peer_id);
+        let server_event: ServerEvent = match state {
+          PeerState::Connected => {
+            trace!("Client with ID [{client_id}] connected");
+            lobby.connected.push(client_id);
+            ServerEvent::ClientConnected { client_id }
+          }
+          PeerState::Disconnected => {
+            trace!("Client with ID [{client_id}] disconnected");
+            lobby.connected.retain(|&id| id != client_id);
+            ServerEvent::ClientDisconnected { client_id }
+          }
+        };
 
-    // Trigger an event for an application to react to
-    commands.trigger(server_event);
+        // Trigger an event for an application to react to
+        commands.trigger(server_event);
+      }
+    }
+    Err(channel_error) => {
+      let error = match channel_error {
+        ChannelError::Closed => NetworkErrorEvent::Disconnect("Connection closed".to_string()),
+        _ => NetworkErrorEvent::OtherError(channel_error.to_string()),
+      };
+
+      // Trigger an error event for an application to react to
+      commands.trigger(error);
+    }
   }
 
   for (peer_id, message) in socket.channel_mut(ChannelType::ReliableOrdered.into()).receive() {

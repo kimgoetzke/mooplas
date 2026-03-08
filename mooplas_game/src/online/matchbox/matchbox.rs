@@ -3,7 +3,7 @@ use crate::prelude::{ConnectionInfoMessage, MenuName, ToggleMenuMessage, UiNotif
 use bevy::app::{App, Plugin, Update};
 use bevy::log::{debug, error, info};
 use bevy::prelude::{
-  Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Res, ResMut, in_state,
+  Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Res, ResMut, State, in_state,
 };
 use mooplas_networking::prelude::{ClientNetworkingActive, NetworkErrorEvent, NetworkRole, ServerNetworkingActive};
 use mooplas_networking_matchbox::prelude::{
@@ -96,24 +96,42 @@ fn handle_connection_info_message(
   }
 }
 
-// TODO: Implement an visual feedback for the user when connection is lost
-// TODO: Handle network disconnect errors for Matchbox
+// TODO: Implement an visual feedback for the user when host leaves
 #[allow(clippy::never_loop)]
 fn receive_network_error_event(
   error_event: On<NetworkErrorEvent>,
   mut commands: Commands,
+  current_app_state: Res<State<AppState>>,
   mut next_app_state: ResMut<NextState<AppState>>,
   mut network_role: ResMut<NetworkRole>,
+  mut ui_message: MessageWriter<UiNotification>,
 ) {
   let error = error_event.event();
-  if matches!(error, &NetworkErrorEvent::NetcodeDisconnect(_)) {
+  if matches!(error, &NetworkErrorEvent::Disconnect(_)) {
+    let next_state = match **current_app_state {
+      AppState::Preparing => AppState::Preparing,
+      _ => AppState::GameOver,
+    };
     info!(
       "Connection lost: [{}] - removing networking resources and setting state to [{:?}]...",
-      error,
-      AppState::GameOver
+      error, next_state
     );
     remove_all_matchbox_resources(&mut commands);
-    next_app_state.set(AppState::GameOver);
+
+    // If the connection is lost during the preparation phase, we want to stay in the preparation phase to allow the
+    // user to try connecting again
+    if matches!(**current_app_state, AppState::Preparing)
+      && matches!(next_state, AppState::Preparing)
+      && network_role.is_client()
+    {
+      ui_message.write(UiNotification::error(
+        "Unable to establish connection - is there a typo in the connection string?".to_string(),
+      ));
+      return;
+    }
+
+    // In all other cases, we fall back to the main menu for now
+    next_app_state.set(next_state);
     *network_role = NetworkRole::None;
     return;
   }

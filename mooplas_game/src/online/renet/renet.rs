@@ -131,10 +131,7 @@ fn receive_network_error_event(
   mut network_role: ResMut<NetworkRole>,
 ) {
   let error = error_event.event();
-  if matches!(
-    error,
-    &NetworkErrorEvent::RenetDisconnect(_) | &NetworkErrorEvent::NetcodeDisconnect(_)
-  ) {
+  if matches!(error, &NetworkErrorEvent::Disconnect(_)) {
     info!(
       "Connection lost: [{}] - removing networking resources and setting state to [{:?}]...",
       error,
