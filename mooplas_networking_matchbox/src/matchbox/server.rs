@@ -2,16 +2,11 @@ use crate::prelude::client_id_from_peer_id;
 use bevy::prelude::*;
 use bevy_matchbox::matchbox_socket::{ChannelError, Packet};
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
-use crossbeam_channel::Receiver;
 use mooplas_networking::prelude::{
   ChannelType, ClientMessage, Lobby, NetworkErrorEvent, OutgoingServerMessage, ServerEvent, ServerNetworkingActive,
   decode_from_bytes,
 };
 use std::net::{Ipv4Addr, SocketAddrV4};
-
-/// Resource to receive client events from callbacks
-#[derive(Resource)]
-pub struct ClientConnectionReceiver(pub Receiver<ServerEvent>);
 
 /// A Bevy plugin that adds server-side online multiplayer capabilities using Matchbox.
 pub struct ServerMatchboxPlugin;

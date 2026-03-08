@@ -4837,7 +4837,6 @@ version = "0.1.0"
 dependencies = [
  "bevy",
  "bevy_matchbox",
- "crossbeam-channel",
  "mooplas_networking",
  "rand 0.10.0",
 ]
