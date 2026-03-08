@@ -19,9 +19,9 @@ use mooplas_networking::prelude::{
 
 /// A plugin that adds shared client-side online multiplayer capabilities to the game. Contains systems that are shared
 /// between different client implementations.
-pub struct SharedClientPlugin;
+pub struct ClientPlugin;
 
-impl Plugin for SharedClientPlugin {
+impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
       .add_observer(receive_server_message_event)

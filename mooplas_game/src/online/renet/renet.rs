@@ -1,5 +1,4 @@
 use crate::app_state::AppState;
-use crate::online::renet::client::ClientPlugin;
 use crate::prelude::{ConnectionInfoMessage, MenuName, ToggleMenuMessage, UiNotification};
 use bevy::app::{App, Plugin, Update};
 use bevy::log::{debug, error, info, warn};
@@ -8,8 +7,8 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::{NetworkErrorEvent, NetworkRole};
 use mooplas_networking_renet::prelude::{
-  RenetNetworkingMessagesPlugin, ServerRenetPlugin, ServerVisualiserPlugin, create_client, create_server,
-  remove_all_renet_resources,
+  ClientHandshakeOutcomeMessage, ClientRenetPlugin, ClientVisualiserPlugin, RenetNetworkingMessagesPlugin,
+  ServerRenetPlugin, ServerVisualiserPlugin, create_client, create_server, remove_all_renet_resources,
 };
 
 /// Plugin that adds online multiplayer capabilities for native builds using UDP/`bevy_renet` to the game.
@@ -21,11 +20,22 @@ impl Plugin for RenetPlugin {
     info!("Online multiplayer using [bevy_renet] is enabled");
     app
       .add_plugins(RenetNetworkingMessagesPlugin)
-      .add_plugins((ClientPlugin, ServerRenetPlugin, ServerVisualiserPlugin))
+      .add_plugins((
+        ClientRenetPlugin,
+        ClientVisualiserPlugin,
+        ServerRenetPlugin,
+        ServerVisualiserPlugin,
+      ))
       .add_systems(Update, handle_toggle_menu_message.run_if(in_state(AppState::Preparing)))
       .add_systems(
         Update,
         handle_connection_info_message
+          .run_if(in_state(AppState::Preparing))
+          .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
+      )
+      .add_systems(
+        Update,
+        client_handshake_system
           .run_if(in_state(AppState::Preparing))
           .run_if(|network_role: Res<NetworkRole>| network_role.is_client()),
       )
@@ -88,6 +98,27 @@ fn handle_connection_info_message(
       warn!("Failed to parse connection string: {}", message);
       ui_message.write(UiNotification::error(message));
     }
+  }
+}
+
+/// System that checks whether the client completed the handshake before the deadline.
+/// If the handshake did not complete in time, it cleans up the client transport and
+/// emits a UI error message.
+///
+///
+pub fn client_handshake_system(
+  mut messages: MessageReader<ClientHandshakeOutcomeMessage>,
+  mut ui_message: MessageWriter<UiNotification>,
+) {
+  for message in messages.read() {
+    let reason = message
+      .reason
+      .as_ref()
+      .expect("Handshake outcome message should always contain a reason");
+    match message.has_succeeded {
+      true => ui_message.write(UiNotification::info(reason.to_string())),
+      false => ui_message.write(UiNotification::error(reason.to_string())),
+    };
   }
 }
 
