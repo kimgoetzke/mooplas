@@ -1,5 +1,3 @@
-#![cfg(feature = "online")]
-
 use crate::prelude::{AvailablePlayerConfigs, PlayerId, PlayerRegistrationMessage, RegisteredPlayers};
 use crate::shared::RegisteredPlayer;
 use bevy::log::*;
