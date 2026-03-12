@@ -6,12 +6,12 @@ use crate::prelude::{
 };
 use bevy::log::{debug, info, warn};
 use bevy::prelude::{
-  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Query, Res, ResMut,
-  Resource, StateTransitionEvent, Time, Timer, TimerMode, Transform, Update, With, in_state, resource_exists,
+  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut, Resource,
+  State, StateTransitionEvent, Time, Timer, TimerMode, Transform, Update, With, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
-  ChannelType, ClientEvent, ClientId, Lobby, NetworkRole, OutgoingServerMessage, ServerEvent, ServerNetworkingActive,
-  encode_to_bytes,
+  ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, NetworkRole, OutboundServerMessage,
+  ServerNetworkingActive, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -22,16 +22,19 @@ pub struct ServerPlugin;
 impl Plugin for ServerPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_observer(receive_client_events)
-      .add_observer(receive_server_events)
       .add_systems(
         Update,
-        broadcast_local_app_state_system.run_if(resource_exists::<ServerNetworkingActive>),
+        (
+          handle_inbound_client_message,
+          handle_inbound_server_message,
+          handle_local_state_transition_event,
+        )
+          .run_if(resource_exists::<ServerNetworkingActive>),
       )
       .add_systems(
         Update,
         (
-          broadcast_local_player_registration_system,
+          handle_local_player_registration_message,
           process_and_broadcast_local_exit_lobby_message,
         )
           .run_if(in_state(AppState::Registering))
@@ -60,101 +63,108 @@ struct ShutdownCountdown(Timer);
 
 /// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients,
 /// if necessary.
-fn receive_client_events(
-  client_event: On<ClientEvent>,
+fn handle_inbound_client_message(
+  mut messages: MessageReader<InboundClientMessage>,
   mut lobby: ResMut<Lobby>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
   mut input_message: MessageWriter<InputMessage>,
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
 ) {
-  match client_event.event() {
-    ClientEvent::PlayerRegistration(message, client_id) => {
-      handle_player_registration_message_from_client(
-        &mut outgoing_messages,
-        &mut registered_players,
-        &available_configs,
-        &mut player_registration_message,
-        &client_id,
-        message.player_id,
-        message.has_registered,
-        &mut lobby,
-      );
-    }
-    ClientEvent::Input(message, client_id) => {
-      let message: InputMessage = message.into();
-      let player_id = match message {
-        InputMessage::Action(player_id) => player_id,
-        InputMessage::Move(player_id, _) => player_id,
-      };
-      if lobby.validate_registration(&client_id, &player_id.into()) {
-        input_message.write(message);
-        return;
+  for message in messages.read() {
+    match message {
+      InboundClientMessage::PlayerRegistration(message, client_id) => {
+        handle_player_registration_message_from_client(
+          &mut outbound_server_message,
+          &mut registered_players,
+          &available_configs,
+          &mut player_registration_message,
+          &client_id,
+          message.player_id,
+          message.has_registered,
+          &mut lobby,
+        );
       }
-      warn!("Received invalid input action on [Unreliable] channel: {:?}", message);
+      InboundClientMessage::Input(message, client_id) => {
+        let message: InputMessage = message.into();
+        let player_id = match message {
+          InputMessage::Action(player_id) => player_id,
+          InputMessage::Move(player_id, _) => player_id,
+        };
+        if lobby.validate_registration(&client_id, &player_id.into()) {
+          input_message.write(message);
+          return;
+        }
+        warn!("Received invalid input action on [Unreliable] channel: {:?}", message);
+      }
     }
   }
 }
 
-/// The main observer system for server events.
-fn receive_server_events(
-  server_event: On<ServerEvent>,
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+/// The main system for server messages.
+fn handle_inbound_server_message(
+  mut messages: MessageReader<InboundServerMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
   mut lobby: ResMut<Lobby>,
+  current_state: Res<State<AppState>>,
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
-  match server_event.event() {
-    ServerEvent::ClientConnected { client_id } => {
-      info!("Client with ID [{}] connected", client_id);
+  for message in messages.read() {
+    match message {
+      InboundServerMessage::ClientConnected { client_id } => {
+        info!("Client with ID [{}] connected", client_id);
 
-      // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
-      // Send the current seed to the newly connected client
-      let seed_message = encode_to_bytes(&ServerEvent::ClientInitialised {
-        seed: seed.get(),
-        client_id: *client_id,
-      })
-      .expect("Failed to serialise seed message");
-      outgoing_messages.write(OutgoingServerMessage::Send {
-        client_id: *client_id,
-        channel: ChannelType::ReliableOrdered,
-        payload: seed_message,
-      });
-    }
-    ServerEvent::ClientDisconnected { client_id } => {
-      info!("Client with ID [{}] disconnected", client_id);
+        // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
+        // Send the current seed to the newly connected client
+        let seed_message = encode_to_bytes(&InboundServerMessage::ClientInitialised {
+          seed: seed.get(),
+          client_id: *client_id,
+        })
+        .expect("Failed to serialise seed message");
+        outbound_server_message.write(OutboundServerMessage::Send {
+          client_id: *client_id,
+          channel: ChannelType::ReliableOrdered,
+          payload: seed_message,
+        });
 
-      // Unregister any players associated with this client and notify other clients about it
-      for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
-        handle_player_registration_message_from_client(
-          &mut outgoing_messages,
-          &mut registered_players,
-          &available_configs,
-          &mut player_registration_message,
-          &client_id,
-          *player_id,
-          false,
-          &mut lobby,
-        );
+        // Transition to lobby (but initialise first)
+        if *current_state == AppState::Preparing {
+          next_state.set(AppState::Initialising);
+        }
       }
-    }
-    _ => { /* Ignored */ }
-  }
+      InboundServerMessage::ClientDisconnected { client_id } => {
+        info!("Client with ID [{}] disconnected", client_id);
 
-  // TODO: Improve state transition logic
-  if lobby.connected.len() > 0 {
-    next_state.set(AppState::Initialising);
+        // Unregister any players associated with this client and notify other clients about it
+        for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
+          handle_player_registration_message_from_client(
+            &mut outbound_server_message,
+            &mut registered_players,
+            &available_configs,
+            &mut player_registration_message,
+            &client_id,
+            *player_id,
+            false,
+            &mut lobby,
+          );
+        }
+
+        // TODO: Transition somewhere (lobby or error screen) when no clients are left or at least show message
+      }
+      _ => { /* Ignored */ }
+    }
   }
 }
 
 /// Broadcasts the authoritative state (position and rotation) of all snake heads to all clients.
 /// This runs every frame to ensure clients have up-to-date positions for interpolation.
 fn broadcast_player_states_system(
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
   snake_heads: Query<(&Transform, &PlayerId), With<SnakeHead>>,
 ) {
   let mut states = Vec::new();
@@ -168,8 +178,8 @@ fn broadcast_player_states_system(
     return;
   }
 
-  if let Ok(payload) = encode_to_bytes(&ServerEvent::UpdatePlayerStates { states }) {
-    outgoing_messages.write(OutgoingServerMessage::Broadcast {
+  if let Ok(payload) = encode_to_bytes(&InboundServerMessage::UpdatePlayerStates { states }) {
+    outbound_server_message.write(OutboundServerMessage::Broadcast {
       channel: ChannelType::Unreliable,
       payload,
     });
@@ -180,7 +190,7 @@ fn broadcast_player_states_system(
 
 /// Processes an individual player registration message from [`ClientId`].
 pub fn handle_player_registration_message_from_client(
-  outgoing_messages: &mut MessageWriter<OutgoingServerMessage>,
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
   mut registered_players: &mut ResMut<RegisteredPlayers>,
   available_configs: &Res<AvailablePlayerConfigs>,
   mut player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
@@ -191,12 +201,12 @@ pub fn handle_player_registration_message_from_client(
 ) {
   if has_registered {
     info!("[{}] with client ID [{}] registered", player_id, client_id);
-    let payload = encode_to_bytes(&ServerEvent::PlayerRegistered {
+    let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
       client_id: (*client_id).into(),
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    outgoing_messages.write(OutgoingServerMessage::BroadcastExcept {
+    outbound_server_message.write(OutboundServerMessage::BroadcastExcept {
       except_client_id: *client_id,
       channel: ChannelType::ReliableOrdered,
       payload,
@@ -210,12 +220,12 @@ pub fn handle_player_registration_message_from_client(
     lobby.register_player(*client_id, player_id.into());
   } else {
     info!("[{}] with client ID [{}] unregistered", player_id, client_id);
-    let payload = encode_to_bytes(&ServerEvent::PlayerUnregistered {
+    let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
       client_id: (*client_id).into(),
       player_id: player_id.0,
     })
     .expect(CLIENT_MESSAGE_SERIALISATION);
-    outgoing_messages.write(OutgoingServerMessage::BroadcastExcept {
+    outbound_server_message.write(OutboundServerMessage::BroadcastExcept {
       except_client_id: *client_id,
       channel: ChannelType::ReliableOrdered,
       payload,
@@ -230,20 +240,20 @@ pub fn handle_player_registration_message_from_client(
 }
 
 /// A system that handles local state change events and broadcasts them to all connected clients.
-fn broadcast_local_app_state_system(
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
-  mut app_state_messages: MessageReader<StateTransitionEvent<AppState>>,
+fn handle_local_state_transition_event(
+  mut messages: MessageReader<StateTransitionEvent<AppState>>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
   winner: Res<WinnerInfo>,
 ) {
-  for message in app_state_messages.read() {
+  for message in messages.read() {
     if let Some(state_name) = message.entered {
-      let server_event = ServerEvent::StateChanged {
+      let server_event = InboundServerMessage::StateChanged {
         new_state: state_name.to_string(),
         winner_info: winner.get_as_u8(),
       };
       debug!("Broadcasting: {:?}", server_event);
       if let Ok(payload) = encode_to_bytes(&server_event) {
-        outgoing_messages.write(OutgoingServerMessage::Broadcast {
+        outbound_server_message.write(OutboundServerMessage::Broadcast {
           channel: ChannelType::ReliableOrdered,
           payload,
         });
@@ -257,9 +267,9 @@ fn broadcast_local_app_state_system(
 
 /// A system that handles local messages (such as player registration messages) and broadcasts them to all connected
 /// clients.
-fn broadcast_local_player_registration_system(
+fn handle_local_player_registration_message(
   mut messages: MessageReader<PlayerRegistrationMessage>,
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
 ) {
   for message in messages.read() {
     if utils::should_message_be_skipped(&message, NetworkRole::Client) {
@@ -267,23 +277,23 @@ fn broadcast_local_player_registration_system(
     }
     if message.has_registered {
       debug!("Broadcasting: [{}] registered locally...", message.player_id);
-      let payload = encode_to_bytes(&ServerEvent::PlayerRegistered {
+      let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
         client_id: ClientId::from_renet_u64(0),
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
-      outgoing_messages.write(OutgoingServerMessage::Broadcast {
+      outbound_server_message.write(OutboundServerMessage::Broadcast {
         channel: ChannelType::ReliableOrdered,
         payload,
       });
     } else {
       debug!("Broadcasting: [{}] unregistered locally...", message.player_id);
-      let payload = encode_to_bytes(&ServerEvent::PlayerUnregistered {
+      let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
         client_id: ClientId::from_renet_u64(0),
         player_id: message.player_id.0,
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
-      outgoing_messages.write(OutgoingServerMessage::Broadcast {
+      outbound_server_message.write(OutboundServerMessage::Broadcast {
         channel: ChannelType::ReliableOrdered,
         payload,
       });
@@ -296,12 +306,12 @@ fn broadcast_local_player_registration_system(
 fn process_and_broadcast_local_exit_lobby_message(
   mut messages: MessageReader<ExitLobbyMessage>,
   mut commands: Commands,
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
 ) {
   for _ in messages.read() {
     info!("Informing all clients about intention to shut down server and scheduling shutdown...");
-    let payload = encode_to_bytes(&ServerEvent::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
-    outgoing_messages.write(OutgoingServerMessage::Broadcast {
+    let payload = encode_to_bytes(&InboundServerMessage::ShutdownServer).expect(CLIENT_MESSAGE_SERIALISATION);
+    outbound_server_message.write(OutboundServerMessage::Broadcast {
       channel: ChannelType::ReliableOrdered,
       payload,
     });
@@ -322,14 +332,14 @@ fn disconnect_all_clients_system(
   mut registered_players: ResMut<RegisteredPlayers>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
   mut next_app_state: ResMut<NextState<AppState>>,
-  mut outgoing_messages: MessageWriter<OutgoingServerMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
 ) {
   countdown.0.tick(time.delta());
   if countdown.0.just_finished() {
     info!("Disconnecting all clients now...");
     lobby.clear();
     registered_players.clear();
-    outgoing_messages.write(OutgoingServerMessage::DisconnectAll);
+    outbound_server_message.write(OutboundServerMessage::DisconnectAll);
     commands.remove_resource::<ShutdownCountdown>();
     toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     next_app_state.set(AppState::Preparing);
@@ -375,12 +385,12 @@ mod tests {
     // Check that a broadcast message with payload was sent on the expected channel
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
     let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
     assert_eq!(message_vec.len(), 1);
     match &message_vec[0] {
-      OutgoingServerMessage::Broadcast { channel, payload } => {
+      OutboundServerMessage::Broadcast { channel, payload } => {
         assert!(matches!(channel, ChannelType::Unreliable));
         assert!(!payload.is_empty());
       }
@@ -396,7 +406,7 @@ mod tests {
 
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
     let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
     assert_eq!(message_vec.len(), 0);
@@ -405,7 +415,7 @@ mod tests {
   #[test]
   fn broadcast_local_player_registration_system_broadcasts_registration() {
     let mut app = setup();
-    app.add_systems(Update, broadcast_local_player_registration_system);
+    app.add_systems(Update, handle_local_player_registration_message);
 
     // Simulate a player registering on the server
     app
@@ -422,7 +432,7 @@ mod tests {
     // Check that a message with payload was broadcast on the expected channel
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
     let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
     assert_eq!(message_vec.len(), 1);
@@ -433,7 +443,7 @@ mod tests {
   #[test]
   fn broadcast_local_player_registration_system_broadcasts_unregistration() {
     let mut app = setup();
-    app.add_systems(Update, broadcast_local_player_registration_system);
+    app.add_systems(Update, handle_local_player_registration_message);
 
     // Simulate a player unregistering on the server
     app
@@ -450,7 +460,7 @@ mod tests {
     // Check that a message with payload was broadcast on the expected channel
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
     let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
     assert_eq!(message_vec.len(), 1);
@@ -460,7 +470,7 @@ mod tests {
   #[test]
   fn broadcast_local_player_registration_system_skips_client_role_messages() {
     let mut app = setup();
-    app.add_systems(Update, broadcast_local_player_registration_system);
+    app.add_systems(Update, handle_local_player_registration_message);
 
     // Simulate a client registration message (which should be ignored by the server)
     app
@@ -477,7 +487,7 @@ mod tests {
     // Check that no messages were broadcast
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
     let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
     assert_eq!(message_vec.len(), 0);
@@ -486,7 +496,7 @@ mod tests {
   #[test]
   fn broadcast_local_app_state_system_broadcasts_state_transitions() {
     let mut app = setup();
-    app.add_systems(Update, broadcast_local_app_state_system);
+    app.add_systems(Update, handle_local_state_transition_event);
     app.update();
 
     // Transition state and update
@@ -503,15 +513,15 @@ mod tests {
     // Check that the correct message was broadcast
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
-    let message_vec: Vec<&OutgoingServerMessage> = messages.iter_current_update_messages().collect();
+    let message_vec: Vec<&OutboundServerMessage> = messages.iter_current_update_messages().collect();
     let playing_messages: Vec<_> = message_vec
       .iter()
       .filter(|m| match m {
-        OutgoingServerMessage::Broadcast { payload, .. } => {
-          let decoded = mooplas_networking::prelude::decode_from_bytes::<ServerEvent>(payload);
-          if let Ok(ServerEvent::StateChanged { new_state, .. }) = decoded {
+        OutboundServerMessage::Broadcast { payload, .. } => {
+          let decoded = mooplas_networking::prelude::decode_from_bytes::<InboundServerMessage>(payload);
+          if let Ok(InboundServerMessage::StateChanged { new_state, .. }) = decoded {
             new_state == "Playing"
           } else {
             false
@@ -528,13 +538,13 @@ mod tests {
   #[test]
   fn broadcast_local_app_state_system_ignores_transitions_without_entered_state() {
     let mut app = setup();
-    app.add_systems(Update, broadcast_local_app_state_system);
+    app.add_systems(Update, handle_local_state_transition_event);
     app.update();
 
     let before_count = {
       let messages = app
         .world_mut()
-        .get_resource_mut::<Messages<OutgoingServerMessage>>()
+        .get_resource_mut::<Messages<OutboundServerMessage>>()
         .expect("Messages<OutgoingServerMessage> missing");
       messages.iter_current_update_messages().count()
     };
@@ -552,7 +562,7 @@ mod tests {
     let after_count = {
       let messages = app
         .world_mut()
-        .get_resource_mut::<Messages<OutgoingServerMessage>>()
+        .get_resource_mut::<Messages<OutboundServerMessage>>()
         .expect("Messages<OutgoingServerMessage> missing");
       messages.iter_current_update_messages().count()
     };
@@ -573,7 +583,7 @@ mod tests {
     // Check that the expected message was broadcast
     let messages = app
       .world_mut()
-      .get_resource_mut::<Messages<OutgoingServerMessage>>()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
     let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
     assert_eq!(message_vec.len(), 1);
@@ -583,9 +593,9 @@ mod tests {
     assert!(app.world().contains_resource::<ShutdownCountdown>());
   }
 
-  fn assert_that_message_was_broadcast(message_vec: &Vec<&OutgoingServerMessage>) {
+  fn assert_that_message_was_broadcast(message_vec: &Vec<&OutboundServerMessage>) {
     match &message_vec[0] {
-      OutgoingServerMessage::Broadcast { channel, payload } => {
+      OutboundServerMessage::Broadcast { channel, payload } => {
         assert!(matches!(channel, ChannelType::ReliableOrdered));
         assert!(!payload.is_empty());
       }

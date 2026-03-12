@@ -24,8 +24,8 @@ mod tests {
   mod online {
     use super::*;
     use crate::prelude::PlayerId;
+    use crate::shared::messages::{ClientMessage, InboundServerMessage, PlayerRegistrationMessage};
     use crate::shared::resources::NetworkRole;
-    use crate::shared::structs::{ClientMessage, PlayerRegistrationMessage, ServerEvent};
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {
@@ -43,7 +43,7 @@ mod tests {
     #[test]
     fn decode_from_bytes_rejects_garbage_bytes() {
       let bytes = vec![0xde, 0xad, 0xbe, 0xef];
-      let decoded: Result<ServerEvent, _> = decode_from_bytes(&bytes);
+      let decoded: Result<InboundServerMessage, _> = decode_from_bytes(&bytes);
       assert!(decoded.is_err());
     }
   }

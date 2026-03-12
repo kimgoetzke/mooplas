@@ -3,8 +3,8 @@ use bevy::prelude::*;
 use bevy_matchbox::matchbox_socket::{ChannelError, Packet};
 use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
 use mooplas_networking::prelude::{
-  ChannelType, ClientMessage, Lobby, NetworkErrorEvent, OutgoingServerMessage, ServerEvent, ServerNetworkingActive,
-  decode_from_bytes,
+  ChannelType, ClientMessage, InboundClientMessage, InboundServerMessage, Lobby, NetworkErrorEvent,
+  OutboundServerMessage, ServerNetworkingActive, decode_from_bytes,
 };
 use std::net::{Ipv4Addr, SocketAddrV4};
 
@@ -20,7 +20,7 @@ impl Plugin for ServerMatchboxPlugin {
       )
       .add_systems(
         Update,
-        send_outgoing_server_messages_system.run_if(resource_exists::<ServerNetworkingActive>),
+        handle_outbound_server_message.run_if(resource_exists::<ServerNetworkingActive>),
       );
   }
 }
@@ -50,26 +50,32 @@ pub fn start_signaling_server(commands: &mut Commands) {
 
 /// A system that receives incoming messages and connection events from the [`MatchboxSocket`] and triggers
 /// corresponding events for the application to react to. Also updates the [`Lobby`] resource with connected clients.
-fn receive_messages(mut socket: ResMut<MatchboxSocket>, mut commands: Commands, mut lobby: ResMut<Lobby>) {
+fn receive_messages(
+  mut socket: ResMut<MatchboxSocket>,
+  mut commands: Commands,
+  mut lobby: ResMut<Lobby>,
+  mut inbound_client_message: MessageWriter<InboundClientMessage>,
+  mut inbound_server_message: MessageWriter<InboundServerMessage>,
+) {
   match socket.try_update_peers() {
     Ok(result) => {
       for (peer_id, state) in result {
         let client_id = client_id_from_peer_id(peer_id);
-        let server_event: ServerEvent = match state {
+        let server_event: InboundServerMessage = match state {
           PeerState::Connected => {
             trace!("Client with ID [{client_id}] connected");
             lobby.connected.push(client_id);
-            ServerEvent::ClientConnected { client_id }
+            InboundServerMessage::ClientConnected { client_id }
           }
           PeerState::Disconnected => {
             trace!("Client with ID [{client_id}] disconnected");
             lobby.connected.retain(|&id| id != client_id);
-            ServerEvent::ClientDisconnected { client_id }
+            InboundServerMessage::ClientDisconnected { client_id }
           }
         };
 
         // Trigger an event for an application to react to
-        commands.trigger(server_event);
+        inbound_server_message.write(server_event);
       }
     }
     Err(channel_error) => {
@@ -91,31 +97,31 @@ fn receive_messages(mut socket: ResMut<MatchboxSocket>, mut commands: Commands, 
       ChannelType::ReliableOrdered,
       client_message
     );
-    commands.trigger(client_message.to_event(client_id));
+    inbound_client_message.write(client_message.to_event(client_id));
   }
 
   for (peer_id, message) in socket.channel_mut(ChannelType::Unreliable.into()).receive() {
     let client_id = client_id_from_peer_id(peer_id);
     let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-    commands.trigger(client_message.to_event(client_id));
+    inbound_client_message.write(client_message.to_event(client_id));
   }
 }
 
 /// A system that applies outgoing send/broadcast/disconnect requests using the [`MatchboxSocket`].
-fn send_outgoing_server_messages_system(
-  mut outgoing_messages: MessageReader<OutgoingServerMessage>,
+fn handle_outbound_server_message(
+  mut messages: MessageReader<OutboundServerMessage>,
   mut socket: ResMut<MatchboxSocket>,
 ) {
-  for outgoing_message in outgoing_messages.read() {
-    match outgoing_message {
-      OutgoingServerMessage::Broadcast { channel, payload } => {
+  for message in messages.read() {
+    match message {
+      OutboundServerMessage::Broadcast { channel, payload } => {
         let packet = Packet::from(payload.as_slice());
         let peers: Vec<PeerId> = socket.connected_peers().collect();
         for peer_id in peers {
           socket.channel_mut((*channel).into()).send(packet.clone(), peer_id);
         }
       }
-      OutgoingServerMessage::BroadcastExcept {
+      OutboundServerMessage::BroadcastExcept {
         except_client_id,
         channel,
         payload,
@@ -129,7 +135,7 @@ fn send_outgoing_server_messages_system(
           socket.channel_mut((*channel).into()).send(packet.clone(), peer_id);
         }
       }
-      OutgoingServerMessage::Send {
+      OutboundServerMessage::Send {
         client_id,
         channel,
         payload,
@@ -141,7 +147,7 @@ fn send_outgoing_server_messages_system(
           .expect("Client ID not found among connected peers");
         socket.channel_mut((*channel).into()).send(packet, peer);
       }
-      OutgoingServerMessage::DisconnectAll => {
+      OutboundServerMessage::DisconnectAll => {
         socket.close();
       }
     }

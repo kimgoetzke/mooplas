@@ -2,10 +2,10 @@ use crate::renet::{RenetServerVisualiser, SHOW_VISUALISERS_BY_DEFAULT};
 use bevy::app::Update;
 use bevy::input::common_conditions::input_toggle_active;
 use bevy::log::*;
-use bevy::prelude::{App, IntoScheduleConfigs, KeyCode, On, Plugin, Res, ResMut, resource_exists};
+use bevy::prelude::{App, IntoScheduleConfigs, KeyCode, MessageReader, Plugin, Res, ResMut, resource_exists};
 use bevy_inspector_egui::bevy_egui::EguiContexts;
 use bevy_renet::RenetServer;
-use mooplas_networking::prelude::ServerEvent;
+use mooplas_networking::prelude::InboundServerMessage;
 
 /// A Bevy plugin that adds a system to update and display the Renet server visualiser when toggled by the user.
 pub struct ServerVisualiserPlugin;
@@ -19,7 +19,10 @@ impl Plugin for ServerVisualiserPlugin {
           .run_if(resource_exists::<RenetServerVisualiser>)
           .run_if(input_toggle_active(SHOW_VISUALISERS_BY_DEFAULT, KeyCode::F2)),
       )
-      .add_observer(receive_server_events);
+      .add_systems(
+        Update,
+        handle_inbound_server_message.run_if(resource_exists::<RenetServerVisualiser>),
+      );
   }
 }
 
@@ -37,20 +40,25 @@ fn update_server_visualiser_system(
   }
 }
 
-fn receive_server_events(server_event: On<ServerEvent>, mut visualiser: Option<ResMut<RenetServerVisualiser>>) {
-  match server_event.event() {
-    ServerEvent::ClientConnected { client_id } => {
-      info!("Adding client [{}] to visualiser", client_id);
-      if let Some(visualiser) = visualiser.as_mut() {
-        visualiser.add_client(client_id);
+fn handle_inbound_server_message(
+  mut inbound_server_message: MessageReader<InboundServerMessage>,
+  mut visualiser: Option<ResMut<RenetServerVisualiser>>,
+) {
+  for message in inbound_server_message.read() {
+    match message {
+      InboundServerMessage::ClientConnected { client_id } => {
+        info!("Adding client [{}] to visualiser", client_id);
+        if let Some(visualiser) = visualiser.as_mut() {
+          visualiser.add_client(client_id);
+        }
       }
-    }
-    ServerEvent::ClientDisconnected { client_id } => {
-      info!("Removing client [{}] from visualiser", client_id);
-      if let Some(visualiser) = visualiser.as_mut() {
-        visualiser.remove_client(client_id);
+      InboundServerMessage::ClientDisconnected { client_id } => {
+        info!("Removing client [{}] from visualiser", client_id);
+        if let Some(visualiser) = visualiser.as_mut() {
+          visualiser.remove_client(client_id);
+        }
       }
+      _ => { /* Ignored */ }
     }
-    _ => { /* Ignored */ }
   }
 }

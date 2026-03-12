@@ -10,7 +10,7 @@ use bevy_renet::netcode::{ClientAuthentication, NetcodeClientPlugin, NetcodeClie
 use bevy_renet::renet::{ConnectionConfig, DefaultChannel};
 use bevy_renet::{RenetClient, RenetClientPlugin};
 use mooplas_networking::prelude::{
-  ChannelType, ClientNetworkingActive, OutgoingClientMessage, ServerEvent, decode_from_bytes,
+  ChannelType, ClientNetworkingActive, InboundServerMessage, OutboundClientMessage, decode_from_bytes,
 };
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::{Instant, SystemTime};
@@ -27,7 +27,7 @@ impl Plugin for ClientRenetPlugin {
         client_handshake_system.run_if(resource_exists::<PendingClientHandshake>),
       )
       .add_systems(Update, receive_server_messages_system.run_if(is_client_connected))
-      .add_systems(Update, send_outgoing_client_messages_system.run_if(is_client_connected));
+      .add_systems(Update, handle_outbound_client_message.run_if(is_client_connected));
   }
 }
 
@@ -118,36 +118,36 @@ pub fn client_handshake_system(
 
 /// A system that reads all messages from the server on all channels, deserialises them and triggers them as events for
 /// an application to read and respond to.
-fn receive_server_messages_system(mut client: ResMut<RenetClient>, mut commands: Commands) {
+fn receive_server_messages_system(
+  mut client: ResMut<RenetClient>,
+  mut inbound_server_message: MessageWriter<InboundServerMessage>,
+) {
   while let Some(reliable_ordered_channel_message) = client.receive_message(DefaultChannel::ReliableOrdered) {
-    let server_message: ServerEvent =
+    let server_message: InboundServerMessage =
       decode_from_bytes(&reliable_ordered_channel_message).expect("Failed to deserialise server message");
     debug!(
       "Received [{:?}] server message: {:?}",
       ChannelType::ReliableOrdered,
       server_message
     );
-    commands.trigger(server_message);
+    inbound_server_message.write(server_message);
   }
 
   while let Some(unreliable_channel_message) = client.receive_message(DefaultChannel::Unreliable) {
-    let server_message: ServerEvent =
+    let server_message: InboundServerMessage =
       decode_from_bytes(&unreliable_channel_message).expect("Failed to deserialise server message");
-    commands.trigger(server_message);
+    inbound_server_message.write(server_message);
   }
 }
 
 /// A system that applies outgoing send/disconnect requests to the active [`RenetClient`].
-fn send_outgoing_client_messages_system(
-  mut outgoing_messages: MessageReader<OutgoingClientMessage>,
-  mut client: ResMut<RenetClient>,
-) {
-  for outgoing_message in outgoing_messages.read() {
-    match outgoing_message {
-      OutgoingClientMessage::Send { channel, payload } => {
+fn handle_outbound_client_message(mut messages: MessageReader<OutboundClientMessage>, mut client: ResMut<RenetClient>) {
+  for message in messages.read() {
+    match message {
+      OutboundClientMessage::Send { channel, payload } => {
         client.send_message(*channel, payload.clone());
       }
-      OutgoingClientMessage::Disconnect => {
+      OutboundClientMessage::Disconnect => {
         client.disconnect();
       }
     }

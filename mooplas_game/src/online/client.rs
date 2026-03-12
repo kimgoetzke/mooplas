@@ -9,12 +9,12 @@ use bevy::app::Update;
 use bevy::log::{debug, error_once, info, warn};
 use bevy::math::Quat;
 use bevy::prelude::{
-  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Plugin, Query, Res, ResMut,
+  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
   State, Time, Transform, With, Without, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
-  ChannelType, ClientMessage, ClientNetworkingActive, NetworkRole, OutgoingClientMessage, PlayerStateUpdateMessage,
-  ServerEvent, encode_to_bytes,
+  ChannelType, ClientMessage, ClientNetworkingActive, InboundServerMessage, NetworkRole, OutboundClientMessage,
+  PlayerStateUpdateMessage, encode_to_bytes,
 };
 
 /// A plugin that adds shared client-side online multiplayer capabilities to the game. Contains systems that are shared
@@ -24,12 +24,15 @@ pub struct ClientPlugin;
 impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
-      .add_observer(receive_server_message_event)
+      .add_systems(
+        Update,
+        handle_inbound_server_message.run_if(resource_exists::<ClientNetworkingActive>),
+      )
       .add_systems(
         Update,
         (
-          send_local_player_registration_system,
-          process_and_send_local_exit_lobby_message_system,
+          handle_local_player_registration_message,
+          handle_local_exit_lobby_message,
         )
           .run_if(in_state(AppState::Registering))
           .run_if(resource_exists::<ClientNetworkingActive>),
@@ -48,8 +51,8 @@ impl Plugin for ClientPlugin {
 }
 
 /// Processes any incoming server messages and acts on them, if required.
-fn receive_server_message_event(
-  server_message: On<ServerEvent>,
+fn handle_inbound_server_message(
+  mut messages: MessageReader<InboundServerMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_configs: Res<AvailablePlayerConfigs>,
   current_state: ResMut<State<AppState>>,
@@ -60,53 +63,55 @@ fn receive_server_message_event(
   mut player_state_update_message: MessageWriter<PlayerStateUpdateMessage>,
   mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
 ) {
-  match server_message.event() {
-    ServerEvent::ClientConnected { client_id } => info!("[{:?}] connected", client_id),
-    ServerEvent::ClientDisconnected { client_id } => info!("[{:?}] disconnected", client_id),
-    ServerEvent::ClientInitialised { seed: server_seed, .. } => {
-      seed.set(*server_seed);
-    }
-    ServerEvent::PlayerRegistered { player_id, .. } => {
-      let player_id = PlayerId(*player_id);
-      utils::register_player_locally(
-        &mut registered_players,
-        &available_configs,
-        &mut registration_message,
-        player_id,
-      );
-    }
-    ServerEvent::PlayerUnregistered { player_id, .. } => {
-      let player_id = PlayerId(*player_id);
-      utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
-    }
-    ServerEvent::StateChanged { new_state, winner_info } => {
-      if !current_state.is_manual_transition_allowed_to(&AppState::from(new_state)) {
-        next_state.set(AppState::from(new_state));
-      } else {
-        debug!(
-          "Ignoring state change to [{}] because [{:?}] is restricted...",
-          new_state, *current_state
+  for message in messages.read() {
+    match message {
+      InboundServerMessage::ClientConnected { client_id } => info!("[{:?}] connected", client_id),
+      InboundServerMessage::ClientDisconnected { client_id } => info!("[{:?}] disconnected", client_id),
+      InboundServerMessage::ClientInitialised { seed: server_seed, .. } => {
+        seed.set(*server_seed);
+      }
+      InboundServerMessage::PlayerRegistered { player_id, .. } => {
+        let player_id = PlayerId(*player_id);
+        utils::register_player_locally(
+          &mut registered_players,
+          &available_configs,
+          &mut registration_message,
+          player_id,
         );
       }
-      if let Some(player_id) = winner_info {
-        winner.set((*player_id).into());
+      InboundServerMessage::PlayerUnregistered { player_id, .. } => {
+        let player_id = PlayerId(*player_id);
+        utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
       }
-    }
-    ServerEvent::ShutdownServer => {
-      exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
-    }
-    ServerEvent::UpdatePlayerStates { states } => {
-      for (player_id, x, y, rotation_z) in states {
-        player_state_update_message.write(PlayerStateUpdateMessage::new(*player_id, (*x, *y), *rotation_z));
+      InboundServerMessage::StateChanged { new_state, winner_info } => {
+        if !current_state.is_manual_transition_allowed_to(&AppState::from(new_state)) {
+          next_state.set(AppState::from(new_state));
+        } else {
+          debug!(
+            "Ignoring state change to [{}] because [{:?}] is restricted...",
+            new_state, *current_state
+          );
+        }
+        if let Some(player_id) = winner_info {
+          winner.set((*player_id).into());
+        }
+      }
+      InboundServerMessage::ShutdownServer => {
+        exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
+      }
+      InboundServerMessage::UpdatePlayerStates { states } => {
+        for (player_id, x, y, rotation_z) in states {
+          player_state_update_message.write(PlayerStateUpdateMessage::new(*player_id, (*x, *y), *rotation_z));
+        }
       }
     }
   }
 }
 
 /// A system that handles local player registration messages by sending them to the server.
-fn send_local_player_registration_system(
+fn handle_local_player_registration_message(
   mut messages: MessageReader<PlayerRegistrationMessage>,
-  mut outgoing_messages: MessageWriter<OutgoingClientMessage>,
+  mut outbound_client_message: MessageWriter<OutboundClientMessage>,
 ) {
   for player_registration_message in messages.read() {
     if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
@@ -115,7 +120,7 @@ fn send_local_player_registration_system(
     let client_message = ClientMessage::PlayerRegistration(player_registration_message.into());
     debug!("Sending: [{:?}]", client_message);
     let payload = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
-    outgoing_messages.write(OutgoingClientMessage::Send {
+    outbound_client_message.write(OutboundClientMessage::Send {
       channel: ChannelType::ReliableOrdered,
       payload,
     });
@@ -123,16 +128,16 @@ fn send_local_player_registration_system(
 }
 
 /// A system that handles local exit lobby messages by disconnecting from the server and returning to the main menu.
-fn process_and_send_local_exit_lobby_message_system(
+fn handle_local_exit_lobby_message(
   mut messages: MessageReader<ExitLobbyMessage>,
-  mut outgoing_messages: MessageWriter<OutgoingClientMessage>,
+  mut outbound_client_message: MessageWriter<OutboundClientMessage>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
 ) {
   for message in messages.read() {
     debug!("Disconnecting from server (by force={})...", message.by_force);
     if !message.by_force {
-      outgoing_messages.write(OutgoingClientMessage::Disconnect);
+      outbound_client_message.write(OutboundClientMessage::Disconnect);
     }
     toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     registered_players.clear();
@@ -144,7 +149,7 @@ fn process_and_send_local_exit_lobby_message_system(
 fn send_local_input_messages(
   mut messages: MessageReader<InputMessage>,
   registered_players: Res<RegisteredPlayers>,
-  mut outgoing_messages: MessageWriter<OutgoingClientMessage>,
+  mut outbound_client_message: MessageWriter<OutboundClientMessage>,
 ) {
   for message in messages.read() {
     let player_id = match message {
@@ -157,7 +162,7 @@ fn send_local_input_messages(
       .find(|player| player.id == *player_id && player.is_local())
     {
       if let Ok(payload) = encode_to_bytes(&ClientMessage::Input(message.into())) {
-        outgoing_messages.write(OutgoingClientMessage::Send {
+        outbound_client_message.write(OutboundClientMessage::Send {
           channel: ChannelType::Unreliable,
           payload,
         });

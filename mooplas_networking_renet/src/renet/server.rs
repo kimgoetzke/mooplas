@@ -3,13 +3,15 @@ use crate::renet::constants::PROTOCOL_ID;
 use crate::renet::{client_id_from_renet_id, renet_id_from_client_id};
 use bevy::app::{Plugin, Update};
 use bevy::log::*;
-use bevy::prelude::{App, Commands, IntoScheduleConfigs, MessageReader, On, Res, ResMut, resource_exists};
+use bevy::prelude::{
+  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, On, Res, ResMut, resource_exists,
+};
 use bevy_renet::netcode::{NetcodeServerPlugin, NetcodeServerTransport, ServerAuthentication, ServerConfig};
 use bevy_renet::renet::ConnectionConfig;
 use bevy_renet::{RenetServer, RenetServerEvent, RenetServerPlugin};
 use mooplas_networking::prelude::{
-  ChannelType, ClientMessage, Lobby, OutgoingServerMessage, ServerEvent, ServerNetworkingActive, decode_from_bytes,
-  encode_to_bytes,
+  ChannelType, ClientMessage, InboundClientMessage, InboundServerMessage, Lobby, OutboundServerMessage,
+  ServerNetworkingActive, decode_from_bytes, encode_to_bytes,
 };
 use std::net::{Ipv6Addr, SocketAddr, UdpSocket};
 use std::time::SystemTime;
@@ -28,7 +30,7 @@ impl Plugin for ServerRenetPlugin {
       )
       .add_systems(
         Update,
-        send_outgoing_server_messages_system.run_if(resource_exists::<RenetServer>),
+        handle_outbound_server_message.run_if(resource_exists::<RenetServer>),
       );
   }
 }
@@ -73,20 +75,20 @@ pub fn create_new_renet_server_resources(
   Ok((server, transport))
 }
 
-/// Receives events from the [`RenetServer`], notifies other connected clients, then triggers corresponding
-/// [`MooplasServerEvent`] for the game to react to with custom logic.
+/// Receives events from the [`RenetServer`], notifies other connected clients, then sends the corresponding
+/// [`InboundServerMessage`] for the game to react to with custom logic.
 fn receive_renet_server_events(
   renet_server_event: On<RenetServerEvent>,
-  mut commands: Commands,
   mut server: ResMut<RenetServer>,
   mut lobby: ResMut<Lobby>,
+  mut inbound_server_message: MessageWriter<InboundServerMessage>,
 ) {
-  let server_event: ServerEvent = match **renet_server_event {
+  let server_message: InboundServerMessage = match **renet_server_event {
     bevy_renet::renet::ServerEvent::ClientConnected { client_id } => {
       info!("Client with ID [{}] connected", client_id);
 
       // Notify all other clients of the new connection
-      let connected_message = encode_to_bytes(&ServerEvent::ClientConnected {
+      let connected_message = encode_to_bytes(&InboundServerMessage::ClientConnected {
         client_id: client_id_from_renet_id(client_id),
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -94,7 +96,7 @@ fn receive_renet_server_events(
       lobby.connected.push(client_id_from_renet_id(client_id));
 
       // Return new event for an application to react to
-      ServerEvent::ClientConnected {
+      InboundServerMessage::ClientConnected {
         client_id: client_id_from_renet_id(client_id),
       }
     }
@@ -102,7 +104,7 @@ fn receive_renet_server_events(
       info!("Client with ID [{}] disconnected: {}", client_id, reason);
 
       // Notify all other clients about the disconnection itself
-      let message = encode_to_bytes(&ServerEvent::ClientDisconnected {
+      let message = encode_to_bytes(&InboundServerMessage::ClientDisconnected {
         client_id: client_id_from_renet_id(client_id),
       })
       .expect(CLIENT_MESSAGE_SERIALISATION);
@@ -110,12 +112,12 @@ fn receive_renet_server_events(
       lobby.connected.retain(|&id| id != client_id_from_renet_id(client_id));
 
       // Return new event for an application to react to
-      ServerEvent::ClientDisconnected {
+      InboundServerMessage::ClientDisconnected {
         client_id: client_id_from_renet_id(client_id),
       }
     }
   };
-  commands.trigger(server_event);
+  inbound_server_message.write(server_message);
 }
 
 /// Attempts to determine the server's public IP address. Returns [`None`] if unable to determine (falls back to bind
@@ -152,7 +154,11 @@ fn get_public_ip_with_port(port: u16) -> Option<SocketAddr> {
 
 /// Processes any incoming messages from the [`RenetServer`] and triggers an event for each that can be observed and
 /// processed by an application.
-fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lobby>, mut commands: Commands) {
+fn receive_client_messages_system(
+  mut server: ResMut<RenetServer>,
+  lobby: Res<Lobby>,
+  mut inbound_client_message: MessageWriter<InboundClientMessage>,
+) {
   for client_id in lobby.connected.iter() {
     while let Some(message) = server.receive_message(renet_id_from_client_id(*client_id), ChannelType::ReliableOrdered)
     {
@@ -163,41 +169,38 @@ fn receive_client_messages_system(mut server: ResMut<RenetServer>, lobby: Res<Lo
         client_id,
         client_message
       );
-      commands.trigger(client_message.to_event(*client_id));
+      inbound_client_message.write(client_message.to_event(*client_id));
     }
 
     while let Some(message) = server.receive_message(renet_id_from_client_id(*client_id), ChannelType::Unreliable) {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-      commands.trigger(client_message.to_event(*client_id));
+      inbound_client_message.write(client_message.to_event(*client_id));
     }
   }
 }
 
 /// A system that applies outgoing send/broadcast/disconnect requests to the active [`RenetServer`].
-fn send_outgoing_server_messages_system(
-  mut outgoing_messages: MessageReader<OutgoingServerMessage>,
-  mut server: ResMut<RenetServer>,
-) {
-  for outgoing_message in outgoing_messages.read() {
-    match outgoing_message {
-      OutgoingServerMessage::Broadcast { channel, payload } => {
+fn handle_outbound_server_message(mut messages: MessageReader<OutboundServerMessage>, mut server: ResMut<RenetServer>) {
+  for message in messages.read() {
+    match message {
+      OutboundServerMessage::Broadcast { channel, payload } => {
         server.broadcast_message(*channel, payload.clone());
       }
-      OutgoingServerMessage::BroadcastExcept {
+      OutboundServerMessage::BroadcastExcept {
         except_client_id,
         channel,
         payload,
       } => {
         server.broadcast_message_except(renet_id_from_client_id(*except_client_id), *channel, payload.clone());
       }
-      OutgoingServerMessage::Send {
+      OutboundServerMessage::Send {
         client_id,
         channel,
         payload,
       } => {
         server.send_message(renet_id_from_client_id(*client_id), *channel, payload.clone());
       }
-      OutgoingServerMessage::DisconnectAll => {
+      OutboundServerMessage::DisconnectAll => {
         server.disconnect_all();
       }
     }
