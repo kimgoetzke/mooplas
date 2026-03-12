@@ -48,7 +48,8 @@ fn handle_toggle_menu_message(
     match *network_role {
       NetworkRole::None => remove_all_matchbox_resources(&mut commands),
       NetworkRole::Server => {
-        debug!("Creating server...");
+        #[cfg(target_arch = "wasm32")]
+        error!("You are trying to start a server in the browser which is not possible");
         #[cfg(not(target_arch = "wasm32"))]
         start_signaling_server(&mut commands);
         let room_url = generate_room_url();

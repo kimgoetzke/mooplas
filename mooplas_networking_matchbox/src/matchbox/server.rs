@@ -28,7 +28,8 @@ impl Plugin for ServerMatchboxPlugin {
   }
 }
 
-/// A system that starts the Matchbox signaling server and inserts the [`MatchboxServer`] resource.
+/// Starts the Matchbox signalling server and inserts the [`MatchboxServer`] resource. This cannot run on WASM targets
+/// as the server cannot run in the browser. It's provided here for local development.
 #[cfg(not(target_arch = "wasm32"))]
 pub fn start_signaling_server(commands: &mut Commands) {
   info!("Starting signaling server");
