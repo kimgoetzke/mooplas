@@ -10,7 +10,7 @@
 <div class="loader"></div>
 <canvas id="mooplas-canvas" width="1280" height="720"></canvas>
 <script type="module">
-    // Intercept canvas creation so the generated `mooplas.js` uses the existing #mooplas-canvas instead of appending a new canvas.
+    // Intercept canvas creation so the generated `mooplas_game.js` uses the existing #mooplas-canvas instead of appending a new canvas.
     const existingCanvas = document.getElementById('mooplas-canvas');
     const originalCreateElement = Document.prototype.createElement;
     const originalCreateElementNS = Document.prototype.createElementNS;
@@ -38,7 +38,7 @@
         return originalCreateElementNS.call(this, namespaceURI, tagName);
     };
     import './restart-audio-context.js';
-    import init from './mooplas.js';
+    import init from './mooplas_game.js';
 
     init().catch((error) => {
         if (!error.message.startsWith("Using exceptions for control flow, don't mind me. This isn't actually an error!")) {

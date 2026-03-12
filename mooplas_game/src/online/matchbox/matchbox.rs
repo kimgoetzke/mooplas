@@ -7,9 +7,10 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::{ClientNetworkingActive, NetworkErrorEvent, NetworkRole, ServerNetworkingActive};
 use mooplas_networking_matchbox::prelude::{
-  MatchboxClientPlugin, ServerMatchboxPlugin, generate_room_url, remove_all_matchbox_resources, start_signaling_server,
-  start_socket,
+  MatchboxClientPlugin, ServerMatchboxPlugin, generate_room_url, remove_all_matchbox_resources, start_socket,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use mooplas_networking_matchbox::prelude::start_signaling_server;
 
 /// Plugin that adds online multiplayer capabilities for WASM targets using websocket/`bevy_matchbox` to the game.
 /// Mutually exclusive with the [`crate::online::renet::RenetPlugin`].
@@ -48,6 +49,7 @@ fn handle_toggle_menu_message(
       NetworkRole::None => remove_all_matchbox_resources(&mut commands),
       NetworkRole::Server => {
         debug!("Creating server...");
+        #[cfg(not(target_arch = "wasm32"))]
         start_signaling_server(&mut commands);
         let room_url = generate_room_url();
         match start_socket(&mut commands, &room_url) {

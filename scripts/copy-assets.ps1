@@ -3,7 +3,7 @@
 # which allows running the game in a web browser.
 
 # Define the directories
-$sourceDirectory = "./assets"
+$sourceDirectory = "./mooplas_game/assets"
 $destinationDirectory = "./www/public/assets"
 
 Write-Host "Copying assets from $sourceDirectory to $destinationDirectory..."

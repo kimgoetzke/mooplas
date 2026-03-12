@@ -1,11 +1,14 @@
 use crate::prelude::client_id_from_peer_id;
 use bevy::prelude::*;
 use bevy_matchbox::matchbox_socket::{ChannelError, Packet};
-use bevy_matchbox::{matchbox_signaling::SignalingServer, prelude::*};
+use bevy_matchbox::prelude::*;
+#[cfg(not(target_arch = "wasm32"))]
+use bevy_matchbox::{MatchboxServer, matchbox_signaling::SignalingServer};
 use mooplas_networking::prelude::{
   ChannelType, ClientMessage, InboundClientMessage, InboundServerMessage, Lobby, NetworkErrorEvent,
   OutboundServerMessage, ServerNetworkingActive, decode_from_bytes,
 };
+#[cfg(not(target_arch = "wasm32"))]
 use std::net::{Ipv4Addr, SocketAddrV4};
 
 /// A Bevy plugin that adds server-side online multiplayer capabilities using Matchbox.
@@ -26,6 +29,7 @@ impl Plugin for ServerMatchboxPlugin {
 }
 
 /// A system that starts the Matchbox signaling server and inserts the [`MatchboxServer`] resource.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn start_signaling_server(commands: &mut Commands) {
   info!("Starting signaling server");
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 3536);

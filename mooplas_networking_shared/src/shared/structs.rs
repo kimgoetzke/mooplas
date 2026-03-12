@@ -58,7 +58,6 @@ impl From<ChannelType> for bevy_renet::renet::DefaultChannel {
 
 /// A component identifying a player. Used to link player entities together.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-#[cfg(not(target_arch = "wasm32"))]
 pub struct PlayerId(pub u8);
 
 impl Display for PlayerId {

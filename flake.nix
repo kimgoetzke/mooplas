@@ -56,7 +56,7 @@
             pkgs.audacity
             pkgs.cargo-flamegraph
             pkgs.clippy
-            pkgs.wasm-bindgen-cli_0_2_100
+            pkgs.wasm-bindgen-cli_0_2_108
             pkgs.nodejs
             pkgs.bashInteractive
           ];

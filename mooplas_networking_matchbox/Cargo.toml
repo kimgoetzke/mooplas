@@ -13,4 +13,9 @@ bevy = { version = "0.18.0", default-features = false, features = [
 # Other dependencies
 mooplas_networking = { path = "../mooplas_networking_shared", default-features = false }
 rand = { version = "0.10.0" }
+
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 bevy_matchbox = { version = "0.14", features = ["signaling"] }
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+bevy_matchbox = { version = "0.14" }
+getrandom = { version = "0.4", features = ["wasm_js"] }

@@ -9,7 +9,7 @@ set -euo pipefail
 
 # Set some variables
 IFS=$'\n\t'
-SOURCE_DIRECTORY="./assets"
+SOURCE_DIRECTORY="./mooplas_game/assets"
 DESTINATION_DIRECTORY="./www/public/assets"
 DRY_RUN=false
 

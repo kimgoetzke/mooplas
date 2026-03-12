@@ -96,7 +96,7 @@ Then you can build the WASM file:
 
 1. Build the WASM file:
    ```shell
-   RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --no-default-features
+   RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online_matchbox
    ```
 2. Clean the `/www/public` directory and copy the game's assets over:
     - **Linux**:
@@ -112,11 +112,11 @@ Then you can build the WASM file:
 3. Run `wasm-bindgen` to generate the JS bindings and move all relevant files to the `/www/public` directory:
     1. **Linux**:
        ```shell
-       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas.wasm
+       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas_game.wasm
        ```
     2. **Windows**:
        ```powershell
-       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas.wasm
+       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas_game.wasm
        ```
 
 #### Optimising
