@@ -8,7 +8,6 @@ use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use mooplas_networking::prelude::NetworkRole;
-use rand::Rng;
 use std::fmt::Display;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
@@ -40,7 +39,7 @@ pub struct Seed {
 impl Default for Seed {
   fn default() -> Self {
     Self {
-      seed: rand::rng().next_u64(),
+      seed: rand::random::<u64>(),
     }
   }
 }
