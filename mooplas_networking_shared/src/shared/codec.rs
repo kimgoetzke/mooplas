@@ -24,12 +24,13 @@ mod tests {
   mod online {
     use super::*;
     use crate::prelude::PlayerId;
-    use crate::shared::messages::{ClientMessage, InboundServerMessage, PlayerRegistrationMessage};
+    use crate::shared::messages::InboundServerMessage;
     use crate::shared::resources::NetworkRole;
+    use crate::shared::structs::{ClientMessage, SerialisablePlayerRegistration};
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {
-      let original = ClientMessage::PlayerRegistration(PlayerRegistrationMessage {
+      let original = ClientMessage::PlayerRegistration(SerialisablePlayerRegistration {
         player_id: PlayerId(7),
         has_registered: true,
         is_anyone_registered: true,

@@ -97,13 +97,13 @@ fn receive_messages(
       ChannelType::ReliableOrdered,
       client_message
     );
-    inbound_client_message.write(client_message.to_event(client_id));
+    inbound_client_message.write(client_message.to_inbound_message(client_id));
   }
 
   for (peer_id, message) in socket.channel_mut(ChannelType::Unreliable.into()).receive() {
     let client_id = client_id_from_peer_id(peer_id);
     let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-    inbound_client_message.write(client_message.to_event(client_id));
+    inbound_client_message.write(client_message.to_inbound_message(client_id));
   }
 }
 

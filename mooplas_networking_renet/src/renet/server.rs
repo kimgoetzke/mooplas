@@ -169,12 +169,12 @@ fn receive_client_messages_system(
         client_id,
         client_message
       );
-      inbound_client_message.write(client_message.to_event(*client_id));
+      inbound_client_message.write(client_message.to_inbound_message(*client_id));
     }
 
     while let Some(message) = server.receive_message(renet_id_from_client_id(*client_id), ChannelType::Unreliable) {
       let client_message: ClientMessage = decode_from_bytes(&message).expect("Failed to deserialise client message");
-      inbound_client_message.write(client_message.to_event(*client_id));
+      inbound_client_message.write(client_message.to_inbound_message(*client_id));
     }
   }
 }

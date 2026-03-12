@@ -1,7 +1,7 @@
 use crate::prelude::{InputMessage, PlayerId, PlayerRegistrationMessage};
 use bevy::math::{Quat, Vec2};
 use bevy::prelude::Component;
-use mooplas_networking::prelude::SerialisableInputMessage;
+use mooplas_networking::prelude::SerialisableInput;
 
 /// A component for interpolating network-synchronised transforms, controlled by the server. Used in an attempt to
 /// smoothly transition from current transform's position/rotation to target position/rotation at a defined speed.
@@ -48,9 +48,9 @@ impl Into<PlayerId> for mooplas_networking::prelude::PlayerId {
   }
 }
 
-impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegistrationMessage {
+impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::SerialisablePlayerRegistration {
   fn from(value: &PlayerRegistrationMessage) -> Self {
-    mooplas_networking::prelude::PlayerRegistrationMessage {
+    mooplas_networking::prelude::SerialisablePlayerRegistration {
       player_id: value.player_id.into(),
       has_registered: value.has_registered,
       is_anyone_registered: value.is_anyone_registered,
@@ -59,7 +59,7 @@ impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerReg
   }
 }
 
-impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegistrationMessage {
+impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::SerialisablePlayerRegistration {
   fn into(self) -> PlayerRegistrationMessage {
     PlayerRegistrationMessage {
       player_id: self.player_id.into(),
@@ -70,29 +70,29 @@ impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::PlayerRegi
   }
 }
 
-impl From<&InputMessage> for SerialisableInputMessage {
+impl From<&InputMessage> for SerialisableInput {
   fn from(value: &InputMessage) -> Self {
     match value {
-      InputMessage::Move(player_id, direction) => SerialisableInputMessage::Move(player_id.0, *direction),
-      InputMessage::Action(player_id) => SerialisableInputMessage::Action(player_id.0),
+      InputMessage::Move(player_id, direction) => SerialisableInput::Move(player_id.0, *direction),
+      InputMessage::Action(player_id) => SerialisableInput::Action(player_id.0),
     }
   }
 }
 
-impl Into<InputMessage> for SerialisableInputMessage {
+impl Into<InputMessage> for SerialisableInput {
   fn into(self) -> InputMessage {
     match self {
-      SerialisableInputMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
-      SerialisableInputMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
+      SerialisableInput::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
+      SerialisableInput::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
     }
   }
 }
 
-impl Into<InputMessage> for &SerialisableInputMessage {
+impl Into<InputMessage> for &SerialisableInput {
   fn into(self) -> InputMessage {
     match self {
-      &SerialisableInputMessage::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
-      &SerialisableInputMessage::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
+      &SerialisableInput::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
+      &SerialisableInput::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
     }
   }
 }
