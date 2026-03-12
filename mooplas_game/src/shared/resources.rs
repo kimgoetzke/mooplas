@@ -8,8 +8,8 @@ use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use mooplas_networking::prelude::NetworkRole;
+use rand::Rng;
 use std::fmt::Display;
-use std::time::SystemTime;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
 pub struct SharedResourcesPlugin;
@@ -40,10 +40,7 @@ pub struct Seed {
 impl Default for Seed {
   fn default() -> Self {
     Self {
-      seed: SystemTime::now()
-        .duration_since(SystemTime::UNIX_EPOCH)
-        .expect("Time went backwards")
-        .as_secs(),
+      seed: rand::rng().next_u64(),
     }
   }
 }
