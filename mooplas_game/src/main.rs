@@ -33,13 +33,30 @@ use crate::player::PlayerPlugin;
 use crate::prelude::*;
 use avian2d::PhysicsPlugins;
 use avian2d::prelude::Gravity;
+use bevy::asset::AssetMetaCheck;
 use bevy::prelude::*;
 use ui::UiPlugin;
 
 fn main() {
   let mut app = App::new();
   app
-    .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+    .add_plugins(
+      DefaultPlugins
+        .set(ImagePlugin::default_nearest())
+        .set(AssetPlugin {
+          // This is a workaround for https://github.com/bevyengine/bevy/issues/10157
+          meta_check: AssetMetaCheck::Never,
+          ..default()
+        })
+        .set(WindowPlugin {
+          primary_window: Some(Window {
+            title: "Mooplas".into(),
+            canvas: Some("#mooplas-canvas".to_string()),
+            ..default()
+          }),
+          ..default()
+        }),
+    )
     .add_plugins((PhysicsPlugins::default().with_length_unit(5.0),))
     .insert_resource(Gravity::ZERO)
     .add_plugins((

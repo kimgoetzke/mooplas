@@ -53,7 +53,7 @@ fn setup_camera_system(mut commands: Commands, mut images: ResMut<Assets<Image>>
       label: None,
       size: canvas_size,
       dimension: TextureDimension::D2,
-      format: TextureFormat::Bgra8UnormSrgb,
+      format: TextureFormat::Rgba8UnormSrgb,
       mip_level_count: 1,
       sample_count: 1,
       usage: TextureUsages::TEXTURE_BINDING | TextureUsages::COPY_DST | TextureUsages::RENDER_ATTACHMENT,
