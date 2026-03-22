@@ -1,44 +1,56 @@
 use bevy::prelude::Commands;
 use bevy_matchbox::MatchboxSocket;
-use bevy_matchbox::matchbox_socket::{PeerId, WebRtcSocket};
+use bevy_matchbox::matchbox_socket::{PeerId, RtcIceServerConfig, WebRtcSocket};
 use bevy_matchbox::prelude::ChannelConfig;
 use mooplas_networking::prelude::{ClientId, ClientNetworkingActive, ServerNetworkingActive};
 use rand::RngExt;
 use rand::distr::Alphanumeric;
+use url::Url;
 
 const ROOM_NAME_LENGTH: usize = 8;
+const STUN_ICE_SERVER_URL: &str = "stun:stun.l.google.com:19302";
 
-/// Generates a WebSocket room URL with a random UUID as the room name.
-pub fn generate_room_url() -> String {
+/// Generates a WebSocket room URL with a random room identifier appended to the given signalling server base URL.
+pub fn generate_room_url(signalling_server_base_url: &str) -> String {
   let room_id: String = rand::rng()
     .sample_iter(&Alphanumeric)
     .take(ROOM_NAME_LENGTH)
     .map(char::from)
     .collect();
-  format!("ws://localhost:3536/{}", room_id)
+  format!("{}/{}", signalling_server_base_url.trim_end_matches('/'), room_id)
+}
+
+pub fn signalling_ice_server_config() -> RtcIceServerConfig {
+  RtcIceServerConfig {
+    urls: vec![STUN_ICE_SERVER_URL.to_string()],
+    username: None,
+    credential: None,
+  }
 }
 
 /// Validates that a string looks like a valid WebSocket URL. Checks:
 /// - Starts with `ws://` or `wss://`
-/// - Contains a port number (e.g., `:3536`)
+/// - Contains a port number for `ws://` URLs (e.g., `:3536`)
 /// - Contains a path with a room identifier (e.g., `/room-id`)
 ///
 /// Returns `Ok(())` if valid, or Err with a message if invalid.
 pub fn validate_websocket_url(url: &str) -> Result<(), String> {
-  // Check protocol
-  if !url.starts_with("ws://") && !url.starts_with("wss://") {
+  let parsed_url = Url::parse(url).map_err(|error| format!("URL is not valid: {error}"))?;
+
+  if !matches!(parsed_url.scheme(), "ws" | "wss") {
     return Err("URL must start with ws:// or wss://".to_string());
   }
-  if !url.contains(':') || url.matches(':').count() < 2 {
+
+  if parsed_url.host_str().is_none() {
+    return Err("URL must include a host".to_string());
+  }
+
+  if parsed_url.scheme() == "ws" && parsed_url.port().is_none() {
     return Err("URL must include a port number (e.g., :3536)".to_string());
   }
-  let parts: Vec<&str> = url.split('/').collect();
-  if parts.len() < 4 {
+
+  if parsed_url.path().trim_matches('/').is_empty() {
     return Err("URL must include a room identifier path (e.g., /room-id)".to_string());
-  }
-  let room_id = parts[3];
-  if room_id.is_empty() {
-    return Err("Room identifier cannot be empty".to_string());
   }
 
   Ok(())
@@ -48,6 +60,7 @@ pub fn validate_websocket_url(url: &str) -> Result<(), String> {
 pub fn start_socket(commands: &mut Commands, room_url: &str) -> Result<(), String> {
   validate_websocket_url(room_url)?;
   let web_rtc_socket_builder = WebRtcSocket::builder(room_url)
+    .ice_server(signalling_ice_server_config())
     .add_unreliable_channel()
     .add_reliable_channel()
     .add_channel(ChannelConfig {
@@ -82,20 +95,28 @@ mod tests {
 
   #[test]
   fn generate_room_url_returns_valid_format() {
-    let url = generate_room_url();
+    let url = generate_room_url("wss://signal.example.com");
     let parts: Vec<&str> = url.split('/').collect();
     let room_id = parts[3];
-    assert!(url.starts_with("ws://localhost:3536/"));
-    assert_eq!(parts.len(), 4); // ["ws:", "", "localhost:3536", "<uuid>"]
+    assert!(url.starts_with("wss://signal.example.com/"));
+    assert_eq!(parts.len(), 4); // ["wss:", "", "signal.example.com", "<room-id>"]
     assert!(!room_id.is_empty());
     assert_eq!(room_id.len(), ROOM_NAME_LENGTH);
   }
 
   #[test]
   fn generate_room_url_generates_unique_urls() {
-    let url1 = generate_room_url();
-    let url2 = generate_room_url();
+    let url1 = generate_room_url("ws://localhost:3536");
+    let url2 = generate_room_url("ws://localhost:3536");
     assert_ne!(url1, url2, "Should generate unique room URLs");
+  }
+
+  #[test]
+  fn generate_room_url_strips_trailing_slash_from_base_url() {
+    let url = generate_room_url("wss://signal.example.com/");
+    assert!(url.starts_with("wss://signal.example.com/"));
+    let url_suffix = url.trim_start_matches("wss://");
+    assert!(!url_suffix.contains("//"));
   }
 
   #[test]
@@ -107,6 +128,12 @@ mod tests {
   #[test]
   fn validate_websocket_url_accepts_valid_wss_url() {
     let result = validate_websocket_url("wss://example.com:3536/room-456");
+    assert!(result.is_ok());
+  }
+
+  #[test]
+  fn validate_websocket_url_accepts_valid_wss_url_without_port() {
+    let result = validate_websocket_url("wss://example.com/room-456");
     assert!(result.is_ok());
   }
 
@@ -135,5 +162,13 @@ mod tests {
   fn validate_websocket_url_rejects_url_with_only_slash() {
     let result = validate_websocket_url("ws://localhost:3536/");
     assert!(result.is_err());
+  }
+
+  #[test]
+  fn signalling_ice_server_config_uses_public_google_stun_server() {
+    let config = signalling_ice_server_config();
+    assert_eq!(config.urls, vec!["stun:stun.l.google.com:19302".to_string()]);
+    assert_eq!(config.username, None);
+    assert_eq!(config.credential, None);
   }
 }

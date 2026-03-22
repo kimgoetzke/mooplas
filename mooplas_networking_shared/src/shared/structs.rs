@@ -72,9 +72,9 @@ impl Debug for PlayerId {
   }
 }
 
-impl Into<u8> for PlayerId {
-  fn into(self) -> u8 {
-    self.0
+impl From<PlayerId> for u8 {
+  fn from(value: PlayerId) -> u8 {
+    value.0
   }
 }
 

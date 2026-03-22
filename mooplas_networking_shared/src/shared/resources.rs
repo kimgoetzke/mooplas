@@ -10,9 +10,13 @@ pub struct NetworkingResourcesPlugin;
 
 impl Plugin for NetworkingResourcesPlugin {
   fn build(&self, app: &mut App) {
-    app.init_resource::<Lobby>();
+    app
+      .init_resource::<Lobby>()
+      .init_resource::<SignallingServerUrl>();
   }
 }
+
+const DEFAULT_SIGNALLING_SERVER_URL: &str = "ws://localhost:3536";
 
 /// A resource that indicates the current network role of this application instance. Only relevant in online
 /// multiplayer mode.
@@ -50,6 +54,25 @@ pub struct ServerNetworkingActive;
 #[derive(Resource, Default)]
 pub struct ClientNetworkingActive;
 
+#[derive(Resource, Debug, Clone, PartialEq, Eq)]
+pub struct SignallingServerUrl(String);
+
+impl Default for SignallingServerUrl {
+  fn default() -> Self {
+    Self::new(DEFAULT_SIGNALLING_SERVER_URL)
+  }
+}
+
+impl SignallingServerUrl {
+  pub fn new(url: impl Into<String>) -> Self {
+    Self(url.into())
+  }
+
+  pub fn as_str(&self) -> &str {
+    &self.0
+  }
+}
+
 /// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]
 pub struct Lobby {
@@ -63,7 +86,7 @@ impl Lobby {
     self
       .registered
       .entry(client_id)
-      .or_insert_with(Vec::new)
+      .or_default()
       .push(player_id);
   }
 
@@ -112,6 +135,7 @@ impl Lobby {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use bevy::MinimalPlugins;
 
   impl ClientId {
     fn default_test() -> Self {
@@ -135,7 +159,7 @@ mod tests {
     let player_id = PlayerId(42);
     lobby.register_player(client_id, player_id);
     lobby.unregister_player(client_id, player_id);
-    assert!(lobby.registered.get(&client_id).is_none());
+    assert!(!lobby.registered.contains_key(&client_id));
   }
 
   #[test]
@@ -218,6 +242,19 @@ mod tests {
     lobby.unregister_player(client_id, player_id_1);
     assert!(!lobby.validate_registration(&client_id, &player_id_1));
     assert!(lobby.validate_registration(&client_id, &player_id_2));
+  }
+
+  #[test]
+  fn networking_resources_plugin_initialises_signalling_server_url() {
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, NetworkingResourcesPlugin));
+
+    let signalling_server_url = app
+      .world()
+      .get_resource::<SignallingServerUrl>()
+      .expect("Failed to retrieve SignallingServerUrl");
+
+    assert_eq!(signalling_server_url.as_str(), DEFAULT_SIGNALLING_SERVER_URL);
   }
 
   fn test_client_id(value: u128) -> ClientId {

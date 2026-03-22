@@ -5,7 +5,9 @@ use bevy::log::{debug, error, info};
 use bevy::prelude::{
   Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, On, Res, ResMut, State, in_state,
 };
-use mooplas_networking::prelude::{ClientNetworkingActive, NetworkErrorEvent, NetworkRole, ServerNetworkingActive};
+use mooplas_networking::prelude::{
+  ClientNetworkingActive, NetworkErrorEvent, NetworkRole, ServerNetworkingActive, SignallingServerUrl,
+};
 #[cfg(not(target_arch = "wasm32"))]
 use mooplas_networking_matchbox::prelude::start_signaling_server;
 use mooplas_networking_matchbox::prelude::{
@@ -36,6 +38,7 @@ fn handle_toggle_menu_message(
   mut commands: Commands,
   mut messages: MessageReader<ToggleMenuMessage>,
   mut network_role: ResMut<NetworkRole>,
+  signalling_server_url: Res<SignallingServerUrl>,
   mut connection_info_message: MessageWriter<ConnectionInfoMessage>,
   mut ui_message: MessageWriter<UiNotification>,
 ) {
@@ -52,7 +55,7 @@ fn handle_toggle_menu_message(
         error!("You are trying to start a server in the browser which is not possible");
         #[cfg(not(target_arch = "wasm32"))]
         start_signaling_server(&mut commands);
-        let room_url = generate_room_url();
+        let room_url = generate_room_url(signalling_server_url.as_str());
         match start_socket(&mut commands, &room_url) {
           Ok(()) => {
             debug!("Server started with room URL [{}]", room_url);
