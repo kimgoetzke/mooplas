@@ -76,6 +76,10 @@ impl ToggleMenuMessage {
 
 /// The name identifying a menu. Used by the [`ToggleMenuMessage`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[expect(
+  clippy::enum_variant_names,
+  reason = "Explicit menu suffix keeps UI state names self-describing across systems"
+)]
 pub enum MenuName {
   MainMenu,
   PlayOnlineMenu,
@@ -114,7 +118,8 @@ impl ExitLobbyMessage {
   }
 }
 
-/// A [`Message`] indicating that the server connection info should be updated, wherever it may be used.
+/// A [`Message`] indicating that connection info should be updated, wherever it may be used.
+/// For Matchbox this may be either a room ID or a full room URL, while Renet uses a full server IP address.
 #[cfg(feature = "online")]
 #[derive(Message, Clone)]
 pub struct ConnectionInfoMessage {

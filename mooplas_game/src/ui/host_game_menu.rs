@@ -109,7 +109,7 @@ fn spawn_menu(
         .with_children(|parent| {
           // Instructions
           parent.spawn((
-            Text::new("Your friends can now join by connecting to:"),
+            Text::new(host_connection_info_label()),
             TextFont {
               font: heading_font.clone(),
               font_size: SMALL_FONT,
@@ -130,7 +130,7 @@ fn spawn_menu(
               justification: Justify::Center,
               ..Default::default()
             },
-            TextInputPrompt::new("Determining your address..."),
+            TextInputPrompt::new(host_connection_info_prompt()),
             TextFont {
               font,
               font_size: NORMAL_FONT,
@@ -164,9 +164,25 @@ fn spawn_menu(
           ));
 
           // Back button
-          spawn_button(parent, &asset_server, BackButton, "Back", 300, NORMAL_FONT);
+          spawn_button(parent, asset_server, BackButton, "Back", 300, NORMAL_FONT);
         });
     });
+}
+
+fn host_connection_info_label() -> &'static str {
+  if cfg!(feature = "online_matchbox") {
+    "Share this room ID with your friends:"
+  } else {
+    "Your friends can now join by connecting to:"
+  }
+}
+
+fn host_connection_info_prompt() -> &'static str {
+  if cfg!(feature = "online_matchbox") {
+    "Generating room ID..."
+  } else {
+    "Determining your address..."
+  }
 }
 
 /// System to handle updating the host address text when the connection info is updated.

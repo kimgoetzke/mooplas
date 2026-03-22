@@ -20,12 +20,43 @@ pub fn generate_room_url(signalling_server_base_url: &str) -> String {
   format!("{}/{}", signalling_server_base_url.trim_end_matches('/'), room_id)
 }
 
-pub fn signalling_ice_server_config() -> RtcIceServerConfig {
-  RtcIceServerConfig {
-    urls: vec![STUN_ICE_SERVER_URL.to_string()],
-    username: None,
-    credential: None,
+pub fn room_id_from_room_url(room_url: &str) -> Result<String, String> {
+  validate_websocket_url(room_url)?;
+  let parsed_url = Url::parse(room_url).map_err(|error| format!("URL is not valid: {error}"))?;
+  let room_id = parsed_url
+    .path_segments()
+    .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
+    .ok_or("URL must include a room identifier path (e.g., /room-id)".to_string())?;
+  Ok(room_id.to_string())
+}
+
+/// Give it the signalling server base URL and a connection string (either a full room URL or just a room ID) and it
+/// resolves it to a full room URL.
+///
+/// Examples:
+/// - Base URL `wss://signal.example.com` and connection string `room-456` will resolve to:
+///   `wss://signal.example.com/room-456`.
+/// - Base URL `ws://localhost:3536` and connection string `wss://signal.example.com/room-456` will resolve to:
+///   `wss://signal.example.com/room-456` (i.e. the connection string remains unchanged).
+pub fn resolve_room_url(signalling_server_base_url: &str, connection_string: &str) -> Result<String, String> {
+  let connection_string = connection_string.trim();
+  if connection_string.is_empty() {
+    return Err("Room ID or websocket URL cannot be empty".to_string());
   }
+  if connection_string.contains("://") {
+    validate_websocket_url(connection_string)?;
+    return Ok(connection_string.to_string());
+  }
+  let room_id = connection_string.trim_matches('/');
+  if room_id.is_empty() {
+    return Err("Room ID cannot be empty".to_string());
+  }
+  if room_id.contains('/') {
+    return Err("Room ID must not contain '/'".to_string());
+  }
+  let room_url = format!("{}/{}", signalling_server_base_url.trim_end_matches('/'), room_id);
+  validate_websocket_url(&room_url)?;
+  Ok(room_url)
 }
 
 /// Validates that a string looks like a valid WebSocket URL. Checks:
@@ -36,23 +67,18 @@ pub fn signalling_ice_server_config() -> RtcIceServerConfig {
 /// Returns `Ok(())` if valid, or Err with a message if invalid.
 pub fn validate_websocket_url(url: &str) -> Result<(), String> {
   let parsed_url = Url::parse(url).map_err(|error| format!("URL is not valid: {error}"))?;
-
   if !matches!(parsed_url.scheme(), "ws" | "wss") {
     return Err("URL must start with ws:// or wss://".to_string());
   }
-
   if parsed_url.host_str().is_none() {
     return Err("URL must include a host".to_string());
   }
-
   if parsed_url.scheme() == "ws" && parsed_url.port().is_none() {
     return Err("URL must include a port number (e.g., :3536)".to_string());
   }
-
   if parsed_url.path().trim_matches('/').is_empty() {
     return Err("URL must include a room identifier path (e.g., /room-id)".to_string());
   }
-
   Ok(())
 }
 
@@ -70,6 +96,14 @@ pub fn start_socket(commands: &mut Commands, room_url: &str) -> Result<(), Strin
   let socket = MatchboxSocket::from(web_rtc_socket_builder);
   commands.insert_resource(socket);
   Ok(())
+}
+
+pub fn signalling_ice_server_config() -> RtcIceServerConfig {
+  RtcIceServerConfig {
+    urls: vec![STUN_ICE_SERVER_URL.to_string()],
+    username: None,
+    credential: None,
+  }
 }
 
 /// Give it a [`PeerId`] from Matchbox, it converts it to a [`ClientId`] used by the game.
@@ -117,6 +151,38 @@ mod tests {
     assert!(url.starts_with("wss://signal.example.com/"));
     let url_suffix = url.trim_start_matches("wss://");
     assert!(!url_suffix.contains("//"));
+  }
+
+  #[test]
+  fn room_id_from_room_url_returns_room_id() {
+    let room_id = room_id_from_room_url("wss://signal.example.com/room-456")
+      .expect("Expected a room ID to be extracted from a valid room URL");
+
+    assert_eq!(room_id, "room-456");
+  }
+
+  #[test]
+  fn resolve_room_url_appends_room_id_to_signalling_server_url() {
+    let room_url = resolve_room_url("wss://signal.example.com", "room-456")
+      .expect("Expected a room ID to resolve against the signalling server URL");
+
+    assert_eq!(room_url, "wss://signal.example.com/room-456");
+  }
+
+  #[test]
+  fn resolve_room_url_accepts_full_room_url() {
+    let room_url = resolve_room_url("ws://localhost:3536", "wss://signal.example.com/room-456")
+      .expect("Expected a full room URL to be accepted unchanged");
+
+    assert_eq!(room_url, "wss://signal.example.com/room-456");
+  }
+
+  #[test]
+  fn resolve_room_url_rejects_non_websocket_url_input() {
+    let error = resolve_room_url("wss://signal.example.com", "https://example.com/room-456")
+      .expect_err("Expected a non-websocket URL to be rejected");
+
+    assert!(error.contains("ws://"));
   }
 
   #[test]

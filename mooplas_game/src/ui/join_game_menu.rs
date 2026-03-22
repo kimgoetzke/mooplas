@@ -124,7 +124,7 @@ fn spawn_menu(
               Name::new("Input Field"),
               TextInputNode {
                 mode: TextInputMode::SingleLine,
-                max_chars: Some(50),
+                max_chars: Some(200),
                 clear_on_submit: true,
                 justification: Justify::Center,
                 ..Default::default()
@@ -137,7 +137,7 @@ fn spawn_menu(
               TextColor(Color::from(ACCENT_COLOUR)),
               BorderColor::all(Color::from(tailwind::SLATE_500)),
               BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
-              TextInputPrompt::new("Paste connection string here..."),
+              TextInputPrompt::new(join_connection_info_prompt()),
               Node {
                 width: percent(100),
                 height: px(45.),
@@ -161,7 +161,7 @@ fn spawn_menu(
           ));
 
           // Button: Connect incl. submission observer
-          let connect_button = spawn_button(parent, &asset_server, ConnectButton, "Connect", 300, NORMAL_FONT);
+          let connect_button = spawn_button(parent, asset_server, ConnectButton, "Connect", 300, NORMAL_FONT);
           parent.commands().entity(connect_button).observe(
             move |_: On<Pointer<Click>>, mut query: Query<&mut TextInputQueue>| {
               query.get_mut(input_field_entity).unwrap().add(TextInputAction::Submit);
@@ -169,7 +169,7 @@ fn spawn_menu(
           );
 
           // Button: Back
-          spawn_button(parent, &asset_server, BackButton, "Back", 300, NORMAL_FONT);
+          spawn_button(parent, asset_server, BackButton, "Back", 300, NORMAL_FONT);
         });
     });
 
@@ -199,6 +199,14 @@ fn spawn_menu(
   ));
 }
 
+fn join_connection_info_prompt() -> &'static str {
+  if cfg!(feature = "online_matchbox") {
+    "Enter room ID or paste room URL here..."
+  } else {
+    "Paste connection string here..."
+  }
+}
+
 /// A system to handle button interactions, excluding the connect button which is handled via an observer because it
 /// uses a message from an external crate.
 //noinspection DuplicatedCode
@@ -226,7 +234,7 @@ fn handle_submit_text_messages(
   for message in messages.read() {
     // Ignore empty submissions
     if message.text.is_empty() {
-      debug!("Received empty connection string submission, ignoring button press...");
+      debug!("Received empty connection string, ignoring button press...");
       continue;
     }
 

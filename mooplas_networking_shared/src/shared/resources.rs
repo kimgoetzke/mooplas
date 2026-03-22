@@ -10,9 +10,7 @@ pub struct NetworkingResourcesPlugin;
 
 impl Plugin for NetworkingResourcesPlugin {
   fn build(&self, app: &mut App) {
-    app
-      .init_resource::<Lobby>()
-      .init_resource::<SignallingServerUrl>();
+    app.init_resource::<Lobby>().init_resource::<SignallingServerUrl>();
   }
 }
 
@@ -83,11 +81,7 @@ pub struct Lobby {
 impl Lobby {
   /// Registers a player for the given client ID.
   pub fn register_player(&mut self, client_id: ClientId, player_id: PlayerId) {
-    self
-      .registered
-      .entry(client_id)
-      .or_default()
-      .push(player_id);
+    self.registered.entry(client_id).or_default().push(player_id);
   }
 
   /// Unregisters a player for the given client ID.

@@ -31,6 +31,10 @@ impl Plugin for ServerMatchboxPlugin {
 /// Starts the Matchbox signalling server and inserts the [`MatchboxServer`] resource. This cannot run on WASM targets
 /// as the server cannot run in the browser. It's provided here for local development.
 #[cfg(not(target_arch = "wasm32"))]
+#[expect(
+  clippy::result_large_err,
+  reason = "matchbox_signaling requires axum::response::Response for connection rejection"
+)]
 pub fn start_signaling_server(commands: &mut Commands) {
   info!("Starting signaling server");
   let addr = SocketAddrV4::new(Ipv4Addr::UNSPECIFIED, 3536);
