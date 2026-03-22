@@ -4,6 +4,7 @@ use bevy::log::debug;
 use bevy::prelude::Resource;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use url::Url;
 
 /// A plugin that registers and initialises shared resources used in either the client or server, or both.
 pub struct NetworkingResourcesPlugin;
@@ -15,6 +16,7 @@ impl Plugin for NetworkingResourcesPlugin {
 }
 
 const DEFAULT_SIGNALLING_SERVER_URL: &str = "ws://localhost:3536";
+const SIGNALLING_SERVER_URL_ENV_VAR: &str = "SIGNALLING_SERVER_URL";
 
 /// A resource that indicates the current network role of this application instance. Only relevant in online
 /// multiplayer mode.
@@ -52,23 +54,63 @@ pub struct ServerNetworkingActive;
 #[derive(Resource, Default)]
 pub struct ClientNetworkingActive;
 
+/// A resource containing the URL of the signalling server. Loaded from the environment by default.
 #[derive(Resource, Debug, Clone, PartialEq, Eq)]
 pub struct SignallingServerUrl(String);
 
 impl Default for SignallingServerUrl {
   fn default() -> Self {
-    Self::new(DEFAULT_SIGNALLING_SERVER_URL)
+    Self::from_build_time_env(option_env!("SIGNALLING_SERVER_URL"))
   }
 }
 
 impl SignallingServerUrl {
   pub fn new(url: impl Into<String>) -> Self {
-    Self(url.into())
+    Self::try_new(url).unwrap_or_else(|error| panic!("Invalid signalling server URL: {error}"))
+  }
+
+  pub fn try_new(url: impl Into<String>) -> Result<Self, String> {
+    let url = url.into();
+    validate_signalling_server_base_url(&url)?;
+    Ok(Self(url.trim_end_matches('/').to_string()))
+  }
+
+  fn from_build_time_env(configured_url: Option<&str>) -> Self {
+    match configured_url {
+      Some(url) => Self::from_build_time_value(url),
+      None => Self::new(DEFAULT_SIGNALLING_SERVER_URL),
+    }
+  }
+
+  fn from_build_time_value(url: &str) -> Self {
+    let url = url.trim();
+    assert!(
+      !url.is_empty(),
+      "{SIGNALLING_SERVER_URL_ENV_VAR} must not be empty when set"
+    );
+    Self::try_new(url).unwrap_or_else(|error| panic!("{SIGNALLING_SERVER_URL_ENV_VAR} is invalid: {error}"))
   }
 
   pub fn as_str(&self) -> &str {
     &self.0
   }
+}
+
+fn validate_signalling_server_base_url(url: &str) -> Result<(), String> {
+  let parsed_url = Url::parse(url).map_err(|error| format!("URL is not valid: {error}"))?;
+  if !matches!(parsed_url.scheme(), "ws" | "wss") {
+    return Err("URL must start with ws:// or wss://".to_string());
+  }
+  if parsed_url.host_str().is_none() {
+    return Err("URL must include a host".to_string());
+  }
+  if parsed_url.scheme() == "ws" && parsed_url.port().is_none() {
+    return Err("URL must include a port number (e.g., :3536)".to_string());
+  }
+  if parsed_url.query().is_some() || parsed_url.fragment().is_some() {
+    return Err("URL must not include a query string or fragment".to_string());
+  }
+  Ok(())
 }
 
 /// A resource for the server to store information about connected clients and their registered players.
@@ -242,13 +284,50 @@ mod tests {
   fn networking_resources_plugin_initialises_signalling_server_url() {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, NetworkingResourcesPlugin));
-
     let signalling_server_url = app
       .world()
       .get_resource::<SignallingServerUrl>()
       .expect("Failed to retrieve SignallingServerUrl");
-
     assert_eq!(signalling_server_url.as_str(), DEFAULT_SIGNALLING_SERVER_URL);
+  }
+
+  #[test]
+  fn signalling_server_url_try_new_accepts_wss_url_without_port() {
+    let signalling_server_url = SignallingServerUrl::try_new("wss://signal.example.com")
+      .expect("Expected a valid wss:// signalling server URL without an explicit port");
+    assert_eq!(signalling_server_url.as_str(), "wss://signal.example.com");
+  }
+
+  #[test]
+  fn signalling_server_url_try_new_strips_trailing_slash() {
+    let signalling_server_url = SignallingServerUrl::try_new("wss://signal.example.com/")
+      .expect("Expected a valid signalling server URL to be normalised");
+    assert_eq!(signalling_server_url.as_str(), "wss://signal.example.com");
+  }
+
+  #[test]
+  fn signalling_server_url_try_new_rejects_non_websocket_url() {
+    let error = SignallingServerUrl::try_new("https://signal.example.com")
+      .expect_err("Expected a non-websocket signalling server URL to be rejected");
+    assert!(error.contains("ws://"));
+  }
+
+  #[test]
+  fn signalling_server_url_from_build_time_env_uses_default_when_unset() {
+    let signalling_server_url = SignallingServerUrl::from_build_time_env(None);
+    assert_eq!(signalling_server_url.as_str(), DEFAULT_SIGNALLING_SERVER_URL);
+  }
+
+  #[test]
+  fn signalling_server_url_from_build_time_env_uses_custom_url() {
+    let signalling_server_url = SignallingServerUrl::from_build_time_env(Some("wss://signal.example.com"));
+    assert_eq!(signalling_server_url.as_str(), "wss://signal.example.com");
+  }
+
+  #[test]
+  #[should_panic(expected = "SIGNALLING_SERVER_URL must not be empty when set")]
+  fn signalling_server_url_from_build_time_env_rejects_empty_url() {
+    let _ = SignallingServerUrl::from_build_time_env(Some("   "));
   }
 
   fn test_client_id(value: u128) -> ClientId {

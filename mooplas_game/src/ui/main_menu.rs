@@ -39,6 +39,7 @@ struct PlayOnlineButton;
 #[derive(Component)]
 struct PlayLocalButton;
 
+// TODO: Disable exit button on WASM
 /// Marker component for the Exit button in the main menu.
 #[derive(Component)]
 struct ExitButton;
