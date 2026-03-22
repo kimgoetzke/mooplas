@@ -3,7 +3,8 @@ members = [
   "mooplas_game",
   "mooplas_networking_shared",
   "mooplas_networking_renet",
-  "mooplas_networking_matchbox"
+  "mooplas_networking_matchbox",
+  "mooplas_signalling_server"
 ]
 resolver = "2" # Important! Bevy/WGPU needs this!
 
