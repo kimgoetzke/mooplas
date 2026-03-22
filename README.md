@@ -60,8 +60,27 @@ immediately after the failure and it will work.
 
 Did RustRover forget where the Rust standard library is again? Run the below and update the path in the settings:
 
-```
+```shell
 find /nix/store -type d -name rust_lib_src
+```
+
+##### Running out of disk space?
+
+`cargo sweep` is your friend and comes with the Flake. For example, the below will delete all build artefacts that
+are older than 7 days:
+
+```shell
+cargo sweep -t 7
+```
+
+To clean everything except for the latest build:
+
+```
+cargo sweep --stamp
+
+<Insert any number of cargo build, cargo test, etc. commands>
+
+cargo sweep --file
 ```
 
 ##### Using the Nix flake
