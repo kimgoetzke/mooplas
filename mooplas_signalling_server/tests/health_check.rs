@@ -27,7 +27,7 @@ async fn health_endpoint_responds_when_server_is_running() {
   let response = wait_for_health(&client, &format!("http://{socket_addr}/health")).await;
 
   assert_eq!(response.status(), reqwest::StatusCode::OK);
-  assert_eq!(response.text().await.expect("read health response"), "ok");
+  assert_eq!(response.text().await.expect("read health response"), "OK\n");
 
   server_handle.abort();
   let _ = server_handle.await;
@@ -54,7 +54,7 @@ async fn https_health_endpoint_responds_when_tls_is_enabled() {
   let response = wait_for_health(&client, &format!("https://foobar.com:{}/health", socket_addr.port())).await;
 
   assert_eq!(response.status(), reqwest::StatusCode::OK);
-  assert_eq!(response.text().await.expect("read health response"), "ok");
+  assert_eq!(response.text().await.expect("read health response"), "OK\n");
 
   server_handle.abort();
   let _ = server_handle.await;
