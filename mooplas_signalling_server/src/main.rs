@@ -27,7 +27,7 @@ impl Cli {
 }
 
 #[tokio::main]
-async fn main() -> Result<(), mooplas_signalling_server::ServerError> {
+async fn main() -> Result<(), mooplas_signalling_server::error::ServerError> {
   setup_logging();
   run_server(Cli::parse().server_config()).await
 }
