@@ -7,19 +7,17 @@ by [Achtung, die Kurve!](https://en.wikipedia.org/wiki/Achtung,_die_Kurve!), wri
 using [Bevy Engine](https://bevy.org/) (v0.18) and [Avian Physics](https://github.com/avianphysics/avian). The goal
 of the project was to explore network programming when real-time movement is involved.
 
+[<img src="mooplas_game/assets/ignore/itch-io-button.png">](https://captainhindsight.itch.io/mooplas)
+
 ## Features
 
 - Implementation of _Achtung, die Kurve!_ (also known as _Curve Fever_)
 - Local multiplayer (up to 5 players)
 - Native online multiplayer (up to 5 players) over UDP using `bevy_renet`
 - Browser-friendly online multiplayer using `bevy_matchbox` (plus a standalone signalling server)
+- You can mix and match local and online players in the same game
 - Touch controls for mobile devices
 - Cross-platform (Linux, Windows, WebAssembly)
-
-> [!NOTE]
-> Check out the branch [with-bevy-renet](https://github.com/kimgoetzke/mooplas/tree/with-bevy-renet) for a
-> P2P multiplayer implementation with `renet` which uses UDP. However, this version does not support WebAssembly
-> multiplayer due to browser limitations around UDP.
 
 ## Networking overview
 

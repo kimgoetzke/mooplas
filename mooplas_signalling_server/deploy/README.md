@@ -42,7 +42,7 @@ TLS is terminated by CloudFront, so the container runs in plain `ws://` mode.
 2. Enter a name
 3. Select **Amazon Linux** as the AMI (Amazon Machine Image)
 4. Select whatever machine type you want
-5. Under **Key pair**, select the key pair you created in step 1A
+5. Under **Key pair**, select the key pair created in step 1A
 6. Under **Network settings**, click **Select existing security group** and choose the one from step 1B
 7. Click **Launch instance**
 
@@ -54,7 +54,7 @@ which breaks the CloudFront origin.
 1. Go to **EC2 > Elastic IPs**
 2. Click **Allocate Elastic IP address**, then **Allocate**
 3. Select the new Elastic IP, click **Actions > Associate Elastic IP address**
-4. Select your instance from the dropdown and click **Associate**
+4. Select the instance from the dropdown and click **Associate**
 
 Note the Elastic IP - this is what is used as `<EC2_ELASTIC_IP>` throughout this guide.
 
