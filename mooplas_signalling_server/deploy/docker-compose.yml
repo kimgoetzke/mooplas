@@ -1,0 +1,7 @@
+services:
+  mooplas-signalling-server:
+    image: ${SIGNALLING_IMAGE:?Set SIGNALLING_IMAGE to the full image reference}
+    container_name: mooplas-signalling-server
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-3536}:${SIGNALLING_PORT:-3536}"

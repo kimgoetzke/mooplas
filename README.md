@@ -159,6 +159,10 @@ Then you can build the WASM file:
        ```powershell
        wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas_game.wasm
        ```
+4. Zip the WASM file if needed (e.g. for itch.io):
+   ```shell
+   zip -r mooplas.zip ./www/public
+   ```
 
 #### Optimising
 
