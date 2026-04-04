@@ -94,6 +94,7 @@ fn spawn_main_menu(
           #[cfg(feature = "online")]
           spawn_button(parent, &asset_server, PlayOnlineButton, "Play Online", 300, NORMAL_FONT);
           spawn_button(parent, &asset_server, PlayLocalButton, "Play Local", 300, NORMAL_FONT);
+          #[cfg(not(target_arch = "wasm32"))]
           spawn_button(parent, &asset_server, ExitButton, "Exit", 300, NORMAL_FONT);
         });
     });
