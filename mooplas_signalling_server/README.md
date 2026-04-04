@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="mooplas_game/assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
+  <img src="../mooplas_game/assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
 </p>
 
 This crate contains a standalone Mooplas signalling server for the Matchbox WASM backend. It supports:
