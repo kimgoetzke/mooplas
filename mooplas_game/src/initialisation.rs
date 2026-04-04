@@ -171,6 +171,7 @@ fn random_start_position(rng: &mut StdRng) -> (f32, f32) {
   (x, y)
 }
 
+// TODO: Support up to 8 players and separate keybindings from player colours in online multiplayer
 /// A system that initialises all available player configurations that players can choose from.
 fn initialise_available_player_configurations_system(
   mut tracker: ResMut<InitialisationTracker>,

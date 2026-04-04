@@ -34,10 +34,6 @@ Online multiplayer:
 
 ![Demo GIF](mooplas_game/assets/ignore/demo/demo.gif)
 
-Menu:
-
-![Screenshot 4](mooplas_game/assets/ignore/demo/screenshot-4.png)
-
 Lobby with touch controls enabled:
 
 ![Screenshots 2](mooplas_game/assets/ignore/demo/screenshot-2.png)
