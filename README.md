@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
+  <img src="mooplas_game/assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
 </p>
 
 This repository contains a basic multiplayer game inspired
@@ -11,7 +11,8 @@ of the project was to explore network programming when real-time movement is inv
 
 - Implementation of _Achtung, die Kurve!_ (also known as _Curve Fever_)
 - Local multiplayer (up to 5 players)
-- Online multiplayer (up to 5 players) over UDP using `bevy_renet`
+- Native online multiplayer (up to 5 players) over UDP using `bevy_renet`
+- Browser-friendly online multiplayer using `bevy_matchbox` (plus a standalone signalling server)
 - Touch controls for mobile devices
 - Cross-platform (Linux, Windows, WebAssembly)
 
@@ -20,23 +21,32 @@ of the project was to explore network programming when real-time movement is inv
 > P2P multiplayer implementation with `renet` which uses UDP. However, this version does not support WebAssembly
 > multiplayer due to browser limitations around UDP.
 
+## Networking overview
+
+- `online_renet` is the native UDP transport
+- `online_matchbox` is the browser-friendly WASM transport
+    - Matchbox sessions share a short room ID; the game expands that against `SIGNALLING_SERVER_URL`
+    - `SIGNALLING_SERVER_URL` defaults to `ws://localhost:3536` for local development
+    - `mooplas_signalling_server` only handles the WASM signalling handshake; once peers connect, gameplay traffic is
+      P2P
+
 ## Demo
 
 Online multiplayer:
 
-![Demo GIF](assets/ignore/demo/demo.gif)
+![Demo GIF](mooplas_game/assets/ignore/demo/demo.gif)
 
 Menu:
 
-![Screenshot 4](assets/ignore/demo/screenshot-4.png)
+![Screenshot 4](mooplas_game/assets/ignore/demo/screenshot-4.png)
 
 Lobby with touch controls enabled:
 
-![Screenshots 2](assets/ignore/demo/screenshot-2.png)
+![Screenshots 2](mooplas_game/assets/ignore/demo/screenshot-2.png)
 
 In-game:
 
-![Screenshots 3](assets/ignore/demo/screenshot-3.png)
+![Screenshots 3](mooplas_game/assets/ignore/demo/screenshot-3.png)
 
 ## How to develop
 
@@ -60,8 +70,27 @@ immediately after the failure and it will work.
 
 Did RustRover forget where the Rust standard library is again? Run the below and update the path in the settings:
 
-```
+```shell
 find /nix/store -type d -name rust_lib_src
+```
+
+##### Running out of disk space?
+
+`cargo sweep` is your friend and comes with the Flake. For example, the below will delete all build artefacts that
+are older than 7 days:
+
+```shell
+cargo sweep -t 7
+```
+
+To clean everything except for the latest build:
+
+```
+cargo sweep --stamp
+
+<Insert any number of cargo build, cargo test, etc. commands>
+
+cargo sweep --file
 ```
 
 ##### Using the Nix flake
@@ -70,8 +99,9 @@ Upgrade the flake by running `nix flake update --flake .` in the repository's ba
 
 ## How to build WASM for the web
 
-> [!WARNING]
-> The web version does not support online multiplayer due to browser limitations around UDP.
+> [!NOTE]
+> Browser builds intended for online multiplayer should use the Matchbox backend (`--features online_matchbox`) and a
+> reachable signalling server URL.
 
 #### Prerequisites
 
@@ -88,16 +118,27 @@ Upgrade the flake by running `nix flake update --flake .` in the repository's ba
        ```powershell
        $env:RUSTFLAGS="--cfg=web_sys_unstable_apis --cfg=getrandom_backend=`"wasm_js`""
        ```
-3. Make sure you have Node.js with `serve` installed
+3. Set `SIGNALLING_SERVER_URL` when building for production. If omitted, the build falls back to
+   `ws://localhost:3536`, which is useful for native/local development but not for deployed HTTPS browser builds.
+    1. **Linux**:
+       ```bash
+       export SIGNALLING_SERVER_URL="wss://signal.example.com"
+       ```
+    2. **Windows**:
+       ```powershell
+       $env:SIGNALLING_SERVER_URL="wss://signal.example.com"
+       ```
+4. Make sure you have Node.js with `serve` installed
 
 #### Building
 
 Then you can build the WASM file:
 
 1. Build the WASM file:
-   ```shell
-   RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --no-default-features
-   ```
+    ```shell
+    SIGNALLING_SERVER_URL='ws://localhost:3536' RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online_matchbox
+    ```
+   For local development builds you can omit `SIGNALLING_SERVER_URL` and the game will use `ws://localhost:3536`.
 2. Clean the `/www/public` directory and copy the game's assets over:
     - **Linux**:
       ```shell
@@ -112,12 +153,16 @@ Then you can build the WASM file:
 3. Run `wasm-bindgen` to generate the JS bindings and move all relevant files to the `/www/public` directory:
     1. **Linux**:
        ```shell
-       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas.wasm
+       wasm-bindgen --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas_game.wasm
        ```
     2. **Windows**:
        ```powershell
-       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas.wasm
+       wasm-bindgen.exe --out-dir ./www/public --target web ./target/wasm32-unknown-unknown/release/mooplas_game.wasm
        ```
+4. Zip the WASM file if needed (e.g. for itch.io):
+   ```shell
+   zip -r mooplas.zip ./www/public
+   ```
 
 #### Optimising
 

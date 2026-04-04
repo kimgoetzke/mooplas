@@ -1,0 +1,82 @@
+mod animation;
+mod app_state;
+mod camera;
+mod controls;
+mod debug;
+mod game_loop;
+mod game_world;
+mod initialisation;
+mod loading;
+mod online;
+mod player;
+mod shared;
+mod ui;
+
+mod prelude {
+  pub use crate::app_state::AppState;
+  pub use crate::shared::*;
+}
+
+#[cfg(feature = "dev")]
+use debug::DebugPlugin;
+
+use crate::animation::AnimationPlugin;
+use crate::app_state::AppStatePlugin;
+use crate::camera::CameraPlugin;
+use crate::controls::ControlsPlugin;
+use crate::game_loop::GameLoopPlugin;
+use crate::game_world::GameWorldPlugin;
+use crate::initialisation::InitialisationPlugin;
+use crate::loading::LoadingPlugin;
+use crate::online::OnlinePlugin;
+use crate::player::PlayerPlugin;
+use crate::prelude::*;
+use avian2d::PhysicsPlugins;
+use avian2d::prelude::Gravity;
+use bevy::asset::AssetMetaCheck;
+use bevy::prelude::*;
+use ui::UiPlugin;
+
+fn main() {
+  let mut app = App::new();
+  app
+    .add_plugins(
+      DefaultPlugins
+        .set(ImagePlugin::default_nearest())
+        .set(AssetPlugin {
+          // This is a workaround for https://github.com/bevyengine/bevy/issues/10157
+          meta_check: AssetMetaCheck::Never,
+          ..default()
+        })
+        .set(WindowPlugin {
+          primary_window: Some(Window {
+            title: "Mooplas".into(),
+            canvas: Some("#mooplas-canvas".to_string()),
+            ..default()
+          }),
+          ..default()
+        }),
+    )
+    .add_plugins((PhysicsPlugins::default().with_length_unit(5.0),))
+    .insert_resource(Gravity::ZERO)
+    .add_plugins((
+      CameraPlugin,
+      AppStatePlugin,
+      GameWorldPlugin,
+      SharedResourcesPlugin,
+      SharedMessagesPlugin,
+      LoadingPlugin,
+      InitialisationPlugin,
+      PlayerPlugin,
+      GameLoopPlugin,
+      UiPlugin,
+      ControlsPlugin,
+      AnimationPlugin,
+      OnlinePlugin,
+    ));
+
+  #[cfg(feature = "dev")]
+  app.add_plugins(DebugPlugin);
+
+  app.run();
+}

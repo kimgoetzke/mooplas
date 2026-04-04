@@ -1,0 +1,323 @@
+use crate::app_state::AppState;
+use crate::online::structs::NetworkTransformInterpolation;
+use crate::online::utils;
+use crate::prelude::{
+  AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, PlayerId, PlayerRegistrationMessage,
+  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, WinnerInfo,
+};
+use bevy::app::Update;
+use bevy::log::{debug, error_once, info, warn};
+use bevy::math::Quat;
+use bevy::prelude::{
+  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
+  State, Time, Transform, With, Without, in_state, resource_exists,
+};
+use mooplas_networking::prelude::{
+  ChannelType, ClientMessage, ClientNetworkingActive, InboundServerMessage, NetworkRole, OutboundClientMessage,
+  PlayerStateUpdateMessage, encode_to_bytes,
+};
+
+/// A plugin that adds shared client-side online multiplayer capabilities to the game. Contains systems that are shared
+/// between different client implementations.
+pub struct ClientPlugin;
+
+impl Plugin for ClientPlugin {
+  fn build(&self, app: &mut App) {
+    app
+      .add_systems(
+        Update,
+        handle_inbound_server_message.run_if(resource_exists::<ClientNetworkingActive>),
+      )
+      .add_systems(
+        Update,
+        (
+          handle_local_player_registration_message,
+          handle_local_exit_lobby_message,
+        )
+          .run_if(in_state(AppState::Registering))
+          .run_if(resource_exists::<ClientNetworkingActive>),
+      )
+      .add_systems(
+        Update,
+        (
+          send_local_input_messages,
+          add_interpolation_component_system,
+          apply_state_interpolation_system,
+        )
+          .run_if(in_state(AppState::Playing))
+          .run_if(resource_exists::<ClientNetworkingActive>),
+      );
+  }
+}
+
+/// Processes any incoming server messages and acts on them, if required.
+fn handle_inbound_server_message(
+  mut messages: MessageReader<InboundServerMessage>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  available_configs: Res<AvailablePlayerConfigs>,
+  current_state: ResMut<State<AppState>>,
+  mut next_state: ResMut<NextState<AppState>>,
+  mut winner: ResMut<WinnerInfo>,
+  mut seed: ResMut<Seed>,
+  mut registration_message: MessageWriter<PlayerRegistrationMessage>,
+  mut player_state_update_message: MessageWriter<PlayerStateUpdateMessage>,
+  mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
+) {
+  for message in messages.read() {
+    match message {
+      InboundServerMessage::ClientConnected { client_id } => info!("[{:?}] connected", client_id),
+      InboundServerMessage::ClientDisconnected { client_id } => info!("[{:?}] disconnected", client_id),
+      InboundServerMessage::ClientInitialised { seed: server_seed, .. } => {
+        seed.set(*server_seed);
+      }
+      InboundServerMessage::PlayerRegistered { player_id, .. } => {
+        let player_id = PlayerId(*player_id);
+        utils::register_player_locally(
+          &mut registered_players,
+          &available_configs,
+          &mut registration_message,
+          player_id,
+        );
+      }
+      InboundServerMessage::PlayerUnregistered { player_id, .. } => {
+        let player_id = PlayerId(*player_id);
+        utils::unregister_player_locally(&mut registered_players, &mut registration_message, player_id);
+      }
+      InboundServerMessage::StateChanged { new_state, winner_info } => {
+        if !current_state.is_manual_transition_allowed_to(&AppState::from(new_state)) {
+          next_state.set(AppState::from(new_state));
+        } else {
+          debug!(
+            "Ignoring state change to [{}] because [{:?}] is restricted...",
+            new_state, *current_state
+          );
+        }
+        if let Some(player_id) = winner_info {
+          winner.set((*player_id).into());
+        }
+      }
+      InboundServerMessage::ShutdownServer => {
+        exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
+      }
+      InboundServerMessage::UpdatePlayerStates { states } => {
+        for (player_id, x, y, rotation_z) in states {
+          player_state_update_message.write(PlayerStateUpdateMessage::new(*player_id, (*x, *y), *rotation_z));
+        }
+      }
+    }
+  }
+}
+
+/// A system that handles local player registration messages by sending them to the server.
+fn handle_local_player_registration_message(
+  mut messages: MessageReader<PlayerRegistrationMessage>,
+  mut outbound_client_message: MessageWriter<OutboundClientMessage>,
+) {
+  for player_registration_message in messages.read() {
+    if utils::should_message_be_skipped(&player_registration_message, NetworkRole::Server) {
+      continue;
+    }
+    let client_message = ClientMessage::PlayerRegistration(player_registration_message.into());
+    debug!("Sending: [{:?}]", client_message);
+    let payload = encode_to_bytes(&client_message).expect("Failed to serialise player registration message");
+    outbound_client_message.write(OutboundClientMessage::Send {
+      channel: ChannelType::ReliableOrdered,
+      payload,
+    });
+  }
+}
+
+/// A system that handles local exit lobby messages by disconnecting from the server and returning to the main menu.
+fn handle_local_exit_lobby_message(
+  mut messages: MessageReader<ExitLobbyMessage>,
+  mut outbound_client_message: MessageWriter<OutboundClientMessage>,
+  mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+) {
+  for message in messages.read() {
+    debug!("Disconnecting from server (by force={})...", message.by_force);
+    if !message.by_force {
+      outbound_client_message.write(OutboundClientMessage::Disconnect);
+    }
+    toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
+    registered_players.clear();
+  }
+}
+
+/// A system that handles local input action messages for mutable players by sending them to the server in order to sync
+/// the movements of the local player(s) with the server.
+fn send_local_input_messages(
+  mut messages: MessageReader<InputMessage>,
+  registered_players: Res<RegisteredPlayers>,
+  mut outbound_client_message: MessageWriter<OutboundClientMessage>,
+) {
+  for message in messages.read() {
+    let player_id = match message {
+      InputMessage::Action(player_id) => player_id,
+      InputMessage::Move(player_id, _) => player_id,
+    };
+    if let Some(_) = registered_players
+      .players
+      .iter()
+      .find(|player| player.id == *player_id && player.is_local())
+    {
+      if let Ok(payload) = encode_to_bytes(&ClientMessage::Input(message.into())) {
+        outbound_client_message.write(OutboundClientMessage::Send {
+          channel: ChannelType::Unreliable,
+          payload,
+        });
+      } else {
+        warn!("Failed to serialise input action message: {:?}", message);
+      }
+    } else {
+      error_once!(
+        "Received input action message for player ID [{}], but no matching local player was found: {:?}",
+        player_id,
+        message
+      );
+    }
+  }
+}
+
+// TODO: Consider if I should really interpolate local players too
+/// Adds a [`NetworkTransformInterpolation`] component to every snake heads.
+fn add_interpolation_component_system(
+  mut commands: Commands,
+  snake_head_query: Query<Entity, (With<SnakeHead>, Without<NetworkTransformInterpolation>)>,
+) {
+  for entity in snake_head_query.iter() {
+    commands.entity(entity).insert(NetworkTransformInterpolation::new(0.3));
+  }
+}
+
+/// Applies interpolation to remote players based on received state updates. Updates the interpolation target when new
+/// states arrive, then interpolates towards them.
+fn apply_state_interpolation_system(
+  time: Res<Time>,
+  mut player_state_messages: MessageReader<PlayerStateUpdateMessage>,
+  mut snake_head_query: Query<(&mut Transform, &mut NetworkTransformInterpolation, &PlayerId), With<SnakeHead>>,
+) {
+  // Update targets based on incoming server messages
+  for message in player_state_messages.read() {
+    for (_, mut interpolation, player_id) in snake_head_query.iter_mut() {
+      if player_id.0 == message.id {
+        let target_position = bevy::math::Vec2::new(message.position.0, message.position.1);
+        let target_rotation = Quat::from_rotation_z(message.rotation);
+        interpolation.update_target(target_position, target_rotation);
+      }
+    }
+  }
+
+  // Interpolate all remote players towards their targets
+  let delta = time.delta_secs();
+  for (mut transform, interpolation, _) in snake_head_query.iter_mut() {
+    let current_position = transform.translation.truncate();
+    let target_position = interpolation.target_position;
+    let new_position = current_position.lerp(target_position, interpolation.interpolation_speed * delta * 60.);
+    transform.translation.x = new_position.x;
+    transform.translation.y = new_position.y;
+    let new_rotation = transform.rotation.slerp(
+      interpolation.target_rotation,
+      interpolation.interpolation_speed * delta * 60.,
+    );
+    transform.rotation = new_rotation;
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use crate::prelude::constants::RESOLUTION_WIDTH;
+  use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
+  use bevy::math::Vec3;
+  use bevy::prelude::*;
+  use mooplas_networking::prelude::NetworkingMessagesPlugin;
+  use std::time::Duration;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    // Add shared messages and resources as they are required by the game loop systems
+    app.add_plugins((SharedMessagesPlugin, SharedResourcesPlugin, NetworkingMessagesPlugin));
+    app
+  }
+
+  fn advance_time_by(app: &mut App, duration: Duration) {
+    let mut time = app.world_mut().get_resource_mut::<Time>().unwrap();
+    info!("Time before manual update: {:?}", time.elapsed());
+    time.advance_by(duration);
+    app.update();
+    let time = app.world_mut().get_resource_mut::<Time>().unwrap();
+    info!("Time after manual update: {:?}", time.elapsed());
+  }
+
+  #[test]
+  fn apply_state_interpolation_system_applies_interpolation_within_screen_bounds() {
+    let mut app = setup();
+
+    // Spawn an entity that the system will operate on
+    let entity = app
+      .world_mut()
+      .spawn((
+        Transform::from_translation(Vec3::new(100.0, 100.0, 0.0)),
+        NetworkTransformInterpolation::new(2.),
+        PlayerId(1),
+        SnakeHead,
+      ))
+      .id();
+
+    // Add the system to be tested and the message to be processed inside the system
+    app.add_systems(Update, apply_state_interpolation_system);
+    app
+      .world_mut()
+      .write_message(PlayerStateUpdateMessage::new(1, (110., 110.), 0.))
+      .expect("Failed to write PlayerStateUpdateMessage message");
+    app.update();
+
+    // Advance the time a little
+    advance_time_by(&mut app, Duration::from_millis(100));
+
+    // Inspect the transform after interpolation and ensure it has moved towards the target
+    let translation = app.world_mut().get::<Transform>(entity).unwrap().translation;
+    assert!(translation.x > 100., "X position did not advance during interpolation");
+    assert!(translation.y > 100., "Y position did not advance during interpolation");
+  }
+
+  #[test]
+  fn apply_state_interpolation_system_handles_far_targets() {
+    let mut app = setup();
+
+    // Spawn an entity that the system will operate on at the right edge
+    let entity = app
+      .world_mut()
+      .spawn((
+        Transform::from_translation(Vec3::new(RESOLUTION_WIDTH as f32, 100., 0.)),
+        NetworkTransformInterpolation::new(2.),
+        PlayerId(1),
+        SnakeHead,
+      ))
+      .id();
+
+    // Add the system to be tested and the message to be processed inside the system - target is on the left side
+    app.add_systems(Update, apply_state_interpolation_system);
+    app
+      .world_mut()
+      .write_message(PlayerStateUpdateMessage::new(1, (0., 100.), 0.))
+      .expect("Failed to write PlayerStateUpdateMessage message");
+    app.update();
+
+    // Advance the time a little
+    advance_time_by(&mut app, Duration::from_millis(100));
+
+    // After interpolation the X should have moved towards 0 (decreased)
+    let translation = app.world_mut().get::<Transform>(entity).unwrap().translation;
+    assert!(
+      translation.y > 99.999 && translation.y < 100.001,
+      "Y position should remain approximately 100"
+    );
+    assert!(
+      translation.x < RESOLUTION_WIDTH as f32,
+      "X position should move towards the target on the left"
+    );
+  }
+}

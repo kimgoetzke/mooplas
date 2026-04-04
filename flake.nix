@@ -47,17 +47,19 @@
             pkgs.vulkan-tools
             pkgs.libxkbcommon
             pkgs.wayland
-            pkgs.xorg.libX11
-            pkgs.xorg.libXcursor
-            pkgs.xorg.libXi
-            pkgs.xorg.libXrandr
+            pkgs.libx11
+            pkgs.libxcursor
+            pkgs.libxi
+            pkgs.libxrandr
             pkgs.glibc.dev
             pkgs.libGL
             pkgs.audacity
             pkgs.cargo-flamegraph
             pkgs.clippy
-            pkgs.wasm-bindgen-cli_0_2_100
+            pkgs.cargo-sweep
+            pkgs.wasm-bindgen-cli_0_2_108
             pkgs.nodejs
+            pkgs.bashInteractive
           ];
         };
 
