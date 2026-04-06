@@ -70,7 +70,7 @@ struct OnlineLobbyUiEntry {
 }
 
 #[derive(Component)]
-struct JoinByPressingNode;
+struct JoinByPressingPromptNode;
 
 /// Marker component for the lobby UI call-to-action (CTA) at the bottom of the player list.
 #[derive(Component)]
@@ -121,106 +121,6 @@ fn spawn_lobby_ui_system(
     &registered_players,
     &network_role,
   );
-}
-
-fn is_online_role(network_role: &NetworkRole) -> bool {
-  !network_role.is_none()
-}
-
-fn online_lobby_ui_entry_state(player_id: PlayerId, registered_players: &RegisteredPlayers) -> OnlineLobbyUiEntryState {
-  match registered_players.players.iter().find(|player| player.id == player_id) {
-    Some(player) if player.is_local() => OnlineLobbyUiEntryState::RegisteredLocally {
-      control_scheme_id: player.input.id,
-    },
-    Some(_) => OnlineLobbyUiEntryState::RegisteredRemotely,
-    None => OnlineLobbyUiEntryState::NotRegistered,
-  }
-}
-
-fn player_slot_label(
-  font: &Handle<Font>,
-  player_id: PlayerId,
-  slot_label_colour: Color,
-) -> (Text, TextFont, TextLayout, TextColor, TextShadow) {
-  (
-    Text::new(format!("Player {}", player_id.0)),
-    default_font(font),
-    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-    TextColor(slot_label_colour),
-    default_shadow(),
-  )
-}
-
-fn spawn_local_lobby_ui_entry_children(
-  commands: &mut Commands,
-  entity: Entity,
-  font: &Handle<Font>,
-  control_scheme: &ControlScheme,
-  registered_players: &RegisteredPlayers,
-  is_touch_controlled: bool,
-) {
-  let player_id = PlayerId(control_scheme.id.0);
-  let is_registered = registered_players
-    .get_local_player_id_for_control_scheme(control_scheme.id)
-    .is_some();
-  let join_prompt_colour = colour_for_player_id(player_id);
-
-  commands.entity(entity).with_children(|parent| {
-    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
-
-    if is_registered {
-      parent.spawn(player_registered_prompt(font));
-      return;
-    }
-
-    parent.spawn(player_join_prompt(
-      font,
-      control_scheme,
-      is_touch_controlled,
-      join_prompt_colour,
-    ));
-  });
-}
-
-fn spawn_online_lobby_ui_entry_children(
-  commands: &mut Commands,
-  entity: Entity,
-  font: &Handle<Font>,
-  player_id: PlayerId,
-  available_control_schemes: &AvailableControlSchemes,
-  registered_players: &RegisteredPlayers,
-) {
-  let entry_state = online_lobby_ui_entry_state(player_id, registered_players);
-
-  commands.entity(entity).with_children(|parent| {
-    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
-
-    match entry_state {
-      OnlineLobbyUiEntryState::NotRegistered => {
-        parent.spawn(player_not_registered_prompt(font));
-      }
-      OnlineLobbyUiEntryState::RegisteredLocally { control_scheme_id } => {
-        let control_scheme = available_control_schemes
-          .find_by_id(control_scheme_id)
-          .unwrap_or_else(|| {
-            panic!(
-              "Failed to find control scheme [{:?}] for local player slot [{}]",
-              control_scheme_id, player_id
-            )
-          });
-        parent.spawn(player_registered_with_keys_prompt(font, control_scheme));
-      }
-      OnlineLobbyUiEntryState::RegisteredRemotely => {
-        parent.spawn(player_registered_remotely_prompt(font));
-      }
-    }
-  });
-}
-
-fn clear_ui_children(commands: &mut Commands, children: &Children) {
-  for child in children.iter() {
-    commands.entity(*child).despawn();
-  }
 }
 
 fn spawn_lobby_ui(
@@ -350,9 +250,9 @@ fn spawn_lobby_ui(
       );
     }
 
-    let join_by_pressing = commands
+    let join_by_pressing_prompt = commands
       .spawn((
-        JoinByPressingNode,
+        JoinByPressingPromptNode,
         Node {
           flex_direction: FlexDirection::Row,
           justify_content: JustifyContent::Center,
@@ -365,7 +265,7 @@ fn spawn_lobby_ui(
         spawn_join_by_pressing_prompt_children(parent, &font, available_control_schemes, registered_players);
       })
       .id();
-    commands.entity(root).add_child(join_by_pressing);
+    commands.entity(root).add_child(join_by_pressing_prompt);
   } else {
     for control_scheme in &available_control_schemes.schemes {
       let entry = commands
@@ -554,7 +454,7 @@ fn handle_player_registration_message(
   registered_players: Res<RegisteredPlayers>,
   local_entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
   online_entries_query: Query<(Entity, &OnlineLobbyUiEntry, &Children)>,
-  join_by_pressing_query: Query<(Entity, &Children), With<JoinByPressingNode>>,
+  join_by_pressing_query: Query<(Entity, &Children), With<JoinByPressingPromptNode>>,
   cta_query: Query<(Entity, &Children), With<LobbyUiCta>>,
   network_role: Res<NetworkRole>,
 ) {
@@ -824,7 +724,6 @@ fn spawn_join_by_pressing_prompt_children(
   let Some(prompt_text) = join_by_pressing_prompt_text(available_control_schemes, registered_players) else {
     return;
   };
-
   parent.spawn((
     Text::new(prompt_text),
     default_font(font),
@@ -837,7 +736,7 @@ fn spawn_join_by_pressing_prompt_children(
 
 fn update_join_by_pressing_prompt(
   commands: &mut Commands,
-  join_by_pressing_query: &Query<(Entity, &Children), With<JoinByPressingNode>>,
+  join_by_pressing_query: &Query<(Entity, &Children), With<JoinByPressingPromptNode>>,
   asset_server: &Res<AssetServer>,
   available_control_schemes: &AvailableControlSchemes,
   registered_players: &RegisteredPlayers,
@@ -1040,6 +939,110 @@ fn spawn_game_over_ui_system(
           ));
         });
     });
+}
+
+/// Spawns a single row for an online player in the lobby UI, showing the player slot, whether they're registered, and
+/// their control scheme if registered. Examples:
+/// - "Player 1: Registered remotely"
+/// - "Player 2: Play with \[Z] and \[C]"
+/// - "Player 3: Not registered"
+fn spawn_online_lobby_ui_entry_children(
+  commands: &mut Commands,
+  entity: Entity,
+  font: &Handle<Font>,
+  player_id: PlayerId,
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) {
+  let entry_state = online_lobby_ui_entry_state(player_id, registered_players);
+  commands.entity(entity).with_children(|parent| {
+    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
+    match entry_state {
+      OnlineLobbyUiEntryState::NotRegistered => {
+        parent.spawn(player_not_registered_prompt(font));
+      }
+      OnlineLobbyUiEntryState::RegisteredLocally { control_scheme_id } => {
+        let control_scheme = available_control_schemes
+          .find_by_id(control_scheme_id)
+          .unwrap_or_else(|| {
+            panic!(
+              "Failed to find control scheme [{:?}] for local player slot [{}]",
+              control_scheme_id, player_id
+            )
+          });
+        parent.spawn(player_registered_with_keys_prompt(font, control_scheme));
+      }
+      OnlineLobbyUiEntryState::RegisteredRemotely => {
+        parent.spawn(player_registered_remotely_prompt(font));
+      }
+    }
+  });
+}
+
+fn online_lobby_ui_entry_state(player_id: PlayerId, registered_players: &RegisteredPlayers) -> OnlineLobbyUiEntryState {
+  match registered_players.players.iter().find(|player| player.id == player_id) {
+    Some(player) if player.is_local() => OnlineLobbyUiEntryState::RegisteredLocally {
+      control_scheme_id: player.input.id,
+    },
+    Some(_) => OnlineLobbyUiEntryState::RegisteredRemotely,
+    None => OnlineLobbyUiEntryState::NotRegistered,
+  }
+}
+
+/// Spawns a single row for a local player in the lobby UI, showing the player slot, whether they're registered, and
+/// how to register, if not registered. Examples:
+/// - "Player 1: Registered"
+/// - "Player 4: Press \[Home] to join"
+fn spawn_local_lobby_ui_entry_children(
+  commands: &mut Commands,
+  entity: Entity,
+  font: &Handle<Font>,
+  control_scheme: &ControlScheme,
+  registered_players: &RegisteredPlayers,
+  is_touch_controlled: bool,
+) {
+  let player_id = PlayerId(control_scheme.id.0);
+  let is_registered = registered_players
+    .get_local_player_id_for_control_scheme(control_scheme.id)
+    .is_some();
+  let join_prompt_colour = colour_for_player_id(player_id);
+  commands.entity(entity).with_children(|parent| {
+    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
+    if is_registered {
+      parent.spawn(player_registered_prompt(font));
+      return;
+    }
+    parent.spawn(player_join_prompt(
+      font,
+      control_scheme,
+      is_touch_controlled,
+      join_prompt_colour,
+    ));
+  });
+}
+
+fn clear_ui_children(commands: &mut Commands, children: &Children) {
+  for child in children.iter() {
+    commands.entity(*child).despawn();
+  }
+}
+
+fn player_slot_label(
+  font: &Handle<Font>,
+  player_id: PlayerId,
+  slot_label_colour: Color,
+) -> (Text, TextFont, TextLayout, TextColor, TextShadow) {
+  (
+    Text::new(format!("Player {}", player_id.0)),
+    default_font(font),
+    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+    TextColor(slot_label_colour),
+    default_shadow(),
+  )
+}
+
+fn is_online_role(network_role: &NetworkRole) -> bool {
+  !network_role.is_none()
 }
 
 fn default_font(font: &Handle<Font>) -> TextFont {

@@ -201,6 +201,14 @@ impl Lobby {
     }
   }
 
+  /// Clears any registrations for the next round, so that players can register again. Use before starting a new round.
+  pub fn reinitialise(&mut self) {
+    for registrations in self.registered.values_mut() {
+      registrations.clear();
+    }
+  }
+
+  /// Clears all connected clients and registrations. Use when exiting an online game, not when starting a new round.
   pub fn clear(&mut self) {
     self.connected.clear();
     self.registered.clear();

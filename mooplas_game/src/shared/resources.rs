@@ -117,6 +117,7 @@ impl RegisteredPlayers {
     self.players.len()
   }
 
+  /// Returns the [`PlayerId`] of the local player using the given [`ControlSchemeId`], if one exists.
   pub fn get_local_player_id_for_control_scheme(&self, control_scheme_id: ControlSchemeId) -> Option<PlayerId> {
     self
       .players

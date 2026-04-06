@@ -7,8 +7,8 @@ use crate::prelude::{
 };
 use bevy::log::{debug, info, warn};
 use bevy::prelude::{
-  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut, Resource,
-  State, StateTransitionEvent, Time, Timer, TimerMode, Transform, Update, With, in_state, resource_exists,
+  App, Commands, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, OnExit, Plugin, Query, Res, ResMut,
+  Resource, State, StateTransitionEvent, Time, Timer, TimerMode, Transform, Update, With, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
   ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, OutboundServerMessage,
@@ -52,7 +52,8 @@ impl Plugin for ServerPlugin {
         disconnect_all_clients_system
           .run_if(resource_exists::<ShutdownCountdown>)
           .run_if(resource_exists::<ServerNetworkingActive>),
-      );
+      )
+      .add_systems(OnExit(AppState::GameOver), reinitialise);
   }
 }
 
@@ -121,12 +122,6 @@ fn handle_registration_request(
     warn!("No player IDs are available for client [{}]", client_id);
     return;
   };
-
-  info!(
-    "[{}] with client ID [{}] registered using control scheme [{:?}]",
-    player_id, client_id, control_scheme_id
-  );
-
   if registers_local_player {
     utils::register_local_player_locally(
       registered_players,
@@ -173,9 +168,6 @@ fn handle_unregistration_request(
     );
     return;
   }
-
-  info!("[{}] with client ID [{}] unregistered", request.player_id, client_id);
-
   if unregisters_local_player {
     utils::unregister_local_player_locally(
       registered_players,
@@ -445,6 +437,10 @@ fn disconnect_all_clients_system(
     toggle_menu_message.write(ToggleMenuMessage::set(MenuName::MainMenu));
     next_app_state.set(AppState::Preparing);
   }
+}
+
+fn reinitialise(mut lobby: ResMut<Lobby>) {
+  lobby.reinitialise();
 }
 
 #[cfg(test)]
