@@ -1,3 +1,4 @@
+#[cfg(feature = "online")]
 use crate::online::structs::LocalInputMapping;
 use bevy::prelude::{App, Plugin};
 

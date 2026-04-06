@@ -146,6 +146,8 @@ fn continue_button_system(
   }
 }
 
+// TODO: Replace all button text below with icons
+/// Spawns all in-game buttons, visible in the player registration phase/lobby.
 pub(crate) fn spawn_in_game_buttons(asset_server: &Res<AssetServer>, parent: &mut RelatedSpawnerCommands<ChildOf>) {
   parent
     .spawn(Node {
