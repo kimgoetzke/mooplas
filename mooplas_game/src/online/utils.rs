@@ -1,5 +1,6 @@
+use crate::online::structs::LocalInputMapping;
 use crate::prelude::{
-  AvailableControlSchemes, ControlSchemeId, LocalInputMapping, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
+  AvailableControlSchemes, ControlSchemeId, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
   colour_for_player_id,
 };
 use crate::shared::RegisteredPlayer;

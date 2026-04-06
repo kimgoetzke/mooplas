@@ -143,10 +143,6 @@ pub struct UiNotification {
 
 #[cfg(feature = "online")]
 impl UiNotification {
-  #[expect(
-    dead_code,
-    reason = "Only transport-specific online backends emit error notifications"
-  )]
   pub fn error(text: String) -> Self {
     Self {
       text,

@@ -1,10 +1,9 @@
 use crate::app_state::AppState;
-use crate::online::structs::NetworkTransformInterpolation;
+use crate::online::structs::{LocalInputMapping, NetworkTransformInterpolation};
 use crate::online::utils;
 use crate::prelude::{
-  AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalInputMapping,
-  LocalPlayerRegistrationRequestMessage, MenuName, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed,
-  SnakeHead, ToggleMenuMessage, WinnerInfo,
+  AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalPlayerRegistrationRequestMessage,
+  MenuName, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, WinnerInfo,
 };
 use bevy::app::Update;
 use bevy::log::{debug, error_once, info, warn};
@@ -301,7 +300,9 @@ mod tests {
       SharedResourcesPlugin,
       NetworkingMessagesPlugin,
     ));
-    app.init_resource::<CurrentClientId>();
+    app
+      .init_resource::<CurrentClientId>()
+      .init_resource::<LocalInputMapping>();
     app
   }
 

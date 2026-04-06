@@ -7,8 +7,6 @@ use bevy_inspector_egui::InspectorOptions;
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use mooplas_networking::prelude::NetworkRole;
-#[cfg(feature = "online")]
-use std::collections::HashMap;
 use std::fmt::Display;
 
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
@@ -28,9 +26,6 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<RegisteredPlayers>()
       .init_resource::<WinnerInfo>()
       .init_resource::<NetworkRole>();
-
-    #[cfg(feature = "online")]
-    app.init_resource::<LocalInputMapping>();
   }
 }
 
@@ -107,34 +102,6 @@ impl AvailableControlSchemes {
   /// Finds a control scheme by its [`ControlSchemeId`].
   pub fn find_by_id(&self, control_scheme_id: ControlSchemeId) -> Option<&ControlScheme> {
     self.schemes.iter().find(|scheme| scheme.id == control_scheme_id)
-  }
-}
-
-// TODO: Move to online/structs.rs
-/// A client-side resource that maps local control schemes to server-assigned player identities.
-/// Only relevant in online multiplayer mode.
-#[cfg(feature = "online")]
-#[derive(Resource, Default, Debug)]
-pub struct LocalInputMapping {
-  mappings: HashMap<ControlSchemeId, PlayerId>,
-}
-
-#[cfg(feature = "online")]
-impl LocalInputMapping {
-  pub fn insert(&mut self, control_scheme_id: ControlSchemeId, player_id: PlayerId) {
-    self.mappings.insert(control_scheme_id, player_id);
-  }
-
-  pub fn clear(&mut self) {
-    self.mappings.clear();
-  }
-
-  pub fn remove(&mut self, control_scheme_id: &ControlSchemeId) {
-    self.mappings.remove(control_scheme_id);
-  }
-
-  pub fn get_player_id(&self, control_scheme_id: &ControlSchemeId) -> Option<PlayerId> {
-    self.mappings.get(control_scheme_id).copied()
   }
 }
 
