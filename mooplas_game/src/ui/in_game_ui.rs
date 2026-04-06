@@ -3,8 +3,8 @@ use crate::prelude::constants::{
   ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT, TEXT_COLOUR,
 };
 use crate::prelude::{
-  AvailablePlayerConfig, AvailablePlayerConfigs, ExitLobbyMessage, PlayerId, RegisteredPlayers, Settings,
-  TouchControlsToggledMessage, WinnerInfo,
+  AvailableControlSchemes, ControlScheme, ControlSchemeId, ExitLobbyMessage, MAX_PLAYERS, PlayerId, RegisteredPlayers,
+  Settings, TouchControlsToggledMessage, WinnerInfo, colour_for_player_id,
 };
 use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
 use crate::ui::shared::{despawn_menu, spawn_button};
@@ -61,8 +61,16 @@ struct LobbyUiRoot;
 /// The component for each available player's information and status in the lobby UI.
 #[derive(Component)]
 struct LobbyUiEntry {
+  control_scheme_id: ControlSchemeId,
+}
+
+#[derive(Component)]
+struct OnlineLobbyUiEntry {
   player_id: PlayerId,
 }
+
+#[derive(Component)]
+struct JoinByPressingNode;
 
 /// Marker component for the lobby UI call-to-action (CTA) at the bottom of the player list.
 #[derive(Component)]
@@ -89,12 +97,19 @@ struct ExitButton;
 #[derive(Component)]
 struct ContinueButton;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OnlineLobbyUiEntryState {
+  NotRegistered,
+  RegisteredLocally { control_scheme_id: ControlSchemeId },
+  RegisteredRemotely,
+}
+
 /// Sets up the lobby UI, displaying available players and prompts to join.
 fn spawn_lobby_ui_system(
   mut commands: Commands,
   settings: Res<Settings>,
   asset_server: Res<AssetServer>,
-  available_configs: Res<AvailablePlayerConfigs>,
+  available_control_schemes: Res<AvailableControlSchemes>,
   registered_players: Res<RegisteredPlayers>,
   network_role: Res<NetworkRole>,
 ) {
@@ -102,17 +117,117 @@ fn spawn_lobby_ui_system(
     &mut commands,
     &settings,
     &asset_server,
-    &available_configs,
+    &available_control_schemes,
     &registered_players,
     &network_role,
   );
+}
+
+fn is_online_role(network_role: &NetworkRole) -> bool {
+  !network_role.is_none()
+}
+
+fn online_lobby_ui_entry_state(player_id: PlayerId, registered_players: &RegisteredPlayers) -> OnlineLobbyUiEntryState {
+  match registered_players.players.iter().find(|player| player.id == player_id) {
+    Some(player) if player.is_local() => OnlineLobbyUiEntryState::RegisteredLocally {
+      control_scheme_id: player.input.id,
+    },
+    Some(_) => OnlineLobbyUiEntryState::RegisteredRemotely,
+    None => OnlineLobbyUiEntryState::NotRegistered,
+  }
+}
+
+fn player_slot_label(
+  font: &Handle<Font>,
+  player_id: PlayerId,
+  slot_label_colour: Color,
+) -> (Text, TextFont, TextLayout, TextColor, TextShadow) {
+  (
+    Text::new(format!("Player {}", player_id.0)),
+    default_font(font),
+    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+    TextColor(slot_label_colour),
+    default_shadow(),
+  )
+}
+
+fn spawn_local_lobby_ui_entry_children(
+  commands: &mut Commands,
+  entity: Entity,
+  font: &Handle<Font>,
+  control_scheme: &ControlScheme,
+  registered_players: &RegisteredPlayers,
+  is_touch_controlled: bool,
+) {
+  let player_id = PlayerId(control_scheme.id.0);
+  let is_registered = registered_players
+    .get_local_player_id_for_control_scheme(control_scheme.id)
+    .is_some();
+  let join_prompt_colour = colour_for_player_id(player_id);
+
+  commands.entity(entity).with_children(|parent| {
+    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
+
+    if is_registered {
+      parent.spawn(player_registered_prompt(font));
+      return;
+    }
+
+    parent.spawn(player_join_prompt(
+      font,
+      control_scheme,
+      is_touch_controlled,
+      join_prompt_colour,
+    ));
+  });
+}
+
+fn spawn_online_lobby_ui_entry_children(
+  commands: &mut Commands,
+  entity: Entity,
+  font: &Handle<Font>,
+  player_id: PlayerId,
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) {
+  let entry_state = online_lobby_ui_entry_state(player_id, registered_players);
+
+  commands.entity(entity).with_children(|parent| {
+    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
+
+    match entry_state {
+      OnlineLobbyUiEntryState::NotRegistered => {
+        parent.spawn(player_not_registered_prompt(font));
+      }
+      OnlineLobbyUiEntryState::RegisteredLocally { control_scheme_id } => {
+        let control_scheme = available_control_schemes
+          .find_by_id(control_scheme_id)
+          .unwrap_or_else(|| {
+            panic!(
+              "Failed to find control scheme [{:?}] for local player slot [{}]",
+              control_scheme_id, player_id
+            )
+          });
+        parent.spawn(player_registered_with_keys_prompt(font, control_scheme));
+      }
+      OnlineLobbyUiEntryState::RegisteredRemotely => {
+        parent.spawn(player_registered_remotely_prompt(font));
+      }
+    }
+  });
+}
+
+fn clear_ui_children(commands: &mut Commands, children: &Children) {
+  for child in children.iter() {
+    commands.entity(*child).despawn();
+  }
 }
 
 fn spawn_lobby_ui(
   commands: &mut Commands,
   settings: &Res<Settings>,
   asset_server: &Res<AssetServer>,
-  available_configs: &Res<AvailablePlayerConfigs>,
+  available_control_schemes: &Res<AvailableControlSchemes>,
   registered_players: &Res<RegisteredPlayers>,
   network_role: &Res<NetworkRole>,
 ) {
@@ -121,6 +236,7 @@ fn spawn_lobby_ui(
   let default_shadow = default_shadow();
   let is_touch_controlled = settings.general.enable_touch_controls;
   let is_permitted_action = !network_role.is_client();
+  let is_online = is_online_role(network_role);
 
   let root = commands
     .spawn((
@@ -206,46 +322,78 @@ fn spawn_lobby_ui(
     })
     .id();
 
-  for available_config in &available_configs.configs {
-    let colour = available_configs
-      .configs
-      .iter()
-      .find(|p| p.id == available_config.id)
-      .map(|p| p.colour)
-      .unwrap_or(DEFAULT_COLOUR);
-    let is_registered = registered_players.players.iter().any(|p| p.id == available_config.id);
-    let entry = commands
+  if is_online {
+    for player_index in 0..MAX_PLAYERS {
+      let player_id = PlayerId(player_index);
+      let entry = commands
+        .spawn((
+          OnlineLobbyUiEntry { player_id },
+          BackgroundColor::from(Color::BLACK.with_alpha(0.5)),
+          Node {
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            width: percent(100.),
+            ..default()
+          },
+          Pickable::IGNORE,
+        ))
+        .id();
+      commands.entity(root).add_child(entry);
+      spawn_online_lobby_ui_entry_children(
+        commands,
+        entry,
+        &font,
+        player_id,
+        available_control_schemes,
+        registered_players,
+      );
+    }
+
+    let join_by_pressing = commands
       .spawn((
-        LobbyUiEntry {
-          player_id: available_config.id,
-        },
-        BackgroundColor::from(Color::BLACK.with_alpha(0.5)),
+        JoinByPressingNode,
         Node {
           flex_direction: FlexDirection::Row,
           justify_content: JustifyContent::Center,
           align_items: AlignItems::Center,
-          width: percent(100.),
           ..default()
         },
         Pickable::IGNORE,
       ))
       .with_children(|parent| {
-        parent.spawn((
-          // Player
-          Text::new(format!("Player {}", available_config.id.0)),
-          default_font.clone(),
-          TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          TextColor(colour),
-          default_shadow,
-        ));
-        if is_registered {
-          parent.spawn(player_registered_prompt(&font));
-        } else {
-          parent.spawn(player_join_prompt(&font, available_config, is_touch_controlled));
-        }
+        spawn_join_by_pressing_prompt_children(parent, &font, available_control_schemes, registered_players);
       })
       .id();
-    commands.entity(root).add_child(entry);
+    commands.entity(root).add_child(join_by_pressing);
+  } else {
+    for control_scheme in &available_control_schemes.schemes {
+      let entry = commands
+        .spawn((
+          LobbyUiEntry {
+            control_scheme_id: control_scheme.id,
+          },
+          BackgroundColor::from(Color::BLACK.with_alpha(0.5)),
+          Node {
+            flex_direction: FlexDirection::Row,
+            justify_content: JustifyContent::Center,
+            align_items: AlignItems::Center,
+            width: percent(100.),
+            ..default()
+          },
+          Pickable::IGNORE,
+        ))
+        .id();
+      commands.entity(root).add_child(entry);
+      spawn_local_lobby_ui_entry_children(
+        commands,
+        entry,
+        &font,
+        control_scheme,
+        registered_players,
+        is_touch_controlled,
+      );
+    }
   }
 
   // Call to action
@@ -402,44 +550,63 @@ fn handle_player_registration_message(
   settings: Res<Settings>,
   mut player_registration_message: MessageReader<PlayerRegistrationMessage>,
   asset_server: Res<AssetServer>,
-  available_configs: Res<AvailablePlayerConfigs>,
-  mut entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
+  available_control_schemes: Res<AvailableControlSchemes>,
+  registered_players: Res<RegisteredPlayers>,
+  local_entries_query: Query<(Entity, &LobbyUiEntry, &Children)>,
+  online_entries_query: Query<(Entity, &OnlineLobbyUiEntry, &Children)>,
+  join_by_pressing_query: Query<(Entity, &Children), With<JoinByPressingNode>>,
   cta_query: Query<(Entity, &Children), With<LobbyUiCta>>,
   network_role: Res<NetworkRole>,
 ) {
   for message in player_registration_message.read() {
     let font = asset_server.load(DEFAULT_FONT);
-    let config = available_configs.configs.iter().find(|p| p.id == message.player_id);
     let is_touch_controlled = settings.general.enable_touch_controls;
     let is_permitted_action = !network_role.is_client();
+    let is_online = is_online_role(&network_role);
 
-    // Update entry for player
-    match message.has_registered {
-      false => {
-        for (entity, entry, children) in &mut entries_query {
-          if entry.player_id == message.player_id {
-            if let Some(prompt_node) = children.get(1) {
-              commands.entity(*prompt_node).despawn();
-              if let Some(ref available_config) = config {
-                let player = commands
-                  .spawn(player_join_prompt(&font, available_config, is_touch_controlled))
-                  .id();
-                commands.entity(entity).add_child(player);
-              }
-            }
-          }
+    if is_online {
+      for (entity, entry, children) in online_entries_query.iter() {
+        if entry.player_id != message.player_id {
+          continue;
         }
+
+        clear_ui_children(&mut commands, children);
+        spawn_online_lobby_ui_entry_children(
+          &mut commands,
+          entity,
+          &font,
+          entry.player_id,
+          &available_control_schemes,
+          &registered_players,
+        );
       }
-      true => {
-        for (entity, entry, children) in &mut entries_query {
-          if entry.player_id == message.player_id {
-            if let Some(prompt_node) = children.get(1) {
-              commands.entity(*prompt_node).despawn();
-              let registered_prompt = commands.spawn(player_registered_prompt(&font)).id();
-              commands.entity(entity).add_child(registered_prompt);
-            }
-          }
+
+      update_join_by_pressing_prompt(
+        &mut commands,
+        &join_by_pressing_query,
+        &asset_server,
+        &available_control_schemes,
+        &registered_players,
+      );
+    } else if let Some(control_scheme_id) = message.control_scheme_id {
+      let Some(control_scheme) = available_control_schemes.find_by_id(control_scheme_id) else {
+        continue;
+      };
+
+      for (entity, entry, children) in local_entries_query.iter() {
+        if entry.control_scheme_id != control_scheme_id {
+          continue;
         }
+
+        clear_ui_children(&mut commands, children);
+        spawn_local_lobby_ui_entry_children(
+          &mut commands,
+          entity,
+          &font,
+          control_scheme,
+          &registered_players,
+          is_touch_controlled,
+        );
       }
     }
 
@@ -457,8 +624,9 @@ fn handle_player_registration_message(
 
 fn player_join_prompt(
   font: &Handle<Font>,
-  available_config: &AvailablePlayerConfig,
+  control_scheme: &ControlScheme,
   is_touch_controlled: bool,
+  colour: Color,
 ) -> (
   Node,
   SpawnRelatedBundle<
@@ -492,7 +660,7 @@ fn player_join_prompt(
       if !is_touch_controlled {
         (
           // ...[Key]...
-          Text::new(format!("[{:?}]", available_config.input.action)),
+          Text::new(format!("[{:?}]", control_scheme.action)),
           default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
           TextColor(Color::from(ACCENT_COLOUR)),
@@ -504,7 +672,7 @@ fn player_join_prompt(
           Text::new("your colour"),
           default_font.clone(),
           TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-          TextColor(available_config.colour),
+          TextColor(colour),
           default_shadow,
         )
       },
@@ -543,6 +711,147 @@ fn player_registered_prompt(
   )
 }
 
+fn player_not_registered_prompt(
+  font: &Handle<Font>,
+) -> (
+  Node,
+  SpawnRelatedBundle<ChildOf, Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>>,
+) {
+  (
+    Node {
+      flex_direction: FlexDirection::Row,
+      justify_content: JustifyContent::Center,
+      align_items: AlignItems::Center,
+      ..default()
+    },
+    children![(
+      Text::new(": Not registered"),
+      default_font(font),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      TEXT_COLOUR,
+      default_shadow(),
+    )],
+  )
+}
+
+fn player_registered_with_keys_prompt(
+  font: &Handle<Font>,
+  control_scheme: &ControlScheme,
+) -> (
+  Node,
+  SpawnRelatedBundle<ChildOf, Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>>,
+) {
+  (
+    Node {
+      flex_direction: FlexDirection::Row,
+      justify_content: JustifyContent::Center,
+      align_items: AlignItems::Center,
+      ..default()
+    },
+    children![(
+      Text::new(format!(
+        ": Play with {:?} and {:?}",
+        control_scheme.left, control_scheme.right
+      )),
+      default_font(font),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      TEXT_COLOUR,
+      default_shadow(),
+    )],
+  )
+}
+
+fn player_registered_remotely_prompt(
+  font: &Handle<Font>,
+) -> (
+  Node,
+  SpawnRelatedBundle<ChildOf, Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>>,
+) {
+  (
+    Node {
+      flex_direction: FlexDirection::Row,
+      justify_content: JustifyContent::Center,
+      align_items: AlignItems::Center,
+      ..default()
+    },
+    children![(
+      Text::new(": Registered remotely"),
+      default_font(font),
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      TEXT_COLOUR,
+      default_shadow(),
+    )],
+  )
+}
+
+fn join_by_pressing_prompt_text(
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) -> Option<String> {
+  let available_action_keys: Vec<String> = available_control_schemes
+    .schemes
+    .iter()
+    .filter(|control_scheme| {
+      !registered_players
+        .players
+        .iter()
+        .any(|player| player.is_local() && player.input.id == control_scheme.id)
+    })
+    .map(|control_scheme| format!("[{:?}]", control_scheme.action))
+    .collect();
+
+  match available_action_keys.as_slice() {
+    [] => None,
+    [only_key] => Some(format!("Join by pressing {}.", only_key)),
+    [first_key, second_key] => Some(format!("Join by pressing {} or {}.", first_key, second_key)),
+    _ => {
+      let last_index = available_action_keys.len() - 1;
+      let initial_keys = available_action_keys[..last_index].join(", ");
+      Some(format!(
+        "Join by pressing {}, or {}.",
+        initial_keys, available_action_keys[last_index]
+      ))
+    }
+  }
+}
+
+fn spawn_join_by_pressing_prompt_children(
+  parent: &mut RelatedSpawnerCommands<ChildOf>,
+  font: &Handle<Font>,
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) {
+  let Some(prompt_text) = join_by_pressing_prompt_text(available_control_schemes, registered_players) else {
+    return;
+  };
+
+  parent.spawn((
+    Text::new(prompt_text),
+    default_font(font),
+    LineHeight::RelativeToFont(2.),
+    TEXT_COLOUR,
+    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+    default_shadow(),
+  ));
+}
+
+fn update_join_by_pressing_prompt(
+  commands: &mut Commands,
+  join_by_pressing_query: &Query<(Entity, &Children), With<JoinByPressingNode>>,
+  asset_server: &Res<AssetServer>,
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) {
+  for (entity, children) in join_by_pressing_query.iter() {
+    clear_ui_children(commands, children);
+
+    let font = asset_server.load(DEFAULT_FONT);
+    commands.entity(entity).with_children(|parent| {
+      spawn_join_by_pressing_prompt_children(parent, &font, available_control_schemes, registered_players);
+    });
+  }
+}
+
 fn update_call_to_action_to_start(
   commands: &mut Commands,
   has_any_players: bool,
@@ -552,9 +861,7 @@ fn update_call_to_action_to_start(
   is_permitted_action: bool,
 ) {
   for (entity, children) in cta_query.iter() {
-    for child in children.iter() {
-      commands.entity(*child).despawn();
-    }
+    clear_ui_children(commands, children);
     let font = asset_server.load(DEFAULT_FONT);
     let default_font = default_font(&font);
     let default_shadow = default_shadow();
@@ -582,7 +889,7 @@ fn handle_touch_controls_toggled_message(
   lobby_ui_root_query: Query<Entity, With<LobbyUiRoot>>,
   settings: Res<Settings>,
   asset_server: Res<AssetServer>,
-  available_configs: Res<AvailablePlayerConfigs>,
+  available_control_schemes: Res<AvailableControlSchemes>,
   registered_players: Res<RegisteredPlayers>,
   network_role: Res<NetworkRole>,
 ) {
@@ -594,7 +901,7 @@ fn handle_touch_controls_toggled_message(
       &mut commands,
       &settings,
       &asset_server,
-      &available_configs,
+      &available_control_schemes,
       &registered_players,
       &network_role,
     );
@@ -758,4 +1065,154 @@ fn default_shadow() -> TextShadow {
 /// Despawns the entire game over UI. Call when exiting the game over state.
 fn despawn_game_over_ui_system(mut commands: Commands, victory_ui_root_query: Query<Entity, With<VictoryUiRoot>>) {
   despawn_menu(&mut commands, &victory_ui_root_query);
+}
+
+#[cfg(all(test, feature = "online"))]
+mod tests {
+  use super::*;
+  #[cfg(feature = "online")]
+  use crate::shared::RegisteredPlayer;
+  #[cfg(feature = "online")]
+  use bevy::prelude::KeyCode;
+
+  #[cfg(feature = "online")]
+  fn test_control_scheme(id: u8) -> ControlScheme {
+    ControlScheme::new(
+      ControlSchemeId(id),
+      match id {
+        0 => KeyCode::ArrowLeft,
+        1 => KeyCode::Digit1,
+        _ => KeyCode::KeyZ,
+      },
+      match id {
+        0 => KeyCode::ArrowRight,
+        1 => KeyCode::KeyA,
+        _ => KeyCode::KeyC,
+      },
+      match id {
+        0 => KeyCode::ArrowUp,
+        1 => KeyCode::KeyQ,
+        _ => KeyCode::KeyX,
+      },
+    )
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn online_lobby_ui_entry_state_returns_not_registered_for_empty_slot() {
+    let registered_players = RegisteredPlayers::default();
+
+    assert_eq!(
+      online_lobby_ui_entry_state(PlayerId(4), &registered_players),
+      OnlineLobbyUiEntryState::NotRegistered
+    );
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn online_lobby_ui_entry_state_returns_local_registration_for_local_player() {
+    let mut registered_players = RegisteredPlayers::default();
+    registered_players
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected the local player registration to succeed");
+
+    assert_eq!(
+      online_lobby_ui_entry_state(PlayerId(4), &registered_players),
+      OnlineLobbyUiEntryState::RegisteredLocally {
+        control_scheme_id: ControlSchemeId(0),
+      }
+    );
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn online_lobby_ui_entry_state_returns_remote_registration_for_remote_player() {
+    let mut registered_players = RegisteredPlayers::default();
+    registered_players
+      .register(RegisteredPlayer::new_immutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected the remote player registration to succeed");
+
+    assert_eq!(
+      online_lobby_ui_entry_state(PlayerId(4), &registered_players),
+      OnlineLobbyUiEntryState::RegisteredRemotely
+    );
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn join_by_pressing_prompt_text_ignores_remote_registrations() {
+    let available_control_schemes = AvailableControlSchemes {
+      schemes: vec![test_control_scheme(0), test_control_scheme(1)],
+    };
+    let mut registered_players = RegisteredPlayers::default();
+    registered_players
+      .register(RegisteredPlayer::new_immutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected the remote player registration to succeed");
+
+    assert_eq!(
+      join_by_pressing_prompt_text(&available_control_schemes, &registered_players),
+      Some("Join by pressing [ArrowUp] or [KeyQ].".to_string())
+    );
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn join_by_pressing_prompt_text_omits_locally_registered_action_keys() {
+    let available_control_schemes = AvailableControlSchemes {
+      schemes: vec![test_control_scheme(0), test_control_scheme(1)],
+    };
+    let mut registered_players = RegisteredPlayers::default();
+    registered_players
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected the local player registration to succeed");
+
+    assert_eq!(
+      join_by_pressing_prompt_text(&available_control_schemes, &registered_players),
+      Some("Join by pressing [KeyQ].".to_string())
+    );
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn join_by_pressing_prompt_text_returns_none_when_all_local_schemes_are_taken() {
+    let available_control_schemes = AvailableControlSchemes {
+      schemes: vec![test_control_scheme(0), test_control_scheme(1)],
+    };
+    let mut registered_players = RegisteredPlayers::default();
+    registered_players
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected the first local player registration to succeed");
+    registered_players
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(5),
+        test_control_scheme(1),
+        colour_for_player_id(PlayerId(5)),
+      ))
+      .expect("Expected the second local player registration to succeed");
+
+    assert_eq!(
+      join_by_pressing_prompt_text(&available_control_schemes, &registered_players),
+      None
+    );
+  }
 }

@@ -1,8 +1,9 @@
 use crate::app_state::AppState;
 use crate::online::utils;
 use crate::prelude::{
-  AvailablePlayerConfigs, ExitLobbyMessage, InputMessage, MenuName, PlayerId, PlayerRegistrationMessage,
-  RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, WinnerInfo,
+  AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalPlayerRegistrationRequestMessage,
+  MAX_PLAYERS, MenuName, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
+  WinnerInfo,
 };
 use bevy::log::{debug, info, warn};
 use bevy::prelude::{
@@ -10,8 +11,8 @@ use bevy::prelude::{
   State, StateTransitionEvent, Time, Timer, TimerMode, Transform, Update, With, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
-  ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, NetworkRole, OutboundServerMessage,
-  ServerNetworkingActive, encode_to_bytes,
+  ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, OutboundServerMessage,
+  SerialisableUnregistrationRequest, ServerNetworkingActive, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -34,7 +35,7 @@ impl Plugin for ServerPlugin {
       .add_systems(
         Update,
         (
-          handle_local_player_registration_message,
+          handle_local_player_registration_request_message,
           process_and_broadcast_local_exit_lobby_message,
         )
           .run_if(in_state(AppState::Registering))
@@ -55,11 +56,144 @@ impl Plugin for ServerPlugin {
   }
 }
 
-const CLIENT_MESSAGE_SERIALISATION: &'static str = "Failed to serialise client message";
+const CLIENT_MESSAGE_SERIALISATION: &str = "Failed to serialise client message";
 
 // A resource to schedule the actual disconnect after broadcasting the shutdown message.
 #[derive(Resource)]
 struct ShutdownCountdown(Timer);
+
+fn host_client_id() -> ClientId {
+  ClientId::nil()
+}
+
+fn broadcast_player_registered(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  client_id: ClientId,
+  player_id: PlayerId,
+  control_scheme_id: ControlSchemeId,
+) {
+  let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
+    client_id,
+    player_id: player_id.0,
+    control_scheme_id: control_scheme_id.0,
+  })
+  .expect(CLIENT_MESSAGE_SERIALISATION);
+  outbound_server_message.write(OutboundServerMessage::Broadcast {
+    channel: ChannelType::ReliableOrdered,
+    payload,
+  });
+}
+
+fn broadcast_player_unregistered(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  client_id: ClientId,
+  player_id: PlayerId,
+) {
+  let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
+    client_id,
+    player_id: player_id.0,
+  })
+  .expect(CLIENT_MESSAGE_SERIALISATION);
+  outbound_server_message.write(OutboundServerMessage::Broadcast {
+    channel: ChannelType::ReliableOrdered,
+    payload,
+  });
+}
+
+fn handle_registration_request(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  registered_players: &mut ResMut<RegisteredPlayers>,
+  available_control_schemes: &Res<AvailableControlSchemes>,
+  player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
+  client_id: ClientId,
+  control_scheme_id: ControlSchemeId,
+  lobby: &mut ResMut<Lobby>,
+  registers_local_player: bool,
+) {
+  if lobby.is_control_scheme_registered(&client_id, control_scheme_id.0) {
+    warn!(
+      "Ignoring duplicate registration for client [{}] and control scheme [{:?}]",
+      client_id, control_scheme_id
+    );
+    return;
+  }
+  let Some(player_id) = next_available_player_id(registered_players) else {
+    warn!("No player IDs are available for client [{}]", client_id);
+    return;
+  };
+
+  info!(
+    "[{}] with client ID [{}] registered using control scheme [{:?}]",
+    player_id, client_id, control_scheme_id
+  );
+
+  if registers_local_player {
+    utils::register_local_player_locally(
+      registered_players,
+      available_control_schemes,
+      player_registration_message,
+      None,
+      player_id,
+      control_scheme_id,
+    );
+  } else {
+    utils::register_remote_player_locally(
+      registered_players,
+      available_control_schemes,
+      player_registration_message,
+      player_id,
+      control_scheme_id,
+    );
+  }
+
+  lobby.register_player(client_id, player_id.into(), control_scheme_id.0);
+  broadcast_player_registered(outbound_server_message, client_id, player_id, control_scheme_id);
+}
+
+/// Returns the first [`PlayerId`] that is not registered, or `None` if all possible player IDs are taken.
+fn next_available_player_id(registered_players: &RegisteredPlayers) -> Option<PlayerId> {
+  (0..MAX_PLAYERS as usize)
+    .map(|index| PlayerId(index as u8))
+    .find(|candidate| !registered_players.players.iter().any(|player| player.id == *candidate))
+}
+
+fn handle_unregistration_request(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  registered_players: &mut ResMut<RegisteredPlayers>,
+  player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
+  client_id: ClientId,
+  request: SerialisableUnregistrationRequest,
+  lobby: &mut ResMut<Lobby>,
+  unregisters_local_player: bool,
+) {
+  if !lobby.validate_registration(&client_id, &request.player_id) {
+    warn!(
+      "Ignoring invalid unregistration for client [{}] and player [{}]",
+      client_id, request.player_id
+    );
+    return;
+  }
+
+  info!("[{}] with client ID [{}] unregistered", request.player_id, client_id);
+
+  if unregisters_local_player {
+    utils::unregister_local_player_locally(
+      registered_players,
+      player_registration_message,
+      None,
+      request.player_id.into(),
+    );
+  } else {
+    utils::unregister_remote_player_locally(
+      registered_players,
+      player_registration_message,
+      request.player_id.into(),
+    );
+  }
+
+  lobby.unregister_player(client_id, request.player_id);
+  broadcast_player_unregistered(outbound_server_message, client_id, request.player_id.into());
+}
 
 /// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients,
 /// if necessary.
@@ -67,23 +201,34 @@ fn handle_inbound_client_message(
   mut messages: MessageReader<InboundClientMessage>,
   mut lobby: ResMut<Lobby>,
   mut registered_players: ResMut<RegisteredPlayers>,
-  available_configs: Res<AvailablePlayerConfigs>,
+  available_control_schemes: Res<AvailableControlSchemes>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
   mut input_message: MessageWriter<InputMessage>,
   mut outbound_server_message: MessageWriter<OutboundServerMessage>,
 ) {
   for message in messages.read() {
     match message {
-      InboundClientMessage::PlayerRegistration(message, client_id) => {
-        handle_player_registration_message_from_client(
+      InboundClientMessage::RegistrationRequest(message, client_id) => {
+        handle_registration_request(
           &mut outbound_server_message,
           &mut registered_players,
-          &available_configs,
+          &available_control_schemes,
           &mut player_registration_message,
-          &client_id,
-          message.player_id,
-          message.has_registered,
+          *client_id,
+          ControlSchemeId(message.control_scheme_id),
           &mut lobby,
+          false,
+        );
+      }
+      InboundClientMessage::UnregistrationRequest(message, client_id) => {
+        handle_unregistration_request(
+          &mut outbound_server_message,
+          &mut registered_players,
+          &mut player_registration_message,
+          *client_id,
+          *message,
+          &mut lobby,
+          false,
         );
       }
       InboundClientMessage::Input(message, client_id) => {
@@ -92,9 +237,9 @@ fn handle_inbound_client_message(
           InputMessage::Action(player_id) => player_id,
           InputMessage::Move(player_id, _) => player_id,
         };
-        if lobby.validate_registration(&client_id, &player_id.into()) {
+        if lobby.validate_registration(client_id, &player_id.into()) {
           input_message.write(message);
-          return;
+          continue;
         }
         warn!("Received invalid input action on [Unreliable] channel: {:?}", message);
       }
@@ -111,7 +256,6 @@ fn handle_inbound_server_message(
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
   mut registered_players: ResMut<RegisteredPlayers>,
-  available_configs: Res<AvailablePlayerConfigs>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
   for message in messages.read() {
@@ -120,7 +264,6 @@ fn handle_inbound_server_message(
         info!("Client with ID [{}] connected", client_id);
 
         // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
-        // Send the current seed to the newly connected client
         let seed_message = encode_to_bytes(&InboundServerMessage::ClientInitialised {
           seed: seed.get(),
           client_id: *client_id,
@@ -132,7 +275,6 @@ fn handle_inbound_server_message(
           payload: seed_message,
         });
 
-        // Transition to lobby (but initialise first)
         if *current_state == AppState::Preparing {
           next_state.set(AppState::Initialising);
         }
@@ -140,23 +282,19 @@ fn handle_inbound_server_message(
       InboundServerMessage::ClientDisconnected { client_id } => {
         info!("Client with ID [{}] disconnected", client_id);
 
-        // Unregister any players associated with this client and notify other clients about it
-        for player_id in lobby.get_registered_players_cloned(&client_id).iter() {
-          handle_player_registration_message_from_client(
+        for player_id in lobby.get_registered_players_cloned(client_id) {
+          handle_unregistration_request(
             &mut outbound_server_message,
             &mut registered_players,
-            &available_configs,
             &mut player_registration_message,
-            &client_id,
-            *player_id,
-            false,
+            *client_id,
+            SerialisableUnregistrationRequest { player_id },
             &mut lobby,
+            false,
           );
         }
-
-        // TODO: Transition somewhere (lobby or error screen) when no clients are left or at least show message
       }
-      _ => { /* Ignored */ }
+      _ => {}
     }
   }
 }
@@ -188,54 +326,53 @@ fn broadcast_player_states_system(
   }
 }
 
-/// Processes an individual player registration message from [`ClientId`].
-pub fn handle_player_registration_message_from_client(
-  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
-  mut registered_players: &mut ResMut<RegisteredPlayers>,
-  available_configs: &Res<AvailablePlayerConfigs>,
-  mut player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
-  client_id: &ClientId,
-  player_id: mooplas_networking::prelude::PlayerId,
-  has_registered: bool,
-  lobby: &mut ResMut<Lobby>,
+fn handle_local_player_registration_request_message(
+  mut messages: MessageReader<LocalPlayerRegistrationRequestMessage>,
+  mut lobby: ResMut<Lobby>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  available_control_schemes: Res<AvailableControlSchemes>,
+  mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
+  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
 ) {
-  if has_registered {
-    info!("[{}] with client ID [{}] registered", player_id, client_id);
-    let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
-      client_id: (*client_id).into(),
-      player_id: player_id.0,
-    })
-    .expect(CLIENT_MESSAGE_SERIALISATION);
-    outbound_server_message.write(OutboundServerMessage::BroadcastExcept {
-      except_client_id: *client_id,
-      channel: ChannelType::ReliableOrdered,
-      payload,
-    });
-    utils::register_player_locally(
-      &mut registered_players,
-      &available_configs,
-      &mut player_registration_message,
-      player_id.into(),
-    );
-    lobby.register_player(*client_id, player_id.into());
-  } else {
-    info!("[{}] with client ID [{}] unregistered", player_id, client_id);
-    let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
-      client_id: (*client_id).into(),
-      player_id: player_id.0,
-    })
-    .expect(CLIENT_MESSAGE_SERIALISATION);
-    outbound_server_message.write(OutboundServerMessage::BroadcastExcept {
-      except_client_id: *client_id,
-      channel: ChannelType::ReliableOrdered,
-      payload,
-    });
-    utils::unregister_player_locally(
+  for request in messages.read() {
+    if request.has_registered {
+      handle_registration_request(
+        &mut outbound_server_message,
+        &mut registered_players,
+        &available_control_schemes,
+        &mut player_registration_message,
+        host_client_id(),
+        request.control_scheme_id,
+        &mut lobby,
+        true,
+      );
+      continue;
+    }
+
+    let Some(player_id) = registered_players
+      .players
+      .iter()
+      .find(|player| player.is_local() && player.input.id == request.control_scheme_id)
+      .map(|player| player.id)
+    else {
+      warn!(
+        "Ignoring local unregistration for unknown control scheme [{:?}]",
+        request.control_scheme_id
+      );
+      continue;
+    };
+
+    handle_unregistration_request(
+      &mut outbound_server_message,
       &mut registered_players,
       &mut player_registration_message,
-      player_id.into(),
+      host_client_id(),
+      SerialisableUnregistrationRequest {
+        player_id: player_id.into(),
+      },
+      &mut lobby,
+      true,
     );
-    lobby.unregister_player(*client_id, player_id);
   }
 }
 
@@ -261,42 +398,6 @@ fn handle_local_state_transition_event(
         warn!("{}: {:?}", CLIENT_MESSAGE_SERIALISATION, server_event);
         return;
       }
-    }
-  }
-}
-
-/// A system that handles local messages (such as player registration messages) and broadcasts them to all connected
-/// clients.
-fn handle_local_player_registration_message(
-  mut messages: MessageReader<PlayerRegistrationMessage>,
-  mut outbound_server_message: MessageWriter<OutboundServerMessage>,
-) {
-  for message in messages.read() {
-    if utils::should_message_be_skipped(&message, NetworkRole::Client) {
-      continue;
-    }
-    if message.has_registered {
-      debug!("Broadcasting: [{}] registered locally...", message.player_id);
-      let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
-        client_id: ClientId::from_renet_u64(0),
-        player_id: message.player_id.0,
-      })
-      .expect(CLIENT_MESSAGE_SERIALISATION);
-      outbound_server_message.write(OutboundServerMessage::Broadcast {
-        channel: ChannelType::ReliableOrdered,
-        payload,
-      });
-    } else {
-      debug!("Broadcasting: [{}] unregistered locally...", message.player_id);
-      let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
-        client_id: ClientId::from_renet_u64(0),
-        player_id: message.player_id.0,
-      })
-      .expect(CLIENT_MESSAGE_SERIALISATION);
-      outbound_server_message.write(OutboundServerMessage::Broadcast {
-        channel: ChannelType::ReliableOrdered,
-        payload,
-      });
     }
   }
 }
@@ -350,10 +451,12 @@ fn disconnect_all_clients_system(
 mod tests {
   use super::*;
   use crate::app_state::AppStatePlugin;
-  use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
+  use crate::prelude::{ControlScheme, SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::prelude::*;
   use bevy::state::app::StatesPlugin;
-  use mooplas_networking::prelude::NetworkingMessagesPlugin;
+  use mooplas_networking::prelude::{
+    NetworkingMessagesPlugin, NetworkingResourcesPlugin, SerialisableRegistrationRequest, decode_from_bytes,
+  };
 
   fn setup() -> App {
     let mut app = App::new();
@@ -363,9 +466,20 @@ mod tests {
       SharedMessagesPlugin,
       SharedResourcesPlugin,
       NetworkingMessagesPlugin,
+      NetworkingResourcesPlugin,
       AppStatePlugin,
     ));
     app
+  }
+
+  fn add_control_schemes(app: &mut App, count: u8) {
+    let mut available_control_schemes = app
+      .world_mut()
+      .get_resource_mut::<AvailableControlSchemes>()
+      .expect("AvailableControlSchemes resource missing");
+    for id in 0..count {
+      available_control_schemes.schemes.push(ControlScheme::test(id));
+    }
   }
 
   #[test]
@@ -373,7 +487,6 @@ mod tests {
     let mut app = setup();
     app.add_systems(Update, broadcast_player_states_system);
 
-    // Spawn some snake heads with different player IDs
     app
       .world_mut()
       .spawn((Transform::from_xyz(100.0, 200.0, 0.0), PlayerId(1), SnakeHead));
@@ -382,7 +495,6 @@ mod tests {
       .spawn((Transform::from_xyz(150.0, 250.0, 0.0), PlayerId(2), SnakeHead));
     app.update();
 
-    // Check that a broadcast message with payload was sent on the expected channel
     let messages = app
       .world_mut()
       .get_resource_mut::<Messages<OutboundServerMessage>>()
@@ -413,84 +525,170 @@ mod tests {
   }
 
   #[test]
-  fn broadcast_local_player_registration_system_broadcasts_registration() {
+  fn handle_inbound_client_message_assigns_next_available_player_id() {
     let mut app = setup();
-    app.add_systems(Update, handle_local_player_registration_message);
+    add_control_schemes(&mut app, 3);
+    app.add_systems(Update, handle_inbound_client_message);
 
-    // Simulate a player registering on the server
+    {
+      let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
+      registered_players
+        .register(crate::prelude::RegisteredPlayer::new_mutable(
+          PlayerId(0),
+          ControlScheme::test(0),
+          Color::WHITE,
+        ))
+        .expect("Host player should register");
+    }
+
     app
       .world_mut()
-      .write_message(PlayerRegistrationMessage {
-        player_id: PlayerId(5),
-        has_registered: true,
-        is_anyone_registered: true,
-        network_role: Some(NetworkRole::Server),
-      })
-      .unwrap();
+      .write_message(InboundClientMessage::RegistrationRequest(
+        SerialisableRegistrationRequest { control_scheme_id: 0 },
+        ClientId::from_renet_u64(42),
+      ))
+      .expect("Failed to queue InboundClientMessage");
     app.update();
 
-    // Check that a message with payload was broadcast on the expected channel
+    let registered_players = app.world().resource::<RegisteredPlayers>();
+    let remote_player = registered_players
+      .players
+      .iter()
+      .find(|player| player.id == PlayerId(1))
+      .expect("Expected a server-assigned player ID");
+    assert!(remote_player.is_remote());
+    assert_eq!(remote_player.input.id, ControlSchemeId(0));
+
     let messages = app
       .world_mut()
       .get_resource_mut::<Messages<OutboundServerMessage>>()
       .expect("Messages<OutgoingServerMessage> missing");
-    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
-    assert_eq!(message_vec.len(), 1);
-    assert_that_message_was_broadcast(&message_vec);
+    let broadcasts: Vec<_> = messages.iter_current_update_messages().collect();
+    assert_eq!(broadcasts.len(), 1);
+    match broadcasts[0] {
+      OutboundServerMessage::Broadcast { payload, .. } => {
+        let decoded: InboundServerMessage = decode_from_bytes(payload).expect("Expected decodable payload");
+        assert!(matches!(
+          decoded,
+          InboundServerMessage::PlayerRegistered {
+            client_id,
+            player_id: 1,
+            control_scheme_id: 0,
+          } if client_id == ClientId::from_renet_u64(42)
+        ));
+      }
+      _ => panic!("Expected a broadcast message"),
+    }
   }
 
-  //noinspection DuplicatedCode
   #[test]
-  fn broadcast_local_player_registration_system_broadcasts_unregistration() {
+  fn handle_inbound_client_message_assigns_player_id_above_local_control_scheme_count() {
     let mut app = setup();
-    app.add_systems(Update, handle_local_player_registration_message);
+    add_control_schemes(&mut app, 5);
+    app.add_systems(Update, handle_inbound_client_message);
 
-    // Simulate a player unregistering on the server
+    {
+      let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
+      for id in 0..5 {
+        registered_players
+          .register(crate::prelude::RegisteredPlayer::new_mutable(
+            PlayerId(id),
+            ControlScheme::test(id),
+            Color::WHITE,
+          ))
+          .expect("Host player should register");
+      }
+    }
+
     app
       .world_mut()
-      .write_message(PlayerRegistrationMessage {
-        player_id: PlayerId(5),
-        has_registered: false,
-        is_anyone_registered: false,
-        network_role: Some(NetworkRole::Server),
-      })
-      .unwrap();
+      .write_message(InboundClientMessage::RegistrationRequest(
+        SerialisableRegistrationRequest { control_scheme_id: 0 },
+        ClientId::from_renet_u64(42),
+      ))
+      .expect("Failed to queue InboundClientMessage");
     app.update();
 
-    // Check that a message with payload was broadcast on the expected channel
-    let messages = app
-      .world_mut()
-      .get_resource_mut::<Messages<OutboundServerMessage>>()
-      .expect("Messages<OutgoingServerMessage> missing");
-    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
-    assert_eq!(message_vec.len(), 1);
-    assert_that_message_was_broadcast(&message_vec);
+    let registered_players = app.world().resource::<RegisteredPlayers>();
+    let remote_player = registered_players
+      .players
+      .iter()
+      .find(|player| player.id == PlayerId(5))
+      .expect("Expected a sixth player slot to be assigned");
+    assert!(remote_player.is_remote());
+    assert_eq!(remote_player.input.id, ControlSchemeId(0));
   }
 
   #[test]
-  fn broadcast_local_player_registration_system_skips_client_role_messages() {
+  fn handle_local_player_registration_request_message_registers_local_host_player() {
     let mut app = setup();
-    app.add_systems(Update, handle_local_player_registration_message);
+    add_control_schemes(&mut app, 2);
+    app.add_systems(Update, handle_local_player_registration_request_message);
 
-    // Simulate a client registration message (which should be ignored by the server)
     app
       .world_mut()
-      .write_message(PlayerRegistrationMessage {
-        player_id: PlayerId(5),
+      .write_message(LocalPlayerRegistrationRequestMessage {
+        control_scheme_id: ControlSchemeId(1),
         has_registered: true,
-        is_anyone_registered: true,
-        network_role: Some(NetworkRole::Client),
       })
-      .unwrap();
+      .expect("Failed to queue LocalPlayerRegistrationRequestMessage");
     app.update();
 
-    // Check that no messages were broadcast
-    let messages = app
+    let registered_players = app.world().resource::<RegisteredPlayers>();
+    let local_player = registered_players
+      .players
+      .iter()
+      .find(|player| player.input.id == ControlSchemeId(1))
+      .expect("Expected local host player to be registered");
+    assert!(local_player.is_local());
+    assert_eq!(local_player.id, PlayerId(0));
+  }
+
+  #[test]
+  fn handle_inbound_client_message_reuses_freed_player_id_after_unregistration() {
+    let mut app = setup();
+    add_control_schemes(&mut app, 2);
+    app.add_systems(Update, handle_inbound_client_message);
+
+    let first_client_id = ClientId::from_renet_u64(42);
+    let second_client_id = ClientId::from_renet_u64(43);
+
+    app
       .world_mut()
-      .get_resource_mut::<Messages<OutboundServerMessage>>()
-      .expect("Messages<OutgoingServerMessage> missing");
-    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
-    assert_eq!(message_vec.len(), 0);
+      .write_message(InboundClientMessage::RegistrationRequest(
+        SerialisableRegistrationRequest { control_scheme_id: 0 },
+        first_client_id,
+      ))
+      .expect("Failed to queue initial registration request");
+    app.update();
+
+    app
+      .world_mut()
+      .write_message(InboundClientMessage::UnregistrationRequest(
+        SerialisableUnregistrationRequest {
+          player_id: PlayerId(0).into(),
+        },
+        first_client_id,
+      ))
+      .expect("Failed to queue unregistration request");
+    app.update();
+
+    app
+      .world_mut()
+      .write_message(InboundClientMessage::RegistrationRequest(
+        SerialisableRegistrationRequest { control_scheme_id: 1 },
+        second_client_id,
+      ))
+      .expect("Failed to queue replacement registration request");
+    app.update();
+
+    let registered_players = app.world().resource::<RegisteredPlayers>();
+    let recycled_player = registered_players
+      .players
+      .iter()
+      .find(|player| player.id == PlayerId(0))
+      .expect("Expected the freed player ID to be reused");
+    assert_eq!(recycled_player.input.id, ControlSchemeId(1));
   }
 
   #[test]
@@ -499,7 +697,6 @@ mod tests {
     app.add_systems(Update, handle_local_state_transition_event);
     app.update();
 
-    // Transition state and update
     app
       .world_mut()
       .write_message(StateTransitionEvent {
@@ -510,7 +707,6 @@ mod tests {
       .unwrap();
     app.update();
 
-    // Check that the correct message was broadcast
     let messages = app
       .world_mut()
       .get_resource_mut::<Messages<OutboundServerMessage>>()
@@ -518,20 +714,19 @@ mod tests {
     let message_vec: Vec<&OutboundServerMessage> = messages.iter_current_update_messages().collect();
     let playing_messages: Vec<_> = message_vec
       .iter()
-      .filter(|m| match m {
+      .filter(|message| match message {
         OutboundServerMessage::Broadcast { payload, .. } => {
-          let decoded = mooplas_networking::prelude::decode_from_bytes::<InboundServerMessage>(payload);
-          if let Ok(InboundServerMessage::StateChanged { new_state, .. }) = decoded {
-            new_state == "Playing"
-          } else {
-            false
-          }
+          let decoded = decode_from_bytes::<InboundServerMessage>(payload);
+          matches!(
+            decoded,
+            Ok(InboundServerMessage::StateChanged { ref new_state, .. }) if new_state == "Playing"
+          )
         }
         _ => false,
       })
       .collect();
 
-    assert!(message_vec.len() >= 1, "Expected at least one message");
+    assert!(!message_vec.is_empty(), "Expected at least one message");
     assert_eq!(playing_messages.len(), 1, "Expected exactly one state message");
   }
 
@@ -567,39 +762,6 @@ mod tests {
       messages.iter_current_update_messages().count()
     };
 
-    assert_eq!(before_count, after_count, "No new messages should have been sent");
-  }
-
-  //noinspection DuplicatedCode
-  #[test]
-  fn process_and_broadcast_local_exit_lobby_message_broadcasts_shutdown() {
-    let mut app = setup();
-    app.add_systems(Update, process_and_broadcast_local_exit_lobby_message);
-
-    // Send exit lobby message and update
-    app.world_mut().write_message(ExitLobbyMessage::default()).unwrap();
-    app.update();
-
-    // Check that the expected message was broadcast
-    let messages = app
-      .world_mut()
-      .get_resource_mut::<Messages<OutboundServerMessage>>()
-      .expect("Messages<OutgoingServerMessage> missing");
-    let message_vec: Vec<_> = messages.iter_current_update_messages().collect();
-    assert_eq!(message_vec.len(), 1);
-    assert_that_message_was_broadcast(&message_vec);
-
-    // ...and that the shutdown countdown resource was created
-    assert!(app.world().contains_resource::<ShutdownCountdown>());
-  }
-
-  fn assert_that_message_was_broadcast(message_vec: &Vec<&OutboundServerMessage>) {
-    match &message_vec[0] {
-      OutboundServerMessage::Broadcast { channel, payload } => {
-        assert!(matches!(channel, ChannelType::ReliableOrdered));
-        assert!(!payload.is_empty());
-      }
-      _ => panic!("Expected broadcast message"),
-    }
+    assert_eq!(before_count, after_count);
   }
 }

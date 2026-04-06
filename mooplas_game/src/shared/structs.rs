@@ -1,45 +1,77 @@
 use crate::prelude::PlayerId;
+use bevy::color::palettes::tailwind;
 use bevy::prelude::{Color, KeyCode};
+
+pub const MAX_PLAYERS: u8 = 8;
+
+/// A local-only identifier for a control scheme. Separates "which keys you're pressing" (local)
+/// from "which player you are" (global/network).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ControlSchemeId(pub u8);
+
+/// Defines a set of key bindings that a player can use to control their character.
+#[derive(Clone, Debug)]
+pub struct ControlScheme {
+  pub id: ControlSchemeId,
+  pub left: KeyCode,
+  pub right: KeyCode,
+  pub action: KeyCode,
+}
+
+impl ControlScheme {
+  pub fn new(id: ControlSchemeId, left: KeyCode, right: KeyCode, action: KeyCode) -> Self {
+    Self {
+      id,
+      left,
+      right,
+      action,
+    }
+  }
+}
+
+/// Deterministically maps a [`PlayerId`] to a colour using the tailwind palette. All machines
+/// share the same lookup so no colour data needs to be sent over the wire.
+pub fn colour_for_player_id(player_id: PlayerId) -> Color {
+  match player_id.0 {
+    0 => Color::from(tailwind::ROSE_500),
+    1 => Color::from(tailwind::LIME_500),
+    2 => Color::from(tailwind::SKY_500),
+    3 => Color::from(tailwind::VIOLET_500),
+    4 => Color::from(tailwind::AMBER_500),
+    5 => Color::from(tailwind::EMERALD_500),
+    6 => Color::from(tailwind::PINK_500),
+    7 => Color::from(tailwind::RED_500),
+    _ => Color::WHITE,
+  }
+}
 
 /// Represents a player that has registered to play the game. Used during the game loop.
 #[derive(Clone)]
 pub struct RegisteredPlayer {
   pub id: PlayerId,
-  pub input: PlayerInput,
+  pub input: ControlScheme,
   pub colour: Color,
   pub alive: bool,
   mutable: bool,
 }
 
-impl From<&AvailablePlayerConfig> for RegisteredPlayer {
-  fn from(config: &AvailablePlayerConfig) -> Self {
-    Self {
-      id: config.id,
-      input: config.input.clone(),
-      colour: config.colour,
-      alive: true,
-      mutable: true,
-    }
-  }
-}
-
 impl RegisteredPlayer {
-  pub fn new_mutable_from(config: &AvailablePlayerConfig) -> Self {
+  pub fn new_mutable(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
     Self {
-      id: config.id,
-      input: config.input.clone(),
-      colour: config.colour,
+      id,
+      input,
+      colour,
       alive: true,
       mutable: true,
     }
   }
 
   #[cfg(feature = "online")]
-  pub fn new_immutable_from(config: &AvailablePlayerConfig) -> Self {
+  pub fn new_immutable(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
     Self {
-      id: config.id,
-      input: config.input.clone(),
-      colour: config.colour,
+      id,
+      input,
+      colour,
       alive: true,
       mutable: false,
     }
@@ -54,54 +86,14 @@ impl RegisteredPlayer {
   }
 }
 
-/// Defines the key bindings for a given player.
-#[derive(Clone, Debug)]
-pub struct PlayerInput {
-  pub id: PlayerId,
-  pub left: KeyCode,
-  pub right: KeyCode,
-  pub action: KeyCode,
-}
-
-impl PlayerInput {
-  pub fn new(id: PlayerId, left: KeyCode, right: KeyCode, action: KeyCode) -> Self {
-    Self {
-      id,
-      left,
-      right,
-      action,
-    }
-  }
-}
-
-/// Represents an available player input configuration. Predefined for players to choose from.
-#[derive(Clone, Debug)]
-pub struct AvailablePlayerConfig {
-  pub id: PlayerId,
-  pub input: PlayerInput,
-  pub colour: Color,
-}
-
-impl AvailablePlayerConfig {
-  pub fn id(&self) -> PlayerId {
-    self.id
-  }
-}
-
-impl Into<PlayerId> for &AvailablePlayerConfig {
-  fn into(self) -> PlayerId {
-    self.id
-  }
-}
-
 #[cfg(test)]
 mod tests {
   use super::*;
 
-  impl PlayerInput {
+  impl ControlScheme {
     pub(crate) fn test(id: u8) -> Self {
       Self {
-        id: PlayerId(id),
+        id: ControlSchemeId(id),
         left: KeyCode::ArrowLeft,
         right: KeyCode::ArrowRight,
         action: KeyCode::Space,
@@ -110,7 +102,7 @@ mod tests {
   }
 
   impl RegisteredPlayer {
-    pub fn new_immutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+    pub fn new_immutable_for_test(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
       Self {
         id,
         input,
@@ -120,17 +112,7 @@ mod tests {
       }
     }
 
-    pub fn new_mutable(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
-      Self {
-        id,
-        input,
-        colour,
-        alive: true,
-        mutable: true,
-      }
-    }
-
-    pub fn new_mutable_dead(id: PlayerId, input: PlayerInput, colour: Color) -> Self {
+    pub fn new_mutable_dead(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
       Self {
         id,
         input,
@@ -139,5 +121,24 @@ mod tests {
         mutable: true,
       }
     }
+  }
+
+  #[test]
+  fn colour_for_player_id_returns_distinct_colours_for_ids_0_through_4() {
+    let colours: Vec<Color> = (0..5).map(|i| colour_for_player_id(PlayerId(i))).collect();
+    for i in 0..colours.len() {
+      for j in (i + 1)..colours.len() {
+        assert_ne!(
+          colours[i], colours[j],
+          "PlayerId({}) and PlayerId({}) should have distinct colours",
+          i, j
+        );
+      }
+    }
+  }
+
+  #[test]
+  fn colour_for_player_id_returns_white_for_unknown_id() {
+    assert_eq!(colour_for_player_id(PlayerId(255)), Color::WHITE);
   }
 }

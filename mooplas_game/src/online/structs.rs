@@ -1,4 +1,4 @@
-use crate::prelude::{InputMessage, PlayerId, PlayerRegistrationMessage};
+use crate::prelude::{InputMessage, PlayerId};
 use bevy::math::{Quat, Vec2};
 use bevy::prelude::Component;
 use mooplas_networking::prelude::SerialisableInput;
@@ -45,28 +45,6 @@ impl From<PlayerId> for mooplas_networking::prelude::PlayerId {
 impl Into<PlayerId> for mooplas_networking::prelude::PlayerId {
   fn into(self) -> PlayerId {
     PlayerId(self.0)
-  }
-}
-
-impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::SerialisablePlayerRegistration {
-  fn from(value: &PlayerRegistrationMessage) -> Self {
-    mooplas_networking::prelude::SerialisablePlayerRegistration {
-      player_id: value.player_id.into(),
-      has_registered: value.has_registered,
-      is_anyone_registered: value.is_anyone_registered,
-      network_role: value.network_role,
-    }
-  }
-}
-
-impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::SerialisablePlayerRegistration {
-  fn into(self) -> PlayerRegistrationMessage {
-    PlayerRegistrationMessage {
-      player_id: self.player_id.into(),
-      has_registered: self.has_registered,
-      is_anyone_registered: self.is_anyone_registered,
-      network_role: self.network_role,
-    }
   }
 }
 
