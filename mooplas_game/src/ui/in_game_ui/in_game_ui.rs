@@ -1,6 +1,6 @@
 use crate::app_state::AppState;
 use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, TEXT_COLOUR};
-use crate::prelude::{AvailableControlSchemes, ControlSchemeId, PlayerId, RegisteredPlayers, Settings, WinnerInfo};
+use crate::prelude::{AvailableControlSchemes, PlayerId, RegisteredPlayers, Settings, WinnerInfo};
 use crate::ui::in_game_ui::in_game_buttons::InGameButtonsPlugin;
 use crate::ui::in_game_ui::in_game_local_ui::InGameLocalUiPlugin;
 use crate::ui::in_game_ui::in_game_online_ui::{self, InGameOnlineUiPlugin};
@@ -14,7 +14,7 @@ use bevy::prelude::{
   TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, default, px,
 };
 use bevy::text::LineHeight;
-use bevy::ui::{BackgroundColor, PositionType, percent};
+use bevy::ui::{PositionType, percent};
 use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
@@ -38,12 +38,6 @@ impl Plugin for InGameUiPlugin {
 /// of this.
 #[derive(Component)]
 pub(crate) struct LobbyUiRoot;
-
-/// The component for each available player's information and status in the lobby UI.
-#[derive(Component)]
-pub(crate) struct LobbyUiEntry {
-  pub(crate) control_scheme_id: ControlSchemeId,
-}
 
 /// Marker component for the lobby UI call-to-action (CTA) at the bottom of the player list.
 #[derive(Component)]
@@ -120,34 +114,16 @@ pub(crate) fn spawn_lobby_ui(
     })
     .id();
 
+  // The "table" showing available players and their statuses
   if network_role.is_none() {
-    for control_scheme in &available_control_schemes.schemes {
-      let entry = commands
-        .spawn((
-          LobbyUiEntry {
-            control_scheme_id: control_scheme.id,
-          },
-          BackgroundColor::from(Color::BLACK.with_alpha(0.5)),
-          Node {
-            flex_direction: FlexDirection::Row,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            width: percent(100.),
-            ..default()
-          },
-          Pickable::IGNORE,
-        ))
-        .id();
-      commands.entity(root).add_child(entry);
-      in_game_local_ui::spawn_local_lobby_ui_entry_children(
-        commands,
-        entry,
-        &font,
-        control_scheme,
-        registered_players,
-        is_touch_controlled,
-      );
-    }
+    in_game_local_ui::spawn_local_lobby_ui(
+      commands,
+      &available_control_schemes,
+      registered_players,
+      &font,
+      is_touch_controlled,
+      root,
+    );
   } else {
     in_game_online_ui::spawn_online_lobby_ui(commands, root, &font, available_control_schemes, registered_players);
   }

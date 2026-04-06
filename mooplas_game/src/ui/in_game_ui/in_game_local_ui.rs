@@ -1,22 +1,22 @@
 use crate::app_state::AppState;
 use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, TEXT_COLOUR};
 use crate::prelude::{
-  AvailableControlSchemes, ControlScheme, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Settings,
-  colour_for_player_id,
+  AvailableControlSchemes, ControlScheme, ControlSchemeId, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
+  Settings, colour_for_player_id,
 };
 use crate::ui::in_game_ui::in_game_ui::{
-  LobbyUiCta, LobbyUiEntry, clear_ui_children, default_font, default_shadow, player_slot_label,
-  update_call_to_action_to_start,
+  LobbyUiCta, clear_ui_children, default_font, default_shadow, player_slot_label, update_call_to_action_to_start,
 };
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
-use bevy::color::Color;
+use bevy::color::{Alpha, Color};
 use bevy::ecs::children;
 use bevy::ecs::spawn::SpawnRelatedBundle;
+use bevy::picking::Pickable;
 use bevy::prelude::{
-  AlignItems, ChildOf, Children, Commands, Entity, FlexDirection, Font, IntoScheduleConfigs, Justify, JustifyContent,
-  LineBreak, MessageReader, Node, Query, Res, Spawn, Text, TextColor, TextFont, TextLayout, TextShadow, With, default,
-  in_state,
+  AlignItems, BackgroundColor, ChildOf, Children, Commands, Component, Entity, FlexDirection, Font,
+  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Node, Query, Res, Spawn, Text, TextColor,
+  TextFont, TextLayout, TextShadow, With, default, in_state, percent,
 };
 use mooplas_networking::prelude::NetworkRole;
 
@@ -32,6 +32,12 @@ impl Plugin for InGameLocalUiPlugin {
         .run_if(|network_role: Res<NetworkRole>| network_role.is_none()),
     );
   }
+}
+
+/// The component for each available player's information and status in the lobby UI.
+#[derive(Component)]
+pub(crate) struct LobbyUiEntry {
+  pub(crate) control_scheme_id: ControlSchemeId,
 }
 
 /// A system that handles player registration messages and updates the local multiplayer lobby UI based on the player's
@@ -84,11 +90,48 @@ fn handle_local_player_registration_message(
   }
 }
 
+pub(crate) fn spawn_local_lobby_ui(
+  commands: &mut Commands,
+  available_control_schemes: &&Res<AvailableControlSchemes>,
+  registered_players: &Res<RegisteredPlayers>,
+  font: &Handle<Font>,
+  is_touch_controlled: bool,
+  root: Entity,
+) {
+  for control_scheme in &available_control_schemes.schemes {
+    let entry = commands
+      .spawn((
+        LobbyUiEntry {
+          control_scheme_id: control_scheme.id,
+        },
+        BackgroundColor::from(Color::BLACK.with_alpha(0.5)),
+        Node {
+          flex_direction: FlexDirection::Row,
+          justify_content: JustifyContent::Center,
+          align_items: AlignItems::Center,
+          width: percent(100.),
+          ..default()
+        },
+        Pickable::IGNORE,
+      ))
+      .id();
+    commands.entity(root).add_child(entry);
+    spawn_local_lobby_ui_entry_children(
+      commands,
+      entry,
+      &font,
+      control_scheme,
+      registered_players,
+      is_touch_controlled,
+    );
+  }
+}
+
 /// Spawns a single row for a local player in the lobby UI, showing the player slot, whether they're registered, and
 /// how to register, if not registered. Examples:
 /// - "Player 1: Registered"
 /// - "Player 4: Press \[Home] to join"
-pub(crate) fn spawn_local_lobby_ui_entry_children(
+fn spawn_local_lobby_ui_entry_children(
   commands: &mut Commands,
   entity: Entity,
   font: &Handle<Font>,

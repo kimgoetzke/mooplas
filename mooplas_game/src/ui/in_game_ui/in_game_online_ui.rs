@@ -1,8 +1,8 @@
 use crate::app_state::AppState;
 use crate::prelude::constants::{DEFAULT_FONT, TEXT_COLOUR};
 use crate::prelude::{
-  AvailableControlSchemes, ControlScheme, ControlSchemeId, MAX_PLAYERS, PlayerId, RegisteredPlayers, Settings,
-  colour_for_player_id,
+  colour_for_player_id, AvailableControlSchemes, ControlScheme, ControlSchemeId, PlayerId, RegisteredPlayers, Settings,
+  MAX_PLAYERS,
 };
 use crate::shared::PlayerRegistrationMessage;
 use crate::ui::in_game_ui::in_game_ui;
@@ -12,12 +12,12 @@ use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::{Spawn, SpawnRelatedBundle};
 use bevy::prelude::{
-  AlignItems, Alpha, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font, Handle,
-  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Node, Pickable, Query, Res, Text, TextColor,
-  TextFont, TextLayout, TextShadow, With, default, in_state,
+  default, in_state, AlignItems, Alpha, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection,
+  Font, Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Node, Pickable, Query, Res,
+  Text, TextColor, TextFont, TextLayout, TextShadow, With,
 };
 use bevy::text::LineHeight;
-use bevy::ui::{BackgroundColor, percent};
+use bevy::ui::{percent, BackgroundColor};
 use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages the online-only in-game lobby UI, such as remote player slots and the join prompt.
@@ -309,6 +309,23 @@ fn join_by_pressing_prompt_text(
   }
 }
 
+fn update_join_by_pressing_prompt(
+  commands: &mut Commands,
+  join_by_pressing_query: &Query<(Entity, &Children), With<JoinByPressingPromptNode>>,
+  asset_server: &Res<AssetServer>,
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) {
+  for (entity, children) in join_by_pressing_query.iter() {
+    in_game_ui::clear_ui_children(commands, children);
+
+    let font = asset_server.load(DEFAULT_FONT);
+    commands.entity(entity).with_children(|parent| {
+      spawn_join_by_pressing_prompt_children(parent, &font, available_control_schemes, registered_players);
+    });
+  }
+}
+
 fn spawn_join_by_pressing_prompt_children(
   parent: &mut RelatedSpawnerCommands<ChildOf>,
   font: &Handle<Font>,
@@ -326,23 +343,6 @@ fn spawn_join_by_pressing_prompt_children(
     TextLayout::new(Justify::Center, LineBreak::WordBoundary),
     in_game_ui::default_shadow(),
   ));
-}
-
-fn update_join_by_pressing_prompt(
-  commands: &mut Commands,
-  join_by_pressing_query: &Query<(Entity, &Children), With<JoinByPressingPromptNode>>,
-  asset_server: &Res<AssetServer>,
-  available_control_schemes: &AvailableControlSchemes,
-  registered_players: &RegisteredPlayers,
-) {
-  for (entity, children) in join_by_pressing_query.iter() {
-    in_game_ui::clear_ui_children(commands, children);
-
-    let font = asset_server.load(DEFAULT_FONT);
-    commands.entity(entity).with_children(|parent| {
-      spawn_join_by_pressing_prompt_children(parent, &font, available_control_schemes, registered_players);
-    });
-  }
 }
 
 #[cfg(all(test, feature = "online"))]
