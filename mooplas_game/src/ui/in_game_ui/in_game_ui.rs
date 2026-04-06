@@ -1,25 +1,25 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{
-  ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, SMALL_FONT, TEXT_COLOUR,
-};
+use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, TEXT_COLOUR};
 use crate::prelude::{
-  AvailableControlSchemes, ControlScheme, ControlSchemeId, ExitLobbyMessage, MAX_PLAYERS, PlayerId, RegisteredPlayers,
-  Settings, TouchControlsToggledMessage, WinnerInfo, colour_for_player_id,
+  AvailableControlSchemes, ControlScheme, ControlSchemeId, MAX_PLAYERS, PlayerId, RegisteredPlayers, Settings,
+  WinnerInfo, colour_for_player_id,
 };
-use crate::shared::{ContinueMessage, CustomInteraction, PlayerRegistrationMessage};
-use crate::ui::shared::{despawn_menu, spawn_button};
+use crate::shared::PlayerRegistrationMessage;
+use crate::ui::in_game_ui;
+use crate::ui::in_game_ui::in_game_buttons::InGameButtonsPlugin;
+use crate::ui::shared::despawn_menu;
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::SpawnRelatedBundle;
-use bevy::log::*;
 use bevy::prelude::{
-  AlignItems, Alpha, AssetServer, Changed, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font,
-  Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, MessageWriter, MonitorSelection,
-  Name, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, ResMut, Single, Spawn, Text, TextBackgroundColor,
-  TextColor, TextFont, TextLayout, TextShadow, Update, Val, Window, With, default, in_state, px,
+  AlignItems, Alpha, AssetServer, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font, Handle,
+  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Name, Node, OnEnter, OnExit, Pickable,
+  Plugin, Query, Res, Spawn, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Update, Val, With,
+  default, in_state, px,
 };
 use bevy::text::LineHeight;
 use bevy::ui::{BackgroundColor, PositionType, percent};
+use in_game_ui::in_game_buttons;
 use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages the in-game user interface, such as the lobby and game over screens.
@@ -28,35 +28,22 @@ pub struct InGameUiPlugin;
 impl Plugin for InGameUiPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
     app
+      .add_plugins(InGameButtonsPlugin)
       .add_systems(OnEnter(AppState::Registering), spawn_lobby_ui_system)
       .add_systems(
         Update,
-        (
-          handle_player_registration_message,
-          handle_touch_controls_toggled_message,
-          toggle_touch_controls_button_system,
-          toggle_fullscreen_button_system,
-          exit_button_system,
-        )
-          .run_if(in_state(AppState::Registering)),
-      )
-      .add_systems(
-        Update,
-        continue_button_system
-          .run_if(in_state(AppState::Registering))
-          .run_if(|network_role: Res<NetworkRole>| !network_role.is_client()),
+        (handle_player_registration_message,).run_if(in_state(AppState::Registering)),
       )
       .add_systems(OnExit(AppState::Registering), despawn_lobby_ui_system)
       .add_systems(OnEnter(AppState::GameOver), spawn_game_over_ui_system)
-      .add_systems(OnExit(AppState::GameOver), despawn_game_over_ui_system)
-      .add_systems(Update, continue_button_system.run_if(in_state(AppState::GameOver)));
+      .add_systems(OnExit(AppState::GameOver), despawn_game_over_ui_system);
   }
 }
 
 /// Marker component for the root of the lobby UI. Used for despawning. All other Lobby UI components must be children
 /// of this.
 #[derive(Component)]
-struct LobbyUiRoot;
+pub(crate) struct LobbyUiRoot;
 
 /// The component for each available player's information and status in the lobby UI.
 #[derive(Component)]
@@ -80,22 +67,6 @@ struct LobbyUiCta;
 /// must be children of this.
 #[derive(Component)]
 struct VictoryUiRoot;
-
-/// Marker component for the touch controls toggle button.
-#[derive(Component)]
-struct ToggleTouchControlsButton;
-
-/// Marker component for the fullscreen toggle button.
-#[derive(Component)]
-struct ToggleFullscreenButton;
-
-/// Marker component for the exit button.
-#[derive(Component)]
-struct ExitButton;
-
-/// Marker component for the touch continue button.
-#[derive(Component)]
-struct ContinueButton;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OnlineLobbyUiEntryState {
@@ -123,7 +94,7 @@ fn spawn_lobby_ui_system(
   );
 }
 
-fn spawn_lobby_ui(
+pub(crate) fn spawn_lobby_ui(
   commands: &mut Commands,
   settings: &Res<Settings>,
   asset_server: &Res<AssetServer>,
@@ -154,6 +125,7 @@ fn spawn_lobby_ui(
     ))
     .with_children(|parent| {
       // TODO: Replace all button text below with icons
+      // Buttons at the top right
       parent
         .spawn(Node {
           width: px(470),
@@ -166,58 +138,7 @@ fn spawn_lobby_ui(
           ..default()
         })
         .with_children(|parent| {
-          parent
-            .spawn(Node {
-              width: px(180),
-              height: px(100),
-              position_type: PositionType::Relative,
-              align_items: AlignItems::Center,
-              justify_content: JustifyContent::Center,
-              ..default()
-            })
-            .with_children(|parent| {
-              spawn_button(
-                parent,
-                asset_server,
-                ToggleTouchControlsButton,
-                "Touch Controls",
-                170,
-                SMALL_FONT,
-              );
-            });
-
-          parent
-            .spawn((Node {
-              width: px(160),
-              height: px(100),
-              position_type: PositionType::Relative,
-              align_items: AlignItems::Center,
-              justify_content: JustifyContent::Center,
-              ..default()
-            },))
-            .with_children(|parent| {
-              spawn_button(
-                parent,
-                asset_server,
-                ToggleFullscreenButton,
-                "Fullscreen",
-                150,
-                SMALL_FONT,
-              );
-            });
-
-          parent
-            .spawn(Node {
-              width: px(110),
-              height: px(100),
-              position_type: PositionType::Relative,
-              align_items: AlignItems::Center,
-              justify_content: JustifyContent::Center,
-              ..default()
-            })
-            .with_children(|parent| {
-              spawn_button(parent, asset_server, ExitButton, "Exit", 100, SMALL_FONT);
-            });
+          in_game_buttons::spawn_in_game_buttons(asset_server, parent);
         });
     })
     .id();
@@ -361,7 +282,7 @@ fn spawn_call_to_action_to_start(
       default_shadow,
     ));
     if is_touch_controlled {
-      spawn_button(parent, asset_server, ContinueButton, "HERE", 170, NORMAL_FONT);
+      in_game_buttons::spawn_continue_button(asset_server, parent);
     } else {
       parent.spawn((
         Text::new("[Space]"),
@@ -380,66 +301,6 @@ fn spawn_call_to_action_to_start(
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       default_shadow,
     ));
-  }
-}
-
-/// A system that toggles touch controls when the corresponding button is pressed.
-fn toggle_touch_controls_button_system(
-  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ToggleTouchControlsButton>)>,
-  mut touch_controls_toggled_message: MessageWriter<TouchControlsToggledMessage>,
-  mut settings: ResMut<Settings>,
-) {
-  for interaction in &mut query {
-    if *interaction == CustomInteraction::Released {
-      settings.general.enable_touch_controls = !settings.general.enable_touch_controls;
-      touch_controls_toggled_message.write(TouchControlsToggledMessage::new(settings.general.enable_touch_controls));
-      info!(
-        "[Button] Set touch controls to [{:?}]",
-        settings.general.enable_touch_controls
-      );
-    }
-  }
-}
-
-/// A system that toggles the window mode when the corresponding button is pressed.
-fn toggle_fullscreen_button_system(
-  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ToggleFullscreenButton>)>,
-  mut window: Single<&mut Window>,
-) {
-  for interaction in &mut query {
-    if *interaction == CustomInteraction::Released {
-      window.mode = match window.mode {
-        bevy::window::WindowMode::Windowed => bevy::window::WindowMode::BorderlessFullscreen(MonitorSelection::Current),
-        _ => bevy::window::WindowMode::Windowed,
-      };
-      info!("[Button] Set window mode to [{:?}]", window.mode);
-    }
-  }
-}
-
-/// A system that exists the current game when the exit button is pressed.
-fn exit_button_system(
-  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ExitButton>)>,
-  mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
-) {
-  for interaction in &mut query {
-    if *interaction == CustomInteraction::Released {
-      exit_lobby_message.write(ExitLobbyMessage::default());
-      info!("[Button] Pressed exit button");
-    }
-  }
-}
-
-/// A system that handles the continue button press by sending [`ContinueMessage`].
-fn continue_button_system(
-  mut query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ContinueButton>)>,
-  mut continue_message: MessageWriter<ContinueMessage>,
-) {
-  for interaction in &mut query {
-    if *interaction == CustomInteraction::Released {
-      continue_message.write(ContinueMessage);
-      info!("[Button] Pressed continue button");
-    }
   }
 }
 
@@ -780,33 +641,6 @@ fn update_call_to_action_to_start(
   }
 }
 
-/// A system that handles messages toggling touch controls to update the lobby UI's prompts accordingly. Makes sure that
-/// the prompt doesn't ask for a key press when touch controls are enabled and vice versa.
-fn handle_touch_controls_toggled_message(
-  mut commands: Commands,
-  mut messages: MessageReader<TouchControlsToggledMessage>,
-  lobby_ui_root_query: Query<Entity, With<LobbyUiRoot>>,
-  settings: Res<Settings>,
-  asset_server: Res<AssetServer>,
-  available_control_schemes: Res<AvailableControlSchemes>,
-  registered_players: Res<RegisteredPlayers>,
-  network_role: Res<NetworkRole>,
-) {
-  for _ in messages.read() {
-    for entity in &lobby_ui_root_query {
-      commands.entity(entity).despawn();
-    }
-    spawn_lobby_ui(
-      &mut commands,
-      &settings,
-      &asset_server,
-      &available_control_schemes,
-      &registered_players,
-      &network_role,
-    );
-  }
-}
-
 /// Despawns the entire lobby UI. Call when exiting the registration state.
 fn despawn_lobby_ui_system(mut commands: Commands, lobby_ui_root_query: Query<Entity, With<LobbyUiRoot>>) {
   for entity in &lobby_ui_root_query {
@@ -917,7 +751,7 @@ fn spawn_game_over_ui_system(
           ));
 
           if settings.general.enable_touch_controls {
-            spawn_button(parent, &asset_server, ContinueButton, "HERE", 170, NORMAL_FONT);
+            in_game_buttons::spawn_continue_button(&asset_server, parent);
           } else {
             parent.spawn((
               Text::new("[Space]"),
