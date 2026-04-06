@@ -8,6 +8,7 @@ pub const MAX_PLAYERS: u8 = 8;
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct ControlSchemeId(pub u8);
 
+// TODO: Stop displaying debug key names in UI and use clean names instead
 /// Defines a set of key bindings that a player can use to control their character.
 #[derive(Clone, Debug)]
 pub struct ControlScheme {

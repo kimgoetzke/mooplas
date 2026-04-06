@@ -16,6 +16,7 @@ use bevy::prelude::*;
 use mooplas_networking::prelude::NetworkRole;
 use std::fmt::Debug;
 
+// TODO: Make online multiplayer UI work with touch controls or don't allow touch controls
 /// A plugin that sets up the touch controls UI and related systems, so that players can use touch input to control
 /// their characters.
 pub struct TouchControlsUiPlugin;
