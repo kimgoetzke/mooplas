@@ -34,13 +34,15 @@ impl Plugin for InGameOnlineUiPlugin {
   }
 }
 
+/// The component for each player and their status in the lobby UI.
 #[derive(Component)]
 struct OnlineLobbyUiEntry {
   player_id: PlayerId,
 }
 
+/// Marker component for the prompt to join by pressing an available action key.
 #[derive(Component)]
-struct JoinByPressingPromptNode;
+struct JoinPromptNode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum OnlineLobbyUiEntryState {
@@ -83,9 +85,10 @@ pub(crate) fn spawn_online_lobby_ui(
     );
   }
 
-  let join_by_pressing_prompt = commands
+  // Join prompt
+  let join_prompt = commands
     .spawn((
-      JoinByPressingPromptNode,
+      JoinPromptNode,
       Node {
         flex_direction: FlexDirection::Row,
         justify_content: JustifyContent::Center,
@@ -95,10 +98,10 @@ pub(crate) fn spawn_online_lobby_ui(
       Pickable::IGNORE,
     ))
     .with_children(|parent| {
-      join_by_pressing_prompt(parent, font, available_control_schemes, registered_players);
+      spawn_join_prompt(parent, font, available_control_schemes, registered_players);
     })
     .id();
-  commands.entity(root).add_child(join_by_pressing_prompt);
+  commands.entity(root).add_child(join_prompt);
 }
 
 /// A system that handles player registration messages and updates the online-only lobby UI based on the player's
@@ -111,18 +114,17 @@ fn handle_online_player_registration_message(
   available_control_schemes: Res<AvailableControlSchemes>,
   registered_players: Res<RegisteredPlayers>,
   online_entries_query: Query<(Entity, &OnlineLobbyUiEntry, &Children)>,
-  join_by_pressing_query: Query<(Entity, &Children), With<JoinByPressingPromptNode>>,
+  join_prompt_query: Query<(Entity, Option<&Children>), With<JoinPromptNode>>,
   cta_query: Query<(Entity, &Children), With<in_game_ui::LobbyUiCta>>,
   network_role: Res<NetworkRole>,
 ) {
   for message in player_registration_message.read() {
+    // The "table" showing players and their statuses
     let font = asset_server.load(DEFAULT_FONT);
-
     for (entity, entry, children) in online_entries_query.iter() {
       if entry.player_id != message.player_id {
         continue;
       }
-
       in_game_ui::clear_ui_children(&mut commands, children);
       spawn_online_lobby_ui_entry_children(
         &mut commands,
@@ -134,14 +136,16 @@ fn handle_online_player_registration_message(
       );
     }
 
-    update_join_by_pressing_prompt(
+    // Join prompt
+    update_join_prompt(
       &mut commands,
-      &join_by_pressing_query,
+      &join_prompt_query,
       &asset_server,
       &available_control_schemes,
       &registered_players,
     );
 
+    // Call to action
     in_game_ui::update_call_to_action_to_start(
       &mut commands,
       message.is_anyone_registered,
@@ -317,25 +321,26 @@ fn available_join_action_keys(
   if keys.is_empty() { None } else { Some(keys) }
 }
 
-fn update_join_by_pressing_prompt(
+fn update_join_prompt(
   commands: &mut Commands,
-  join_by_pressing_query: &Query<(Entity, &Children), With<JoinByPressingPromptNode>>,
+  join_prompt_query: &Query<(Entity, Option<&Children>), With<JoinPromptNode>>,
   asset_server: &Res<AssetServer>,
   available_control_schemes: &AvailableControlSchemes,
   registered_players: &RegisteredPlayers,
 ) {
-  for (entity, children) in join_by_pressing_query.iter() {
-    in_game_ui::clear_ui_children(commands, children);
-
+  for (entity, children) in join_prompt_query.iter() {
+    if let Some(children) = children {
+      in_game_ui::clear_ui_children(commands, children);
+    }
     let font = asset_server.load(DEFAULT_FONT);
     commands.entity(entity).with_children(|parent| {
-      join_by_pressing_prompt(parent, &font, available_control_schemes, registered_players);
+      spawn_join_prompt(parent, &font, available_control_schemes, registered_players);
     });
   }
 }
 
 /// Spawns the prompt to join. Example: "Join by pressing \[A] or \[N]."
-fn join_by_pressing_prompt(
+fn spawn_join_prompt(
   parent: &mut RelatedSpawnerCommands<ChildOf>,
   font: &Handle<Font>,
   available_control_schemes: &AvailableControlSchemes,

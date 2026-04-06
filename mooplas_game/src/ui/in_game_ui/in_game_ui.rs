@@ -114,7 +114,7 @@ pub(crate) fn spawn_lobby_ui(
     })
     .id();
 
-  // The "table" showing available players and their statuses
+  // The "table" showing players and their statuses
   if network_role.is_none() {
     in_game_local_ui::spawn_local_lobby_ui(
       commands,
