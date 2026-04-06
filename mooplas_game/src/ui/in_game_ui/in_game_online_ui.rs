@@ -95,7 +95,7 @@ pub(crate) fn spawn_online_lobby_ui(
       Pickable::IGNORE,
     ))
     .with_children(|parent| {
-      spawn_join_by_pressing_prompt_children(parent, font, available_control_schemes, registered_players);
+      join_by_pressing_prompt(parent, font, available_control_schemes, registered_players);
     })
     .id();
   commands.entity(root).add_child(join_by_pressing_prompt);
@@ -298,11 +298,11 @@ fn player_registered_remotely_prompt(
   )
 }
 
-fn join_by_pressing_prompt_text(
+fn available_join_action_keys(
   available_control_schemes: &AvailableControlSchemes,
   registered_players: &RegisteredPlayers,
-) -> Option<String> {
-  let available_action_keys: Vec<String> = available_control_schemes
+) -> Option<Vec<String>> {
+  let keys: Vec<String> = available_control_schemes
     .schemes
     .iter()
     .filter(|control_scheme| {
@@ -314,19 +314,7 @@ fn join_by_pressing_prompt_text(
     .map(|control_scheme| format!("[{:?}]", control_scheme.action))
     .collect();
 
-  match available_action_keys.as_slice() {
-    [] => None,
-    [only_key] => Some(format!("Join by pressing {}.", only_key)),
-    [first_key, second_key] => Some(format!("Join by pressing {} or {}.", first_key, second_key)),
-    _ => {
-      let last_index = available_action_keys.len() - 1;
-      let initial_keys = available_action_keys[..last_index].join(", ");
-      Some(format!(
-        "Join by pressing {}, or {}.",
-        initial_keys, available_action_keys[last_index]
-      ))
-    }
-  }
+  if keys.is_empty() { None } else { Some(keys) }
 }
 
 fn update_join_by_pressing_prompt(
@@ -341,28 +329,63 @@ fn update_join_by_pressing_prompt(
 
     let font = asset_server.load(DEFAULT_FONT);
     commands.entity(entity).with_children(|parent| {
-      spawn_join_by_pressing_prompt_children(parent, &font, available_control_schemes, registered_players);
+      join_by_pressing_prompt(parent, &font, available_control_schemes, registered_players);
     });
   }
 }
 
-fn spawn_join_by_pressing_prompt_children(
+/// Spawns the prompt to join. Example: "Join by pressing \[A] or \[N]."
+fn join_by_pressing_prompt(
   parent: &mut RelatedSpawnerCommands<ChildOf>,
   font: &Handle<Font>,
   available_control_schemes: &AvailableControlSchemes,
   registered_players: &RegisteredPlayers,
 ) {
-  let Some(prompt_text) = join_by_pressing_prompt_text(available_control_schemes, registered_players) else {
+  let Some(keys) = available_join_action_keys(available_control_schemes, registered_players) else {
     return;
   };
-  parent.spawn((
-    Text::new(prompt_text),
-    in_game_ui::default_font(font),
-    LineHeight::RelativeToFont(2.),
-    TEXT_COLOUR,
-    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-    in_game_ui::default_shadow(),
-  ));
+  let default_font = in_game_ui::default_font(font);
+  let mut segments: Vec<(String, bool)> = vec![("Join by pressing ".to_string(), false)];
+  match keys.as_slice() {
+    [only_key] => {
+      segments.push((only_key.clone(), true));
+    }
+    [first_key, second_key] => {
+      segments.push((first_key.clone(), true));
+      segments.push((" or ".to_string(), false));
+      segments.push((second_key.clone(), true));
+    }
+    _ => {
+      let last_index = keys.len() - 1;
+      for (index, key) in keys.iter().enumerate() {
+        if index > 0 {
+          if index == last_index {
+            segments.push((", or ".to_string(), false));
+          } else {
+            segments.push((", ".to_string(), false));
+          }
+        }
+        segments.push((key.clone(), true));
+      }
+    }
+  }
+  segments.push((".".to_string(), false));
+
+  for (text, is_key) in segments {
+    let colour = if is_key {
+      TextColor(Color::from(ACCENT_COLOUR))
+    } else {
+      TEXT_COLOUR
+    };
+    parent.spawn((
+      Text::new(text),
+      default_font.clone(),
+      LineHeight::RelativeToFont(2.),
+      colour,
+      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+      in_game_ui::default_shadow(),
+    ));
+  }
 }
 
 #[cfg(all(test, feature = "online"))]
@@ -439,7 +462,7 @@ mod tests {
   }
 
   #[test]
-  fn join_by_pressing_prompt_text_ignores_remote_registrations() {
+  fn available_join_action_keys_ignores_remote_registrations() {
     let available_control_schemes = AvailableControlSchemes {
       schemes: vec![test_control_scheme(0), test_control_scheme(1)],
     };
@@ -453,13 +476,13 @@ mod tests {
       .expect("Expected the remote player registration to succeed");
 
     assert_eq!(
-      join_by_pressing_prompt_text(&available_control_schemes, &registered_players),
-      Some("Join by pressing [ArrowUp] or [KeyQ].".to_string())
+      available_join_action_keys(&available_control_schemes, &registered_players),
+      Some(vec!["[ArrowUp]".to_string(), "[KeyQ]".to_string()])
     );
   }
 
   #[test]
-  fn join_by_pressing_prompt_text_omits_locally_registered_action_keys() {
+  fn available_join_action_keys_omits_locally_registered_action_keys() {
     let available_control_schemes = AvailableControlSchemes {
       schemes: vec![test_control_scheme(0), test_control_scheme(1)],
     };
@@ -473,13 +496,13 @@ mod tests {
       .expect("Expected the local player registration to succeed");
 
     assert_eq!(
-      join_by_pressing_prompt_text(&available_control_schemes, &registered_players),
-      Some("Join by pressing [KeyQ].".to_string())
+      available_join_action_keys(&available_control_schemes, &registered_players),
+      Some(vec!["[KeyQ]".to_string()])
     );
   }
 
   #[test]
-  fn join_by_pressing_prompt_text_returns_none_when_all_local_schemes_are_taken() {
+  fn available_join_action_keys_returns_none_when_all_local_schemes_are_taken() {
     let available_control_schemes = AvailableControlSchemes {
       schemes: vec![test_control_scheme(0), test_control_scheme(1)],
     };
@@ -500,7 +523,7 @@ mod tests {
       .expect("Expected the second local player registration to succeed");
 
     assert_eq!(
-      join_by_pressing_prompt_text(&available_control_schemes, &registered_players),
+      available_join_action_keys(&available_control_schemes, &registered_players),
       None
     );
   }
