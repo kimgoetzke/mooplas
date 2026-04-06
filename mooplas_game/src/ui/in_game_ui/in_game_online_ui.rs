@@ -1,8 +1,8 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{DEFAULT_FONT, TEXT_COLOUR};
+use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, TEXT_COLOUR};
 use crate::prelude::{
-  colour_for_player_id, AvailableControlSchemes, ControlScheme, ControlSchemeId, PlayerId, RegisteredPlayers, Settings,
-  MAX_PLAYERS,
+  AvailableControlSchemes, ControlScheme, ControlSchemeId, MAX_PLAYERS, PlayerId, RegisteredPlayers, Settings,
+  colour_for_player_id,
 };
 use crate::shared::PlayerRegistrationMessage;
 use crate::ui::in_game_ui::in_game_ui;
@@ -12,12 +12,12 @@ use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::ecs::spawn::{Spawn, SpawnRelatedBundle};
 use bevy::prelude::{
-  default, in_state, AlignItems, Alpha, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection,
-  Font, Handle, IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Node, Pickable, Query, Res,
-  Text, TextColor, TextFont, TextLayout, TextShadow, With,
+  AlignItems, Alpha, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font, Handle,
+  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Node, Pickable, Query, Res, Text, TextColor,
+  TextFont, TextLayout, TextShadow, With, default, in_state,
 };
 use bevy::text::LineHeight;
-use bevy::ui::{percent, BackgroundColor};
+use bevy::ui::{BackgroundColor, percent};
 use mooplas_networking::prelude::NetworkRole;
 
 /// A plugin that manages the online-only in-game lobby UI, such as remote player slots and the join prompt.
@@ -186,7 +186,7 @@ fn spawn_online_lobby_ui_entry_children(
               control_scheme_id, player_id
             )
           });
-        parent.spawn(player_registered_with_keys_prompt(font, control_scheme));
+        spawn_player_registered_with_keys_prompt(parent, control_scheme, font);
       }
       OnlineLobbyUiEntryState::RegisteredRemotely => {
         parent.spawn(player_registered_remotely_prompt(font));
@@ -228,31 +228,51 @@ fn player_not_registered_prompt(
   )
 }
 
-fn player_registered_with_keys_prompt(
-  font: &Handle<Font>,
+fn spawn_player_registered_with_keys_prompt(
+  parent: &mut RelatedSpawnerCommands<ChildOf>,
   control_scheme: &ControlScheme,
-) -> (
-  Node,
-  SpawnRelatedBundle<ChildOf, Spawn<(Text, TextFont, TextLayout, TextColor, TextShadow)>>,
+  font: &Handle<Font>,
 ) {
-  (
-    Node {
+  let default_font = in_game_ui::default_font(font);
+  let default_shadow = in_game_ui::default_shadow();
+
+  parent
+    .spawn((Node {
       flex_direction: FlexDirection::Row,
       justify_content: JustifyContent::Center,
       align_items: AlignItems::Center,
       ..default()
-    },
-    children![(
-      Text::new(format!(
-        ": Play with {:?} and {:?}",
-        control_scheme.left, control_scheme.right
-      )),
-      in_game_ui::default_font(font),
-      TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-      TEXT_COLOUR,
-      in_game_ui::default_shadow(),
-    )],
-  )
+    },))
+    .with_children(|parent| {
+      parent.spawn((
+        Text::new(": Play with "),
+        default_font.clone(),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        TEXT_COLOUR,
+        default_shadow,
+      ));
+      parent.spawn((
+        Text::new(format!("[{:?}]", control_scheme.left)),
+        default_font.clone(),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        TextColor(Color::from(ACCENT_COLOUR)),
+        default_shadow,
+      ));
+      parent.spawn((
+        Text::new(" and "),
+        default_font.clone(),
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        TEXT_COLOUR,
+        default_shadow,
+      ));
+      parent.spawn((
+        Text::new(format!("[{:?}]", control_scheme.right)),
+        default_font,
+        TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+        TextColor(Color::from(ACCENT_COLOUR)),
+        default_shadow,
+      ));
+    });
 }
 
 fn player_registered_remotely_prompt(
