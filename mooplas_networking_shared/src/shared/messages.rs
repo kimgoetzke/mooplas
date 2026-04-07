@@ -1,5 +1,5 @@
 use crate::prelude::{ChannelType, ClientId};
-use crate::shared::structs::{SerialisableInput, SerialisablePlayerRegistration};
+use crate::shared::structs::{SerialisableInput, SerialisableRegistrationRequest, SerialisableUnregistrationRequest};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Component, Message};
 use serde::{Deserialize, Serialize};
@@ -45,17 +45,25 @@ impl PlayerStateUpdateMessage {
 /// [`ClientMessage`]. For the consumption of the application code.
 #[derive(Message, Serialize, Deserialize)]
 pub enum InboundClientMessage {
-  PlayerRegistration(SerialisablePlayerRegistration, ClientId),
+  RegistrationRequest(SerialisableRegistrationRequest, ClientId),
+  UnregistrationRequest(SerialisableUnregistrationRequest, ClientId),
   Input(SerialisableInput, ClientId),
 }
 
 impl Debug for InboundClientMessage {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
-      InboundClientMessage::PlayerRegistration(message, client_id) => {
+      InboundClientMessage::RegistrationRequest(message, client_id) => {
         write!(
           f,
-          "ClientMessage::PlayerRegistration for {} with ID {}",
+          "ClientMessage::RegistrationRequest for control scheme {} with ID {}",
+          message.control_scheme_id, client_id
+        )
+      }
+      InboundClientMessage::UnregistrationRequest(message, client_id) => {
+        write!(
+          f,
+          "ClientMessage::UnregistrationRequest for {} with ID {}",
           message.player_id, client_id
         )
       }
@@ -109,7 +117,11 @@ pub enum InboundServerMessage {
   /// Indicates that the app state has changed on the server.
   StateChanged { new_state: String, winner_info: Option<u8> },
   /// Informs clients that a player has registered in the lobby.
-  PlayerRegistered { client_id: ClientId, player_id: u8 },
+  PlayerRegistered {
+    client_id: ClientId,
+    player_id: u8,
+    control_scheme_id: u8,
+  },
   /// Informs clients that a player has unregistered from the lobby.
   PlayerUnregistered { client_id: ClientId, player_id: u8 },
   /// Contains authoritative player state updates in a vec of (player_id, x, y, rotation).

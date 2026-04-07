@@ -1,4 +1,4 @@
-use crate::prelude::{InboundClientMessage, NetworkRole};
+use crate::prelude::InboundClientMessage;
 use bevy::prelude::{Component, Event};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -149,16 +149,16 @@ pub enum SerialisableInput {
   Action(u8),
 }
 
-/// A type that communicates a change to a user's registration status in the lobby.
+/// A type that communicates a local control scheme registration request.
 #[derive(Debug, Serialize, Deserialize, Copy, Clone)]
-pub struct SerialisablePlayerRegistration {
+pub struct SerialisableRegistrationRequest {
+  pub control_scheme_id: u8,
+}
+
+/// A type that communicates an unregistration request for an authoritative player identity.
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+pub struct SerialisableUnregistrationRequest {
   pub player_id: PlayerId,
-  /// Whether the player has registered (true) or unregistered (false).
-  pub has_registered: bool,
-  /// Whether any player is currently registered, after this change.
-  pub is_anyone_registered: bool,
-  /// Whether this message originated from the server or the client. Used to prevent echoing.
-  pub network_role: Option<NetworkRole>,
 }
 
 /// The type sent by the networking code of the client. It's the same as [`InboundClientMessage`] but doesn't contain
@@ -167,14 +167,16 @@ pub struct SerialisablePlayerRegistration {
 /// available to the application code.
 #[derive(Serialize, Deserialize)]
 pub enum ClientMessage {
-  PlayerRegistration(SerialisablePlayerRegistration),
+  RegistrationRequest(SerialisableRegistrationRequest),
+  UnregistrationRequest(SerialisableUnregistrationRequest),
   Input(SerialisableInput),
 }
 
 impl ClientMessage {
   pub fn to_inbound_message(self, client_id: ClientId) -> InboundClientMessage {
     match self {
-      ClientMessage::PlayerRegistration(message) => InboundClientMessage::PlayerRegistration(message, client_id),
+      ClientMessage::RegistrationRequest(message) => InboundClientMessage::RegistrationRequest(message, client_id),
+      ClientMessage::UnregistrationRequest(message) => InboundClientMessage::UnregistrationRequest(message, client_id),
       ClientMessage::Input(action) => InboundClientMessage::Input(action, client_id),
     }
   }
@@ -183,8 +185,15 @@ impl ClientMessage {
 impl Debug for ClientMessage {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
-      ClientMessage::PlayerRegistration(message) => {
-        write!(f, "ClientMessage::PlayerRegistration for {}", message.player_id)
+      ClientMessage::RegistrationRequest(message) => {
+        write!(
+          f,
+          "ClientMessage::RegistrationRequest for control scheme {}",
+          message.control_scheme_id
+        )
+      }
+      ClientMessage::UnregistrationRequest(message) => {
+        write!(f, "ClientMessage::UnregistrationRequest for {}", message.player_id)
       }
       ClientMessage::Input(action) => {
         write!(f, "ClientMessage::{:?}", action)

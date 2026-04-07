@@ -1,10 +1,6 @@
 use crate::prelude::constants::{EDGE_MARGIN, RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
-use crate::prelude::{
-  AppState, AvailablePlayerConfig, AvailablePlayerConfigs, PlayerId, PlayerInput, Seed, SpawnPoints,
-};
+use crate::prelude::{AppState, AvailableControlSchemes, ControlScheme, ControlSchemeId, Seed, SpawnPoints};
 use bevy::app::{App, Plugin};
-use bevy::color::Color;
-use bevy::color::palettes::tailwind;
 use bevy::log::*;
 use bevy::platform::collections::HashSet;
 use bevy::prelude::{IntoScheduleConfigs, KeyCode, NextState, OnEnter, Res, ResMut, Resource, Update, in_state};
@@ -171,42 +167,26 @@ fn random_start_position(rng: &mut StdRng) -> (f32, f32) {
   (x, y)
 }
 
-// TODO: Support up to 8 players and separate keybindings from player colours in online multiplayer
-/// A system that initialises all available player configurations that players can choose from.
+/// A system that initialises all available control schemes that players can choose from.
 fn initialise_available_player_configurations_system(
   mut tracker: ResMut<InitialisationTracker>,
-  mut available_configs: ResMut<AvailablePlayerConfigs>,
+  mut available_control_schemes: ResMut<AvailableControlSchemes>,
 ) {
   run_initialisation_step(
     &mut tracker,
     InitialisationStep::InitialiseAvailablePlayerConfigs,
     || {
-      available_configs.configs = vec![
-        AvailablePlayerConfig {
-          id: PlayerId(0),
-          input: PlayerInput::new(PlayerId(0), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
-          colour: Color::from(tailwind::ROSE_500),
-        },
-        AvailablePlayerConfig {
-          id: PlayerId(1),
-          input: PlayerInput::new(PlayerId(1), KeyCode::Digit1, KeyCode::KeyA, KeyCode::KeyQ),
-          colour: Color::from(tailwind::LIME_500),
-        },
-        AvailablePlayerConfig {
-          id: PlayerId(2),
-          input: PlayerInput::new(PlayerId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-          colour: Color::from(tailwind::SKY_500),
-        },
-        AvailablePlayerConfig {
-          id: PlayerId(3),
-          input: PlayerInput::new(PlayerId(3), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyN),
-          colour: Color::from(tailwind::VIOLET_500),
-        },
-        AvailablePlayerConfig {
-          id: PlayerId(4),
-          input: PlayerInput::new(PlayerId(4), KeyCode::End, KeyCode::PageUp, KeyCode::Home),
-          colour: Color::from(tailwind::AMBER_500),
-        },
+      available_control_schemes.schemes = vec![
+        ControlScheme::new(
+          ControlSchemeId(0),
+          KeyCode::ArrowLeft,
+          KeyCode::ArrowRight,
+          KeyCode::ArrowUp,
+        ),
+        ControlScheme::new(ControlSchemeId(1), KeyCode::Digit1, KeyCode::KeyA, KeyCode::KeyQ),
+        ControlScheme::new(ControlSchemeId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+        ControlScheme::new(ControlSchemeId(3), KeyCode::KeyB, KeyCode::KeyM, KeyCode::KeyN),
+        ControlScheme::new(ControlSchemeId(4), KeyCode::End, KeyCode::PageUp, KeyCode::Home),
       ];
     },
   );
@@ -337,43 +317,31 @@ mod tests {
     let mut tracker = InitialisationTracker::default();
     tracker.reset(vec![InitialisationStep::InitialiseAvailablePlayerConfigs]);
     app.insert_resource(tracker);
-    app.insert_resource(AvailablePlayerConfigs::default());
+    app.insert_resource(AvailableControlSchemes::default());
 
     // Add system and run one update to execute it
     app.add_systems(Update, initialise_available_player_configurations_system);
     app.update();
 
-    // Validate available player configs
-    let available_configs = app
+    // Validate available control schemes
+    let available_schemes = app
       .world()
-      .get_resource::<AvailablePlayerConfigs>()
-      .expect("AvailablePlayerConfigs missing");
+      .get_resource::<AvailableControlSchemes>()
+      .expect("AvailableControlSchemes missing");
     assert_eq!(
-      available_configs.configs.len(),
+      available_schemes.schemes.len(),
       5,
-      "Expected 5 available player configurations"
+      "Expected 5 available control schemes"
     );
 
-    // Validate that player IDs are unique
-    let mut player_ids: Vec<usize> = available_configs.configs.iter().map(|c| c.id.0 as usize).collect();
-    player_ids.sort_unstable();
-    player_ids.dedup();
+    // Validate that control scheme IDs are unique
+    let mut scheme_ids: Vec<usize> = available_schemes.schemes.iter().map(|s| s.id.0 as usize).collect();
+    scheme_ids.sort_unstable();
+    scheme_ids.dedup();
     assert_eq!(
-      player_ids.len(),
-      available_configs.configs.len(),
-      "Player ids are not unique"
+      scheme_ids.len(),
+      available_schemes.schemes.len(),
+      "Control scheme ids are not unique"
     );
-
-    // Validate that each config has a unique colour assigned
-    let mut seen = HashSet::new();
-    for (idx, available_config) in available_configs.configs.iter().enumerate() {
-      let key = (
-        (available_config.colour.to_srgba().red * 10000.) as u32,
-        (available_config.colour.to_srgba().green * 10000.) as u32,
-        (available_config.colour.to_srgba().blue * 10000.) as u32,
-        (available_config.colour.to_srgba().alpha * 10000.) as u32,
-      );
-      assert!(seen.insert(key), "Player colour duplicated at config {}", idx);
-    }
   }
 }

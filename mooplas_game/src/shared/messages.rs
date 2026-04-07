@@ -2,9 +2,8 @@ use crate::shared::PlayerId;
 use avian2d::math::Scalar;
 use bevy::app::{App, Plugin};
 use bevy::prelude::Message;
-use mooplas_networking::prelude::NetworkRole;
-use serde::{Deserialize, Serialize};
 
+use crate::prelude::ControlSchemeId;
 #[cfg(feature = "online")]
 use crate::prelude::constants::{ERROR_COLOUR, INFO_COLOUR};
 #[cfg(feature = "online")]
@@ -26,6 +25,7 @@ impl Plugin for SharedMessagesPlugin {
 
     #[cfg(feature = "online")]
     app
+      .add_message::<LocalPlayerRegistrationRequestMessage>()
       .add_message::<ConnectionInfoMessage>()
       .add_message::<UiNotification>();
   }
@@ -39,15 +39,21 @@ pub struct DebugStateMessage {
 }
 
 /// A message that communicates a change to a user's registration status in the lobby.
-#[derive(Message, Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Message, Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) struct PlayerRegistrationMessage {
   pub player_id: PlayerId,
-  /// Whether the player has registered (true) or unregistered (false).
-  pub has_registered: bool,
+  pub control_scheme_id: Option<ControlSchemeId>,
   /// Whether any player is currently registered, after this change.
   pub is_anyone_registered: bool,
-  /// Whether this message originated from the server or the client. Used to prevent echoing.
-  pub network_role: Option<NetworkRole>,
+}
+
+/// A local request to register or unregister a control scheme in online mode.
+#[cfg(feature = "online")]
+#[derive(Message, Debug, Copy, Clone)]
+pub(crate) struct LocalPlayerRegistrationRequestMessage {
+  pub control_scheme_id: ControlSchemeId,
+  /// Whether the control scheme should register (true) or unregister (false).
+  pub has_registered: bool,
 }
 
 /// A message that communicates a change to the touch controls setting.

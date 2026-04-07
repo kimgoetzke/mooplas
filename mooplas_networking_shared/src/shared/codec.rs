@@ -23,19 +23,12 @@ mod tests {
 
   mod online {
     use super::*;
-    use crate::prelude::PlayerId;
     use crate::shared::messages::InboundServerMessage;
-    use crate::shared::resources::NetworkRole;
-    use crate::shared::structs::{ClientMessage, SerialisablePlayerRegistration};
+    use crate::shared::structs::{ClientMessage, SerialisableRegistrationRequest};
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {
-      let original = ClientMessage::PlayerRegistration(SerialisablePlayerRegistration {
-        player_id: PlayerId(7),
-        has_registered: true,
-        is_anyone_registered: true,
-        network_role: Some(NetworkRole::Client),
-      });
+      let original = ClientMessage::RegistrationRequest(SerialisableRegistrationRequest { control_scheme_id: 7 });
       let bytes = encode_to_bytes(&original).expect("Encode should succeed");
       let decoded: ClientMessage = decode_from_bytes(&bytes).expect("Decode should succeed");
       assert_eq!(format!("{original:?}"), format!("{decoded:?}"));

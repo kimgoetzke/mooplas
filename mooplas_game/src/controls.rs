@@ -1,7 +1,7 @@
 use crate::prelude::constants::{MOVEMENT_SPEED, ROTATION_SPEED};
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, ContinueMessage, InputMessage, PlayerId, PlayerInput, RegisteredPlayers, Settings,
-  SnakeHead, TouchControlsToggledMessage, has_registered_players,
+  AppState, AvailableControlSchemes, ContinueMessage, ControlScheme, InputMessage, PlayerId, RegisteredPlayers,
+  Settings, SnakeHead, TouchControlsToggledMessage, has_registered_players,
 };
 use avian2d::math::{AdjustPrecision, Scalar};
 use avian2d::prelude::{AngularVelocity, LinearVelocity};
@@ -49,15 +49,16 @@ impl Plugin for ControlsPlugin {
 /// Handles player registration and unregistration based on keyboard input. Sends an event for the UI to update.
 fn player_input_action_system(
   keyboard_input: Res<ButtonInput<KeyCode>>,
-  available_configs: Res<AvailablePlayerConfigs>,
+  available_control_schemes: Res<AvailableControlSchemes>,
   mut input_message: MessageWriter<InputMessage>,
 ) {
-  for available_config in &available_configs.configs {
-    if !keyboard_input.just_pressed(available_config.input.action) {
+  for control_scheme in &available_control_schemes.schemes {
+    if !keyboard_input.just_pressed(control_scheme.action) {
       continue;
     }
 
-    input_message.write(InputMessage::Action(available_config.into()));
+    // In local mode, ControlSchemeId maps implicitly to PlayerId
+    input_message.write(InputMessage::Action(PlayerId(control_scheme.id.0)));
   }
 }
 
@@ -85,24 +86,25 @@ fn player_input_system(
     if player.is_remote() {
       continue;
     }
-    process_inputs(&mut input_message, &keyboard_input, player.input.clone());
+    process_inputs(&mut input_message, &keyboard_input, player.id, &player.input);
   }
 }
 
 fn process_inputs(
   input_message: &mut MessageWriter<InputMessage>,
   keyboard_input: &Res<ButtonInput<KeyCode>>,
-  player_input: PlayerInput,
+  player_id: PlayerId,
+  control_scheme: &ControlScheme,
 ) {
-  let left = keyboard_input.any_pressed([player_input.left]);
-  let right = keyboard_input.any_pressed([player_input.right]);
+  let left = keyboard_input.any_pressed([control_scheme.left]);
+  let right = keyboard_input.any_pressed([control_scheme.right]);
   let horizontal_p1 = right as i8 - left as i8;
   let direction = horizontal_p1 as Scalar;
   if direction != 0.0 {
-    input_message.write(InputMessage::Move(player_input.id, direction));
+    input_message.write(InputMessage::Move(player_id, direction));
   }
-  if keyboard_input.just_pressed(player_input.action) {
-    input_message.write(InputMessage::Action(player_input.id));
+  if keyboard_input.just_pressed(control_scheme.action) {
+    input_message.write(InputMessage::Action(player_id));
   }
 }
 
@@ -183,7 +185,8 @@ mod tests {
   use super::*;
   use crate::app_state::AppStatePlugin;
   use crate::prelude::{
-    AvailablePlayerConfig, PlayerId, RegisteredPlayer, SharedMessagesPlugin, SharedResourcesPlugin,
+    AvailableControlSchemes, ControlScheme, ControlSchemeId, PlayerId, RegisteredPlayer, SharedMessagesPlugin,
+    SharedResourcesPlugin,
   };
   use bevy::MinimalPlugins;
   use bevy::prelude::Color;
@@ -238,17 +241,18 @@ mod tests {
   fn player_input_action_system_sends_input_message() {
     let mut app = setup();
 
-    // Prepare an available player config that reacts to KeyX
-    let mut available_configs = app
+    // Prepare an available control scheme that reacts to KeyX
+    let mut available_schemes = app
       .world_mut()
-      .get_resource_mut::<AvailablePlayerConfigs>()
-      .expect("AvailablePlayerConfigs resource missing");
-    available_configs.configs.push(AvailablePlayerConfig {
-      id: PlayerId(0),
-      input: PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-      colour: Color::WHITE,
-    });
-    drop(available_configs);
+      .get_resource_mut::<AvailableControlSchemes>()
+      .expect("AvailableControlSchemes resource missing");
+    available_schemes.schemes.push(ControlScheme::new(
+      ControlSchemeId(0),
+      KeyCode::KeyZ,
+      KeyCode::KeyC,
+      KeyCode::KeyX,
+    ));
+    drop(available_schemes);
 
     // Verify initial state
     let state = app.world().resource::<State<AppState>>();
@@ -297,11 +301,13 @@ mod tests {
       .world_mut()
       .get_resource_mut::<RegisteredPlayers>()
       .expect("RegisteredPlayers resource missing");
-    registered_players.players.push(RegisteredPlayer::new_immutable(
-      PlayerId(0),
-      PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-      Color::WHITE,
-    ));
+    registered_players
+      .players
+      .push(RegisteredPlayer::new_immutable_for_test(
+        PlayerId(0),
+        ControlScheme::new(ControlSchemeId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
+        Color::WHITE,
+      ));
     drop(registered_players);
 
     // Simulate pressing Space which should trigger a ContinueMessage
@@ -321,7 +327,7 @@ mod tests {
   #[test]
   fn player_input_system_sends_move_and_action_messages() {
     let mut app = setup();
-    let player_input = PlayerInput::new(PlayerId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX);
+    let control_scheme = ControlScheme::new(ControlSchemeId(0), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX);
 
     // Register a player for the input system to process
     let mut registered_players = app
@@ -329,8 +335,8 @@ mod tests {
       .get_resource_mut::<RegisteredPlayers>()
       .expect("RegisteredPlayers resource missing");
     registered_players.players.push(RegisteredPlayer::new_mutable(
-      player_input.id,
-      player_input.clone(),
+      PlayerId(control_scheme.id.0),
+      control_scheme.clone(),
       Color::WHITE,
     ));
     drop(registered_players);
@@ -343,9 +349,9 @@ mod tests {
     assert_eq!(state.get(), &AppState::Playing);
 
     // Simulate pressing left, right and action
-    handle_key_input(&mut app, TestKeyboardInput::Press(player_input.left));
-    handle_key_input(&mut app, TestKeyboardInput::Press(player_input.right));
-    handle_key_input(&mut app, TestKeyboardInput::Press(player_input.action));
+    handle_key_input(&mut app, TestKeyboardInput::Press(control_scheme.left));
+    handle_key_input(&mut app, TestKeyboardInput::Press(control_scheme.right));
+    handle_key_input(&mut app, TestKeyboardInput::Press(control_scheme.action));
 
     // Read produced messages
     let messages = app

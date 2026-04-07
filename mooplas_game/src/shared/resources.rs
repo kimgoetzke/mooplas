@@ -1,7 +1,6 @@
-use crate::prelude::{AvailablePlayerConfig, PlayerId, RegisteredPlayer};
+use crate::prelude::{ControlScheme, ControlSchemeId, PlayerId, RegisteredPlayer};
 use bevy::app::{App, Plugin};
-#[cfg(feature = "online")]
-use bevy::log::*;
+use bevy::log::debug;
 use bevy::prelude::{Reflect, ReflectResource, Resource};
 #[cfg(feature = "dev")]
 use bevy_inspector_egui::InspectorOptions;
@@ -23,7 +22,7 @@ impl Plugin for SharedResourcesPlugin {
       .register_type::<GeneralSettings>()
       .register_type::<SpawnPoints>()
       .init_resource::<SpawnPoints>()
-      .init_resource::<AvailablePlayerConfigs>()
+      .init_resource::<AvailableControlSchemes>()
       .init_resource::<RegisteredPlayers>()
       .init_resource::<WinnerInfo>()
       .init_resource::<NetworkRole>();
@@ -51,7 +50,6 @@ impl Seed {
   }
 
   /// Sets the seed value.
-  #[cfg(feature = "online")]
   pub fn set(&mut self, seed: u64) {
     debug!("Setting seed to [{}]", seed);
     self.seed = seed;
@@ -59,22 +57,14 @@ impl Seed {
 }
 
 /// A resource that holds various settings that can be configured for the game. Intended for developer use only.
-#[derive(Resource, Reflect, Clone, Copy)]
+#[derive(Resource, Reflect, Clone, Copy, Default)]
 pub struct Settings {
   pub general: GeneralSettings,
 }
 
-impl Default for Settings {
-  fn default() -> Self {
-    Self {
-      general: GeneralSettings::default(),
-    }
-  }
-}
-
 /// A resource that holds general settings, a child of the [`Settings`] resource. Intended for developer use only.
 #[cfg(feature = "dev")]
-#[derive(Resource, Reflect, InspectorOptions, Clone, Copy)]
+#[derive(Resource, Reflect, InspectorOptions, Clone, Copy, Default)]
 #[reflect(Resource, InspectorOptions)]
 pub struct GeneralSettings {
   /// Whether to display player gizmos that help debugging.
@@ -85,7 +75,7 @@ pub struct GeneralSettings {
 
 /// A resource that holds general settings, a child of the [`Settings`] resource. Intended for developer use only.
 #[cfg(not(feature = "dev"))]
-#[derive(Resource, Reflect, Clone, Copy)]
+#[derive(Resource, Reflect, Clone, Copy, Default)]
 #[reflect(Resource)]
 pub struct GeneralSettings {
   /// Whether to display player gizmos that help debugging.
@@ -94,33 +84,24 @@ pub struct GeneralSettings {
   pub enable_touch_controls: bool,
 }
 
-impl Default for GeneralSettings {
-  fn default() -> Self {
-    Self {
-      display_player_gizmos: false,
-      enable_touch_controls: false,
-    }
-  }
-}
-
 /// A resource that holds all valid spawn points in the game world. Contains a list of (x, y, rotation) tuples.
 #[derive(Resource, Reflect, Clone, Default)]
 pub struct SpawnPoints {
   pub data: Vec<(f32, f32, f32)>,
 }
 
-/// A resource that holds all pre-configured player configurations available for players to choose from.
+/// A resource that holds all available control schemes that players can choose from. Unified for
+/// both local and online modes — each scheme defines key bindings without coupling to player
+/// identity or colour.
 #[derive(Resource, Default, Debug)]
-pub struct AvailablePlayerConfigs {
-  pub(crate) configs: Vec<AvailablePlayerConfig>,
+pub struct AvailableControlSchemes {
+  pub(crate) schemes: Vec<ControlScheme>,
 }
 
-impl AvailablePlayerConfigs {
-  /// Finds an available player configuration by its [`PlayerId`]. Returns [`Option<&AvailablePlayerConfig>`] if found,
-  /// [`None`] otherwise.
-  #[cfg(feature = "online")]
-  pub fn find_by_id(&self, player_id: PlayerId) -> Option<&AvailablePlayerConfig> {
-    self.configs.iter().find(|config| config.id == player_id)
+impl AvailableControlSchemes {
+  /// Finds a control scheme by its [`ControlSchemeId`].
+  pub fn find_by_id(&self, control_scheme_id: ControlSchemeId) -> Option<&ControlScheme> {
+    self.schemes.iter().find(|scheme| scheme.id == control_scheme_id)
   }
 }
 
@@ -134,6 +115,15 @@ impl RegisteredPlayers {
   /// Gets the number of registered players.
   pub fn count(&self) -> usize {
     self.players.len()
+  }
+
+  /// Returns the [`PlayerId`] of the local player using the given [`ControlSchemeId`], if one exists.
+  pub fn get_local_player_id_for_control_scheme(&self, control_scheme_id: ControlSchemeId) -> Option<PlayerId> {
+    self
+      .players
+      .iter()
+      .find(|player| player.is_local() && player.input.id == control_scheme_id)
+      .map(|player| player.id)
   }
 
   /// Adds a new registered player.
@@ -252,7 +242,7 @@ impl WinnerInfo {
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::PlayerInput;
+  use crate::prelude::ControlScheme;
   use bevy::MinimalPlugins;
   use bevy::prelude::{Color, KeyCode};
 
@@ -302,61 +292,55 @@ mod tests {
       .get_resource::<SpawnPoints>()
       .expect("Failed to retrieve SpawnPoints");
     assert!(spawn_points.data.is_empty());
-    assert!(world.contains_resource::<AvailablePlayerConfigs>());
+    assert!(world.contains_resource::<AvailableControlSchemes>());
     assert!(world.contains_resource::<RegisteredPlayers>());
     assert!(world.contains_resource::<WinnerInfo>());
   }
 
   #[test]
-  fn find_by_id_returns_correct_config_when_id_exists() {
-    let configs = vec![
-      AvailablePlayerConfig {
-        id: PlayerId(1),
-        input: PlayerInput::new(PlayerId(1), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
-        colour: Default::default(),
-      },
-      AvailablePlayerConfig {
-        id: PlayerId(2),
-        input: PlayerInput::new(PlayerId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-        colour: Default::default(),
-      },
+  fn find_by_id_returns_correct_scheme_when_id_exists() {
+    let schemes = vec![
+      ControlScheme::new(
+        ControlSchemeId(1),
+        KeyCode::ArrowLeft,
+        KeyCode::ArrowRight,
+        KeyCode::ArrowUp,
+      ),
+      ControlScheme::new(ControlSchemeId(2), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
     ];
-    let available_configs = AvailablePlayerConfigs { configs };
-    let result = available_configs.find_by_id(PlayerId(1));
+    let available = AvailableControlSchemes { schemes };
+    let result = available.find_by_id(ControlSchemeId(1));
     assert!(result.is_some());
-    assert_eq!(result.unwrap().id, PlayerId(1));
+    assert_eq!(result.unwrap().id, ControlSchemeId(1));
   }
 
   #[test]
   fn find_by_id_returns_none_when_id_does_not_exist() {
-    let configs = vec![
-      AvailablePlayerConfig {
-        id: PlayerId(0),
-        input: PlayerInput::new(PlayerId(0), KeyCode::ArrowLeft, KeyCode::ArrowRight, KeyCode::ArrowUp),
-        colour: Default::default(),
-      },
-      AvailablePlayerConfig {
-        id: PlayerId(4),
-        input: PlayerInput::new(PlayerId(4), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
-        colour: Default::default(),
-      },
+    let schemes = vec![
+      ControlScheme::new(
+        ControlSchemeId(0),
+        KeyCode::ArrowLeft,
+        KeyCode::ArrowRight,
+        KeyCode::ArrowUp,
+      ),
+      ControlScheme::new(ControlSchemeId(4), KeyCode::KeyZ, KeyCode::KeyC, KeyCode::KeyX),
     ];
-    let available_configs = AvailablePlayerConfigs { configs };
-    let result = available_configs.find_by_id(PlayerId(3));
+    let available = AvailableControlSchemes { schemes };
+    let result = available.find_by_id(ControlSchemeId(3));
     assert!(result.is_none());
   }
 
   #[test]
-  fn find_by_id_returns_none_when_configs_are_empty() {
-    let available_configs = AvailablePlayerConfigs { configs: vec![] };
-    let result = available_configs.find_by_id(PlayerId(1));
+  fn find_by_id_returns_none_when_schemes_are_empty() {
+    let available = AvailableControlSchemes { schemes: vec![] };
+    let result = available.find_by_id(ControlSchemeId(1));
     assert!(result.is_none());
   }
 
   #[test]
   fn register_adds_player_when_not_already_registered() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let player = RegisteredPlayer::new_immutable_for_test(PlayerId(1), ControlScheme::test(1), Color::default());
     let result = registered_players.register(player);
     assert!(result.is_ok());
     assert_eq!(registered_players.players.len(), 1);
@@ -366,7 +350,7 @@ mod tests {
   #[test]
   fn register_returns_error_when_player_already_registered() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let player = RegisteredPlayer::new_immutable_for_test(PlayerId(1), ControlScheme::test(1), Color::default());
     registered_players
       .register(player.clone())
       .expect("Failed to registered player the first time");
@@ -382,7 +366,7 @@ mod tests {
   #[test]
   fn unregister_mutable_removes_player_when_registered_and_mutable() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");
@@ -406,7 +390,7 @@ mod tests {
   #[test]
   fn unregister_mutable_returns_error_when_player_is_remote() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let player = RegisteredPlayer::new_immutable_for_test(PlayerId(1), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");
@@ -423,7 +407,7 @@ mod tests {
   #[test]
   fn unregister_immutable_removes_player_when_registered_and_immutable() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_immutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let player = RegisteredPlayer::new_immutable_for_test(PlayerId(1), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");
@@ -449,7 +433,7 @@ mod tests {
   #[test]
   fn unregister_immutable_returns_error_when_player_is_local() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), PlayerInput::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");
