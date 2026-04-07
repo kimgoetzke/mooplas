@@ -6,6 +6,7 @@ use crate::prelude::{
 };
 use crate::shared::PlayerRegistrationMessage;
 use crate::ui::in_game_ui::in_game_ui;
+use crate::ui::shared::{LobbyUiCta, default_font, default_shadow, despawn_children, player_slot_label};
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::AssetServer;
 use bevy::ecs::children;
@@ -20,7 +21,7 @@ use bevy::text::LineHeight;
 use bevy::ui::{BackgroundColor, percent};
 use mooplas_networking::prelude::NetworkRole;
 
-/// A plugin that manages the online-only in-game lobby UI, such as remote player slots and the join prompt.
+/// A plugin that manages the online-only in-game lobby UI, including the player registration slots and the join prompt.
 pub struct InGameOnlineUiPlugin;
 
 impl Plugin for InGameOnlineUiPlugin {
@@ -45,7 +46,7 @@ struct OnlineLobbyUiEntry {
 struct JoinPromptNode;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum OnlineLobbyUiEntryState {
+enum PlayerEntryState {
   NotRegistered,
   RegisteredLocally { control_scheme_id: ControlSchemeId },
   RegisteredRemotely,
@@ -115,7 +116,7 @@ fn handle_online_player_registration_message(
   registered_players: Res<RegisteredPlayers>,
   online_entries_query: Query<(Entity, &OnlineLobbyUiEntry, &Children)>,
   join_prompt_query: Query<(Entity, Option<&Children>), With<JoinPromptNode>>,
-  cta_query: Query<(Entity, &Children), With<in_game_ui::LobbyUiCta>>,
+  cta_query: Query<(Entity, &Children), With<LobbyUiCta>>,
   network_role: Res<NetworkRole>,
 ) {
   for message in player_registration_message.read() {
@@ -125,7 +126,7 @@ fn handle_online_player_registration_message(
       if entry.player_id != message.player_id {
         continue;
       }
-      in_game_ui::clear_ui_children(&mut commands, children);
+      despawn_children(&mut commands, children);
       spawn_online_lobby_ui_entry_children(
         &mut commands,
         entity,
@@ -172,16 +173,12 @@ fn spawn_online_lobby_ui_entry_children(
 ) {
   let entry_state = online_lobby_ui_entry_state(player_id, registered_players);
   commands.entity(entity).with_children(|parent| {
-    parent.spawn(in_game_ui::player_slot_label(
-      font,
-      player_id,
-      colour_for_player_id(player_id),
-    ));
+    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
     match entry_state {
-      OnlineLobbyUiEntryState::NotRegistered => {
-        parent.spawn(player_not_registered_prompt(font));
+      PlayerEntryState::NotRegistered => {
+        parent.spawn(player_not_registered_label(font));
       }
-      OnlineLobbyUiEntryState::RegisteredLocally { control_scheme_id } => {
+      PlayerEntryState::RegisteredLocally { control_scheme_id } => {
         let control_scheme = available_control_schemes
           .find_by_id(control_scheme_id)
           .unwrap_or_else(|| {
@@ -190,26 +187,26 @@ fn spawn_online_lobby_ui_entry_children(
               control_scheme_id, player_id
             )
           });
-        spawn_player_registered_with_keys_prompt(parent, control_scheme, font);
+        spawn_player_registered_with_keys_label(parent, control_scheme, font);
       }
-      OnlineLobbyUiEntryState::RegisteredRemotely => {
+      PlayerEntryState::RegisteredRemotely => {
         parent.spawn(player_registered_remotely_prompt(font));
       }
     }
   });
 }
 
-fn online_lobby_ui_entry_state(player_id: PlayerId, registered_players: &RegisteredPlayers) -> OnlineLobbyUiEntryState {
+fn online_lobby_ui_entry_state(player_id: PlayerId, registered_players: &RegisteredPlayers) -> PlayerEntryState {
   match registered_players.players.iter().find(|player| player.id == player_id) {
-    Some(player) if player.is_local() => OnlineLobbyUiEntryState::RegisteredLocally {
+    Some(player) if player.is_local() => PlayerEntryState::RegisteredLocally {
       control_scheme_id: player.input.id,
     },
-    Some(_) => OnlineLobbyUiEntryState::RegisteredRemotely,
-    None => OnlineLobbyUiEntryState::NotRegistered,
+    Some(_) => PlayerEntryState::RegisteredRemotely,
+    None => PlayerEntryState::NotRegistered,
   }
 }
 
-fn player_not_registered_prompt(
+fn player_not_registered_label(
   font: &Handle<Font>,
 ) -> (
   Node,
@@ -224,21 +221,23 @@ fn player_not_registered_prompt(
     },
     children![(
       Text::new(": Not registered"),
-      in_game_ui::default_font(font),
+      default_font(font),
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       TEXT_COLOUR,
-      in_game_ui::default_shadow(),
+      default_shadow(),
     )],
   )
 }
 
-fn spawn_player_registered_with_keys_prompt(
+/// Spawns bundle with the text ": Play with \[{navigational key 1}] and \[{navigational key 2}]" - intended to be
+/// prefixed with the player to which it applies.
+fn spawn_player_registered_with_keys_label(
   parent: &mut RelatedSpawnerCommands<ChildOf>,
   control_scheme: &ControlScheme,
   font: &Handle<Font>,
 ) {
-  let default_font = in_game_ui::default_font(font);
-  let default_shadow = in_game_ui::default_shadow();
+  let default_font = default_font(font);
+  let default_shadow = default_shadow();
 
   parent
     .spawn((Node {
@@ -279,6 +278,7 @@ fn spawn_player_registered_with_keys_prompt(
     });
 }
 
+/// Returns bundle with the text ": Registered remotely" - intended to be prefixed with the player to which it applies.
 fn player_registered_remotely_prompt(
   font: &Handle<Font>,
 ) -> (
@@ -294,33 +294,16 @@ fn player_registered_remotely_prompt(
     },
     children![(
       Text::new(": Registered remotely"),
-      in_game_ui::default_font(font),
+      default_font(font),
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
       TEXT_COLOUR,
-      in_game_ui::default_shadow(),
+      default_shadow(),
     )],
   )
 }
 
-fn available_join_action_keys(
-  available_control_schemes: &AvailableControlSchemes,
-  registered_players: &RegisteredPlayers,
-) -> Option<Vec<String>> {
-  let keys: Vec<String> = available_control_schemes
-    .schemes
-    .iter()
-    .filter(|control_scheme| {
-      !registered_players
-        .players
-        .iter()
-        .any(|player| player.is_local() && player.input.id == control_scheme.id)
-    })
-    .map(|control_scheme| format!("[{:?}]", control_scheme.action))
-    .collect();
-
-  if keys.is_empty() { None } else { Some(keys) }
-}
-
+/// Clears and respawns the prompt to join. Used to add newly available or remove now unavailable action keys from
+/// the list.
 fn update_join_prompt(
   commands: &mut Commands,
   join_prompt_query: &Query<(Entity, Option<&Children>), With<JoinPromptNode>>,
@@ -330,7 +313,7 @@ fn update_join_prompt(
 ) {
   for (entity, children) in join_prompt_query.iter() {
     if let Some(children) = children {
-      in_game_ui::clear_ui_children(commands, children);
+      despawn_children(commands, children);
     }
     let font = asset_server.load(DEFAULT_FONT);
     commands.entity(entity).with_children(|parent| {
@@ -349,7 +332,7 @@ fn spawn_join_prompt(
   let Some(keys) = available_join_action_keys(available_control_schemes, registered_players) else {
     return;
   };
-  let default_font = in_game_ui::default_font(font);
+  let default_font = default_font(font);
   let mut segments: Vec<(String, bool)> = vec![("Join by pressing ".to_string(), false)];
   match keys.as_slice() {
     [only_key] => {
@@ -388,9 +371,28 @@ fn spawn_join_prompt(
       LineHeight::RelativeToFont(2.),
       colour,
       TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-      in_game_ui::default_shadow(),
+      default_shadow(),
     ));
   }
+}
+
+fn available_join_action_keys(
+  available_control_schemes: &AvailableControlSchemes,
+  registered_players: &RegisteredPlayers,
+) -> Option<Vec<String>> {
+  let keys: Vec<String> = available_control_schemes
+    .schemes
+    .iter()
+    .filter(|control_scheme| {
+      !registered_players
+        .players
+        .iter()
+        .any(|player| player.is_local() && player.input.id == control_scheme.id)
+    })
+    .map(|control_scheme| format!("[{:?}]", control_scheme.action))
+    .collect();
+
+  if keys.is_empty() { None } else { Some(keys) }
 }
 
 #[cfg(all(test, feature = "online"))]
@@ -426,7 +428,7 @@ mod tests {
 
     assert_eq!(
       online_lobby_ui_entry_state(PlayerId(4), &registered_players),
-      OnlineLobbyUiEntryState::NotRegistered
+      PlayerEntryState::NotRegistered
     );
   }
 
@@ -443,7 +445,7 @@ mod tests {
 
     assert_eq!(
       online_lobby_ui_entry_state(PlayerId(4), &registered_players),
-      OnlineLobbyUiEntryState::RegisteredLocally {
+      PlayerEntryState::RegisteredLocally {
         control_scheme_id: ControlSchemeId(0),
       }
     );
@@ -462,7 +464,7 @@ mod tests {
 
     assert_eq!(
       online_lobby_ui_entry_state(PlayerId(4), &registered_players),
-      OnlineLobbyUiEntryState::RegisteredRemotely
+      PlayerEntryState::RegisteredRemotely
     );
   }
 

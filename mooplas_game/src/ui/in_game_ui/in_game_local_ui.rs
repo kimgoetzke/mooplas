@@ -4,9 +4,8 @@ use crate::prelude::{
   AvailableControlSchemes, ControlScheme, ControlSchemeId, PlayerId, PlayerRegistrationMessage, RegisteredPlayers,
   Settings, colour_for_player_id,
 };
-use crate::ui::in_game_ui::in_game_ui::{
-  LobbyUiCta, clear_ui_children, default_font, default_shadow, player_slot_label, update_call_to_action_to_start,
-};
+use crate::ui::in_game_ui::in_game_ui::update_call_to_action_to_start;
+use crate::ui::shared::{LobbyUiCta, default_font, default_shadow, despawn_children, player_slot_label};
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::{AssetServer, Handle};
 use bevy::color::{Alpha, Color};
@@ -20,7 +19,7 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::NetworkRole;
 
-/// A plugin that manages the local-only in-game lobby UI, such as rows with player colour/controls.
+/// A plugin that manages the local-only in-game lobby UI, including the player registration slots.
 pub struct InGameLocalUiPlugin;
 
 impl Plugin for InGameLocalUiPlugin {
@@ -66,7 +65,7 @@ fn handle_local_player_registration_message(
           continue;
         }
 
-        clear_ui_children(&mut commands, children);
+        despawn_children(&mut commands, children);
         spawn_local_lobby_ui_entry_children(
           &mut commands,
           entity,

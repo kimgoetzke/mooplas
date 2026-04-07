@@ -1,17 +1,19 @@
 use crate::app_state::AppState;
-use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, TEXT_COLOUR};
-use crate::prelude::{AvailableControlSchemes, PlayerId, RegisteredPlayers, Settings, WinnerInfo};
+use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_COLOUR, DEFAULT_FONT, TEXT_COLOUR};
+use crate::prelude::{AvailableControlSchemes, RegisteredPlayers, Settings, TouchControlsToggledMessage, WinnerInfo};
 use crate::ui::in_game_ui::in_game_buttons::InGameButtonsPlugin;
 use crate::ui::in_game_ui::in_game_local_ui::InGameLocalUiPlugin;
 use crate::ui::in_game_ui::in_game_online_ui::{self, InGameOnlineUiPlugin};
 use crate::ui::in_game_ui::{in_game_buttons, in_game_local_ui};
-use crate::ui::shared::despawn_menu;
+use crate::ui::shared::{LobbyUiCta, default_font, default_shadow, despawn_children, despawn_menu, large_font};
+use bevy::app::Update;
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::prelude::{
-  AlignItems, Alpha, AssetServer, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection, Font, Handle,
-  Justify, JustifyContent, LineBreak, Name, Node, OnEnter, OnExit, Pickable, Plugin, Query, Res, Text,
-  TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, default, px,
+  AlignItems, Alpha, AssetServer, ChildOf, Children, Color, Commands, Component, Entity, FlexDirection,
+  IntoScheduleConfigs, Justify, JustifyContent, LineBreak, MessageReader, Name, Node, OnEnter, OnExit, Pickable,
+  Plugin, Query, Res, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, TextShadow, Val, With, default,
+  in_state, px,
 };
 use bevy::text::LineHeight;
 use bevy::ui::{PositionType, percent};
@@ -24,6 +26,10 @@ impl Plugin for InGameUiPlugin {
   fn build(&self, app: &mut bevy::prelude::App) {
     app
       .add_plugins((InGameButtonsPlugin, InGameLocalUiPlugin))
+      .add_systems(
+        Update,
+        handle_touch_controls_toggled_message.run_if(in_state(AppState::Registering)),
+      )
       .add_systems(OnEnter(AppState::Registering), spawn_lobby_ui_system)
       .add_systems(OnExit(AppState::Registering), despawn_lobby_ui_system)
       .add_systems(OnEnter(AppState::GameOver), spawn_game_over_ui_system)
@@ -37,16 +43,39 @@ impl Plugin for InGameUiPlugin {
 /// Marker component for the root of the lobby UI. Used for despawning. All other Lobby UI components must be children
 /// of this.
 #[derive(Component)]
-pub(crate) struct LobbyUiRoot;
-
-/// Marker component for the lobby UI call-to-action (CTA) at the bottom of the player list.
-#[derive(Component)]
-pub(crate) struct LobbyUiCta;
+struct LobbyUiRoot;
 
 /// Marker component for the root of the victory/game over UI. Used for despawning. All other Victory UI components
 /// must be children of this.
 #[derive(Component)]
 struct VictoryUiRoot;
+
+/// A system that handles messages toggling touch controls to update the lobby UI's prompts accordingly. Makes sure that
+/// the prompt doesn't ask for a key press when touch controls are enabled and vice versa.
+fn handle_touch_controls_toggled_message(
+  mut commands: Commands,
+  mut messages: MessageReader<TouchControlsToggledMessage>,
+  lobby_ui_root_query: Query<Entity, With<LobbyUiRoot>>,
+  settings: Res<Settings>,
+  asset_server: Res<AssetServer>,
+  available_control_schemes: Res<AvailableControlSchemes>,
+  registered_players: Res<RegisteredPlayers>,
+  network_role: Res<NetworkRole>,
+) {
+  for _ in messages.read() {
+    for entity in &lobby_ui_root_query {
+      commands.entity(entity).despawn();
+    }
+    spawn_lobby_ui(
+      &mut commands,
+      &settings,
+      &asset_server,
+      &available_control_schemes,
+      &registered_players,
+      &network_role,
+    );
+  }
+}
 
 /// Sets up the lobby UI, displaying available players and prompts to join.
 fn spawn_lobby_ui_system(
@@ -67,7 +96,7 @@ fn spawn_lobby_ui_system(
   );
 }
 
-pub(crate) fn spawn_lobby_ui(
+fn spawn_lobby_ui(
   commands: &mut Commands,
   settings: &Res<Settings>,
   asset_server: &Res<AssetServer>,
@@ -224,7 +253,7 @@ pub(crate) fn update_call_to_action_to_start(
   is_permitted_action: bool,
 ) {
   for (entity, children) in cta_query.iter() {
-    clear_ui_children(commands, children);
+    despawn_children(commands, children);
     let font = asset_server.load(DEFAULT_FONT);
     let default_font = default_font(&font);
     let default_shadow = default_shadow();
@@ -376,46 +405,6 @@ fn spawn_game_over_ui_system(
           ));
         });
     });
-}
-
-pub(crate) fn clear_ui_children(commands: &mut Commands, children: &Children) {
-  for child in children.iter() {
-    commands.entity(*child).despawn();
-  }
-}
-
-pub(crate) fn player_slot_label(
-  font: &Handle<Font>,
-  player_id: PlayerId,
-  slot_label_colour: Color,
-) -> (Text, TextFont, TextLayout, TextColor, TextShadow) {
-  (
-    Text::new(format!("Player {}", player_id.0)),
-    default_font(font),
-    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
-    TextColor(slot_label_colour),
-    default_shadow(),
-  )
-}
-
-pub(crate) fn default_font(font: &Handle<Font>) -> TextFont {
-  TextFont {
-    font: font.clone(),
-    font_size: NORMAL_FONT,
-    ..default()
-  }
-}
-
-fn large_font(font: &Handle<Font>) -> TextFont {
-  TextFont {
-    font: font.clone(),
-    font_size: LARGE_FONT,
-    ..default()
-  }
-}
-
-pub(crate) fn default_shadow() -> TextShadow {
-  TextShadow::default()
 }
 
 /// Despawns the entire game over UI. Call when exiting the game over state.

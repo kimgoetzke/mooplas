@@ -1,23 +1,19 @@
 use crate::app_state::AppState;
 use crate::prelude::constants::{NORMAL_FONT, SMALL_FONT};
-use crate::prelude::{
-  AvailableControlSchemes, ContinueMessage, CustomInteraction, ExitLobbyMessage, RegisteredPlayers, Settings,
-  TouchControlsToggledMessage,
-};
-use crate::ui::in_game_ui::in_game_ui;
+use crate::prelude::{ContinueMessage, CustomInteraction, ExitLobbyMessage, Settings, TouchControlsToggledMessage};
 use crate::ui::shared::spawn_button;
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::AssetServer;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
 use bevy::log::info;
 use bevy::prelude::{
-  AlignItems, Changed, ChildOf, Commands, Component, Entity, IntoScheduleConfigs, JustifyContent, MessageReader,
-  MessageWriter, MonitorSelection, Node, PositionType, Query, Res, ResMut, Single, Window, With, default, in_state, px,
+  AlignItems, Changed, ChildOf, Component, IntoScheduleConfigs, JustifyContent, MessageWriter, MonitorSelection, Node,
+  PositionType, Query, Res, ResMut, Single, Window, With, default, in_state, px,
 };
 use mooplas_networking::prelude::NetworkRole;
 
-/// A plugin that manages all in-game buttons and their related systems, such as toggling touch controls and fullscreen
-/// mode, exiting the lobby, and continuing after game over.
+/// A plugin that manages all in-game UI buttons and their related systems, such as toggling touch controls and
+/// fullscreen mode, exiting the lobby, and continuing after game over.
 pub struct InGameButtonsPlugin;
 
 impl Plugin for InGameButtonsPlugin {
@@ -26,7 +22,6 @@ impl Plugin for InGameButtonsPlugin {
       .add_systems(
         Update,
         (
-          handle_touch_controls_toggled_message,
           toggle_touch_controls_button_system,
           toggle_fullscreen_button_system,
           exit_button_system,
@@ -58,33 +53,6 @@ struct ExitButton;
 /// Marker component for the touch continue button.
 #[derive(Component)]
 struct ContinueButton;
-
-/// A system that handles messages toggling touch controls to update the lobby UI's prompts accordingly. Makes sure that
-/// the prompt doesn't ask for a key press when touch controls are enabled and vice versa.
-fn handle_touch_controls_toggled_message(
-  mut commands: Commands,
-  mut messages: MessageReader<TouchControlsToggledMessage>,
-  lobby_ui_root_query: Query<Entity, With<in_game_ui::LobbyUiRoot>>,
-  settings: Res<Settings>,
-  asset_server: Res<AssetServer>,
-  available_control_schemes: Res<AvailableControlSchemes>,
-  registered_players: Res<RegisteredPlayers>,
-  network_role: Res<NetworkRole>,
-) {
-  for _ in messages.read() {
-    for entity in &lobby_ui_root_query {
-      commands.entity(entity).despawn();
-    }
-    in_game_ui::spawn_lobby_ui(
-      &mut commands,
-      &settings,
-      &asset_server,
-      &available_control_schemes,
-      &registered_players,
-      &network_role,
-    );
-  }
-}
 
 /// A system that toggles touch controls when the corresponding button is pressed.
 fn toggle_touch_controls_button_system(
@@ -147,7 +115,8 @@ fn continue_button_system(
 }
 
 // TODO: Replace all button text below with icons
-/// Spawns all in-game buttons, visible in the player registration phase/lobby.
+/// Spawns all in-game buttons, visible in the player registration phase/lobby e.g. to toggle fullscreen or touch
+/// controls.
 pub(crate) fn spawn_in_game_buttons(asset_server: &Res<AssetServer>, parent: &mut RelatedSpawnerCommands<ChildOf>) {
   parent
     .spawn(Node {
