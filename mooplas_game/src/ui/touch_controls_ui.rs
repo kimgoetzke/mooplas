@@ -16,7 +16,6 @@ use bevy::prelude::*;
 use mooplas_networking::prelude::NetworkRole;
 use std::fmt::Debug;
 
-// TODO: Make online multiplayer UI work with touch controls or don't allow touch controls
 /// A plugin that sets up the touch controls UI and related systems, so that players can use touch input to control
 /// their characters.
 pub struct TouchControlsUiPlugin;
@@ -173,7 +172,7 @@ fn spawn_touch_controls_ui(
           parent
             .spawn((
               // Player action button
-              touch_control_button(Some(colour), BorderRadius::all(percent(20))),
+              touch_control_button(colour, BorderRadius::all(percent(20))),
               TouchControl::Action(player_id),
             ))
             .observe(set_interaction_on_hover)
@@ -223,27 +222,25 @@ fn handle_touch_controls_player_registration_message(
       continue;
     };
     let (player_id, action_colour) = touch_controls_player_state(control_scheme_id, &registered_players, &network_role);
-
     for (player_touch_controls, mut current_player_id, children) in &mut player_touch_controls_query {
       if player_touch_controls.control_scheme_id != control_scheme_id {
         continue;
       }
-
       *current_player_id = player_id;
-
       for child in children.iter() {
         let Ok((mut touch_control, mut background_colour)) = touch_control_query.get_mut(child) else {
           continue;
         };
-
         let rebound_touch_control = match *touch_control {
           TouchControl::Movement(_, direction) => TouchControl::Movement(player_id, direction),
           TouchControl::Action(_) => {
-            *background_colour = BackgroundColor(action_colour.with_alpha(BUTTON_ALPHA_DEFAULT));
+            *background_colour = match action_colour {
+              Some(colour) => BackgroundColor(colour.with_alpha(BUTTON_ALPHA_DEFAULT)),
+              None => BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT)),
+            };
             TouchControl::Action(player_id)
           }
         };
-
         *touch_control = rebound_touch_control;
         rebind_active_touch_control(&mut tracker, child, rebound_touch_control);
       }
@@ -255,16 +252,15 @@ fn touch_controls_player_state(
   control_scheme_id: ControlSchemeId,
   registered_players: &RegisteredPlayers,
   network_role: &NetworkRole,
-) -> (PlayerId, Color) {
+) -> (PlayerId, Option<Color>) {
   let slot_player_id = PlayerId(control_scheme_id.0);
   if network_role.is_none() {
-    return (slot_player_id, colour_for_player_id(slot_player_id));
+    return (slot_player_id, Some(colour_for_player_id(slot_player_id)));
   }
   if let Some(player_id) = registered_players.get_local_player_id_for_control_scheme(control_scheme_id) {
-    return (player_id, colour_for_player_id(player_id));
+    return (player_id, Some(colour_for_player_id(player_id)));
   }
-
-  (slot_player_id, colour_for_player_id(slot_player_id))
+  (slot_player_id, None)
 }
 
 fn rebind_active_touch_control(tracker: &mut ActiveMovementTracker, entity: Entity, touch_control: TouchControl) {
@@ -559,16 +555,14 @@ mod tests {
     let mut app = setup();
     *app.world_mut().resource_mut::<NetworkRole>() = NetworkRole::Client;
 
-    {
-      let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
-      registered_players
-        .register(RegisteredPlayer::new_mutable(
-          PlayerId(4),
-          test_control_scheme(0),
-          colour_for_player_id(PlayerId(4)),
-        ))
-        .expect("Expected authoritative local registration to succeed");
-    }
+    let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
+    registered_players
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected authoritative local registration to succeed");
 
     let parent_entity = app
       .world_mut()
@@ -641,6 +635,68 @@ mod tests {
     }
 
     assert!(saw_rebound_action_button, "Expected an action button to be rebound");
+  }
+
+  #[cfg(feature = "online")]
+  #[test]
+  fn handle_touch_controls_player_registration_message_clears_action_colour_on_unregistration() {
+    let mut app = setup();
+    *app.world_mut().resource_mut::<NetworkRole>() = NetworkRole::Client;
+
+    // No player registered which simulates the state after unregistration
+    app
+      .world_mut()
+      .spawn((
+        PlayerTouchControls {
+          control_scheme_id: ControlSchemeId(0),
+        },
+        PlayerId(4),
+      ))
+      .with_children(|parent| {
+        parent.spawn((
+          TouchControl::Movement(PlayerId(4), -1.0),
+          TouchControlButton,
+          BackgroundColor(Color::BLACK),
+        ));
+        parent.spawn((
+          TouchControl::Action(PlayerId(4)),
+          TouchControlButton,
+          BackgroundColor(colour_for_player_id(PlayerId(4)).with_alpha(BUTTON_ALPHA_DEFAULT)),
+        ));
+      });
+
+    // Fire an unregistration message -> player_id is provided but no longer in registered_players
+    app
+      .world_mut()
+      .write_message(PlayerRegistrationMessage {
+        player_id: PlayerId(4),
+        control_scheme_id: Some(ControlSchemeId(0)),
+        is_anyone_registered: false,
+      })
+      .expect("Expected PlayerRegistrationMessage to be queued");
+
+    app.update();
+
+    let default_colour = BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT));
+
+    let children: Vec<Entity> = app
+      .world_mut()
+      .query::<(Entity, &TouchControl)>()
+      .iter(app.world())
+      .filter_map(|(entity, touch_control)| matches!(touch_control, TouchControl::Action(_)).then_some(entity))
+      .collect();
+    assert!(!children.is_empty(), "Expected at least one action button in the world");
+
+    for entity in children {
+      let background_colour = app
+        .world()
+        .get::<BackgroundColor>(entity)
+        .expect("Expected action button to have a background colour");
+      assert_eq!(
+        *background_colour, default_colour,
+        "Expected action button colour to be cleared to default after unregistration"
+      );
+    }
   }
 
   #[cfg(feature = "online")]
