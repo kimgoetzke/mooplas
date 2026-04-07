@@ -173,7 +173,7 @@ fn spawn_touch_controls_ui(
             .spawn((
               // Player action button
               touch_control_button(colour, BorderRadius::all(percent(20))),
-              TouchControl::Action(player_id),
+              TouchControl::Action(PlayerId(control_scheme.id.0)),
             ))
             .observe(set_interaction_on_hover)
             .observe(set_interaction_on_hover_exit)
@@ -233,12 +233,12 @@ fn handle_touch_controls_player_registration_message(
         };
         let rebound_touch_control = match *touch_control {
           TouchControl::Movement(_, direction) => TouchControl::Movement(player_id, direction),
-          TouchControl::Action(_) => {
+          TouchControl::Action(slot_player_id) => {
             *background_colour = match action_colour {
               Some(colour) => BackgroundColor(colour.with_alpha(BUTTON_ALPHA_DEFAULT)),
               None => BackgroundColor(Color::from(tailwind::SLATE_600).with_alpha(BUTTON_ALPHA_DEFAULT)),
             };
-            TouchControl::Action(player_id)
+            TouchControl::Action(slot_player_id)
           }
         };
         *touch_control = rebound_touch_control;
@@ -551,7 +551,7 @@ mod tests {
 
   #[cfg(feature = "online")]
   #[test]
-  fn handle_touch_controls_player_registration_message_rebinds_touch_controls_to_authoritative_player() {
+  fn handle_touch_controls_player_registration_message_rebinds_movement_and_updates_action_colour() {
     let mut app = setup();
     *app.world_mut().resource_mut::<NetworkRole>() = NetworkRole::Client;
 
@@ -609,7 +609,7 @@ mod tests {
       .get::<Children>(parent_entity)
       .expect("Expected touch controls to have spawned child buttons");
 
-    let mut saw_rebound_action_button = false;
+    let mut saw_action_button = false;
     for child in children.iter() {
       let touch_control = app
         .world()
@@ -620,21 +620,26 @@ mod tests {
       match touch_control {
         TouchControl::Movement(player_id, _) => assert_eq!(player_id, PlayerId(4)),
         TouchControl::Action(player_id) => {
-          assert_eq!(player_id, PlayerId(4));
+          assert_eq!(
+            player_id,
+            PlayerId(0),
+            "Action button must keep the slot player ID, not the authoritative one"
+          );
           let background_colour = app
             .world()
             .get::<BackgroundColor>(child)
-            .expect("Expected action button to keep a background colour");
+            .expect("Expected action button to have a background colour");
           assert_eq!(
             background_colour.0,
-            colour_for_player_id(PlayerId(4)).with_alpha(BUTTON_ALPHA_DEFAULT)
+            colour_for_player_id(PlayerId(4)).with_alpha(BUTTON_ALPHA_DEFAULT),
+            "Action button colour must reflect the authoritative player ID"
           );
-          saw_rebound_action_button = true;
+          saw_action_button = true;
         }
       }
     }
 
-    assert!(saw_rebound_action_button, "Expected an action button to be rebound");
+    assert!(saw_action_button, "Expected an action button in the children");
   }
 
   #[cfg(feature = "online")]
@@ -705,16 +710,14 @@ mod tests {
     let mut app = setup();
     *app.world_mut().resource_mut::<NetworkRole>() = NetworkRole::Client;
 
-    {
-      let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
-      registered_players
-        .register(RegisteredPlayer::new_mutable(
-          PlayerId(4),
-          test_control_scheme(0),
-          colour_for_player_id(PlayerId(4)),
-        ))
-        .expect("Expected authoritative local registration to succeed");
-    }
+    let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
+    registered_players
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(4),
+        test_control_scheme(0),
+        colour_for_player_id(PlayerId(4)),
+      ))
+      .expect("Expected authoritative local registration to succeed");
 
     let mut movement_entity = None;
     app
@@ -739,13 +742,11 @@ mod tests {
 
     let movement_entity = movement_entity.expect("Expected to spawn a movement button");
 
-    {
-      let mut tracker = app.world_mut().resource_mut::<ActiveMovementTracker>();
-      tracker.players.insert(
-        PlayerId(0),
-        (movement_entity, TouchControl::Movement(PlayerId(0), -1.0)),
-      );
-    }
+    let mut tracker = app.world_mut().resource_mut::<ActiveMovementTracker>();
+    tracker.players.insert(
+      PlayerId(0),
+      (movement_entity, TouchControl::Movement(PlayerId(0), -1.0)),
+    );
 
     app
       .world_mut()
