@@ -23,7 +23,7 @@ pub fn colour_for_player_id(player_id: PlayerId) -> Color {
     4 => Color::from(tailwind::AMBER_500),
     5 => Color::from(tailwind::EMERALD_500),
     6 => Color::from(tailwind::PINK_500),
-    7 => Color::from(tailwind::RED_500),
+    7 => Color::from(tailwind::ORANGE_500),
     _ => Color::WHITE,
   }
 }
