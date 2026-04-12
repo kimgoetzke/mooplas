@@ -1,7 +1,8 @@
-use crate::prelude::{InputMessage, PlayerId, PlayerRegistrationMessage};
+use crate::prelude::{ControlSchemeId, InputMessage, PlayerId};
 use bevy::math::{Quat, Vec2};
-use bevy::prelude::Component;
+use bevy::prelude::{Component, Resource};
 use mooplas_networking::prelude::SerialisableInput;
+use std::collections::HashMap;
 
 /// A component for interpolating network-synchronised transforms, controlled by the server. Used in an attempt to
 /// smoothly transition from current transform's position/rotation to target position/rotation at a defined speed.
@@ -48,28 +49,6 @@ impl Into<PlayerId> for mooplas_networking::prelude::PlayerId {
   }
 }
 
-impl From<&PlayerRegistrationMessage> for mooplas_networking::prelude::SerialisablePlayerRegistration {
-  fn from(value: &PlayerRegistrationMessage) -> Self {
-    mooplas_networking::prelude::SerialisablePlayerRegistration {
-      player_id: value.player_id.into(),
-      has_registered: value.has_registered,
-      is_anyone_registered: value.is_anyone_registered,
-      network_role: value.network_role,
-    }
-  }
-}
-
-impl Into<PlayerRegistrationMessage> for mooplas_networking::prelude::SerialisablePlayerRegistration {
-  fn into(self) -> PlayerRegistrationMessage {
-    PlayerRegistrationMessage {
-      player_id: self.player_id.into(),
-      has_registered: self.has_registered,
-      is_anyone_registered: self.is_anyone_registered,
-      network_role: self.network_role,
-    }
-  }
-}
-
 impl From<&InputMessage> for SerialisableInput {
   fn from(value: &InputMessage) -> Self {
     match value {
@@ -94,5 +73,32 @@ impl Into<InputMessage> for &SerialisableInput {
       &SerialisableInput::Move(player_id, direction) => InputMessage::Move(PlayerId(player_id), direction),
       &SerialisableInput::Action(player_id) => InputMessage::Action(PlayerId(player_id)),
     }
+  }
+}
+
+/// A client-side resource that maps local control schemes to server-assigned player identities.
+/// Only relevant in online multiplayer mode.
+#[cfg(feature = "online")]
+#[derive(Resource, Default, Debug)]
+pub(crate) struct LocalInputMapping {
+  mappings: HashMap<ControlSchemeId, PlayerId>,
+}
+
+#[cfg(feature = "online")]
+impl LocalInputMapping {
+  pub fn insert(&mut self, control_scheme_id: ControlSchemeId, player_id: PlayerId) {
+    self.mappings.insert(control_scheme_id, player_id);
+  }
+
+  pub fn clear(&mut self) {
+    self.mappings.clear();
+  }
+
+  pub fn remove(&mut self, control_scheme_id: &ControlSchemeId) {
+    self.mappings.remove(control_scheme_id);
+  }
+
+  pub fn get_player_id(&self, control_scheme_id: &ControlSchemeId) -> Option<PlayerId> {
+    self.mappings.get(control_scheme_id).copied()
   }
 }

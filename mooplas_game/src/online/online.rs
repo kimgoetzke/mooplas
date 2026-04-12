@@ -1,3 +1,5 @@
+#[cfg(feature = "online")]
+use crate::online::structs::LocalInputMapping;
 use bevy::prelude::{App, Plugin};
 
 /// Plugin that adds online multiplayer capabilities to the game.
@@ -13,6 +15,9 @@ impl Plugin for OnlinePlugin {
       crate::online::server::ServerPlugin,
       crate::online::client::ClientPlugin,
     ));
+
+    #[cfg(feature = "online")]
+    app.init_resource::<LocalInputMapping>();
 
     #[cfg(feature = "online_renet")]
     app.add_plugins(crate::online::renet::RenetPlugin);

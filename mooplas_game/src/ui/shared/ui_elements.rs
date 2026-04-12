@@ -1,8 +1,8 @@
 use crate::prelude::constants::{
-  BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, PIXEL_PERFECT_LAYER, RESOLUTION_HEIGHT, RESOLUTION_WIDTH,
-  TEXT_COLOUR,
+  BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER,
+  RESOLUTION_HEIGHT, RESOLUTION_WIDTH, TEXT_COLOUR,
 };
-use crate::prelude::{AnimationIndices, AnimationTimer, CustomInteraction, RegularButton};
+use crate::prelude::{AnimationIndices, AnimationTimer, CustomInteraction, PlayerId, RegularButton};
 use crate::ui;
 use crate::ui::ButtonAnimation;
 use crate::ui::shared::BackgroundRoot;
@@ -14,14 +14,14 @@ use bevy::image::{Image, TextureAtlas, TextureAtlasLayout};
 use bevy::math::{UVec2, Vec2};
 use bevy::prelude::{
   AlignItems, BackgroundColor, BorderColor, BorderGradient, BorderRadius, Bundle, ChildOf, Component, Entity,
-  FlexDirection, ImageNode, JustifyContent, LinearGradient, Name, Node, NodeImageMode, PositionType, Query,
-  SpriteImageMode, SpriteScalingMode, Text, TextFont, TextShadow, Timer, TimerMode, UiRect, With, children, default,
-  percent, px,
+  FlexDirection, Font, ImageNode, Justify, JustifyContent, LineBreak, LinearGradient, Name, Node, NodeImageMode,
+  PositionType, Query, SpriteImageMode, SpriteScalingMode, Text, TextColor, TextFont, TextLayout, TextShadow, Timer,
+  TimerMode, UiRect, With, children, default, percent, px,
 };
 use bevy::prelude::{Commands, Sprite, Transform};
 
 /// Creates a node with the given marker component and name. This node serves as the base for every menu.
-pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bundle {
+pub(crate) fn menu_base_node(marker_component: impl Component, name: String) -> impl Bundle {
   (
     Name::new(name),
     marker_component,
@@ -39,7 +39,7 @@ pub fn menu_base_node(marker_component: impl Component, name: String) -> impl Bu
 }
 
 /// Spawn the logo in an absolute positioned node.
-pub fn spawn_logo<T: Component>(
+pub(crate) fn spawn_logo<T: Component>(
   commands: &mut Commands,
   marker_component: T,
   logo_image: Handle<Image>,
@@ -84,7 +84,7 @@ pub fn spawn_logo<T: Component>(
 }
 
 /// Spawns the background image for the given menu if it doesn't exist already.
-pub fn spawn_background_if_not_exists<T: Component>(
+pub(crate) fn spawn_background_if_not_exists<T: Component>(
   commands: &mut Commands,
   marker_component: T,
   background_image: Handle<Image>,
@@ -120,7 +120,7 @@ pub fn spawn_background_if_not_exists<T: Component>(
 }
 
 /// Spawns a [`RegularButton`] with the given parameters. Standard interaction observers are attached.
-pub fn spawn_button(
+pub(crate) fn spawn_button(
   parent: &mut RelatedSpawnerCommands<ChildOf>,
   asset_server: &AssetServer,
   button_type: impl Component,
@@ -177,7 +177,8 @@ fn button(
   )
 }
 
-pub fn default_gradient(transparency: f32) -> BorderGradient {
+/// Returns the default [`BorderGradient`] with the given transparency. Used for buttons.
+pub(crate) fn default_gradient(transparency: f32) -> BorderGradient {
   BorderGradient::from(LinearGradient {
     stops: vec![
       tailwind::YELLOW_400.with_alpha(transparency).into(),
@@ -188,8 +189,41 @@ pub fn default_gradient(transparency: f32) -> BorderGradient {
   })
 }
 
-pub fn despawn_menu(commands: &mut Commands, marker_component_query: &Query<Entity, With<impl Component>>) {
-  for root in marker_component_query {
-    commands.entity(root).despawn();
+/// Returns a bundle containing the text "Player {id}" in the given colour. Used in the player registration phase/lobby
+/// to label player slots.
+pub(crate) fn player_slot_label(
+  font: &Handle<Font>,
+  player_id: PlayerId,
+  slot_label_colour: Color,
+) -> (Text, TextFont, TextLayout, TextColor, TextShadow) {
+  (
+    Text::new(format!("Player {}", player_id.0)),
+    default_font(font),
+    TextLayout::new(Justify::Center, LineBreak::WordBoundary),
+    TextColor(slot_label_colour),
+    default_shadow(),
+  )
+}
+
+/// Returns the [`TextFont`] for regular in-game text.
+pub(crate) fn default_font(font: &Handle<Font>) -> TextFont {
+  TextFont {
+    font: font.clone(),
+    font_size: NORMAL_FONT,
+    ..default()
   }
+}
+
+/// Returns the [`TextFont`] for large in-game text, e.g. the "Player {id} wins!" text at the end of a game.
+pub(crate) fn large_font(font: &Handle<Font>) -> TextFont {
+  TextFont {
+    font: font.clone(),
+    font_size: LARGE_FONT,
+    ..default()
+  }
+}
+
+/// Returns the [`TextShadow`] for regular in-game text. Used to make text more visible against the background.
+pub(crate) fn default_shadow() -> TextShadow {
+  TextShadow::default()
 }

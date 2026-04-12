@@ -114,22 +114,36 @@ fn validate_signalling_server_base_url(url: &str) -> Result<(), String> {
 }
 
 /// A resource for the server to store information about connected clients and their registered players.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RegisteredClientPlayer {
+  pub player_id: PlayerId,
+  pub control_scheme_id: u8,
+}
+
+/// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]
 pub struct Lobby {
   pub connected: Vec<ClientId>,
-  pub registered: HashMap<ClientId, Vec<PlayerId>>,
+  pub registered: HashMap<ClientId, Vec<RegisteredClientPlayer>>,
 }
 
 impl Lobby {
   /// Registers a player for the given client ID.
-  pub fn register_player(&mut self, client_id: ClientId, player_id: PlayerId) {
-    self.registered.entry(client_id).or_default().push(player_id);
+  pub fn register_player(&mut self, client_id: ClientId, player_id: PlayerId, control_scheme_id: u8) {
+    self
+      .registered
+      .entry(client_id)
+      .or_default()
+      .push(RegisteredClientPlayer {
+        player_id,
+        control_scheme_id,
+      });
   }
 
   /// Unregisters a player for the given client ID.
   pub fn unregister_player(&mut self, client_id: ClientId, player_id: PlayerId) {
     if let Some(players) = self.registered.get_mut(&client_id) {
-      players.retain(|&id| id != player_id);
+      players.retain(|registration| registration.player_id != player_id);
       if players.is_empty() {
         self.registered.remove(&client_id);
       }
@@ -138,15 +152,40 @@ impl Lobby {
 
   /// Returns a cloned list of registered players for the given client ID.
   pub fn get_registered_players_cloned(&self, client_id: &ClientId) -> Vec<PlayerId> {
-    self.registered.get(client_id).cloned().unwrap_or(Vec::new())
+    self
+      .registered
+      .get(client_id)
+      .map(|registrations| {
+        registrations
+          .iter()
+          .map(|registration| registration.player_id)
+          .collect()
+      })
+      .unwrap_or_default()
+  }
+
+  /// Returns `true` if the control scheme ID is registered for the given client ID, `false` otherwise.
+  pub fn is_control_scheme_registered(&self, client_id: &ClientId, control_scheme_id: u8) -> bool {
+    self
+      .registered
+      .get(client_id)
+      .map(|registrations| {
+        registrations
+          .iter()
+          .any(|registration| registration.control_scheme_id == control_scheme_id)
+      })
+      .unwrap_or(false)
   }
 
   pub fn get_client_id_by_player_id(&self, player_id: &PlayerId) -> Option<ClientId> {
-    self.registered.iter().find_map(|(client_id, player_ids)| {
-      if player_ids.contains(player_id) {
+    self.registered.iter().find_map(|(client_id, registrations)| {
+      if registrations
+        .iter()
+        .any(|registration| registration.player_id == *player_id)
+      {
         Some(*client_id)
       } else {
-        debug!("Player ID {} not found for client ID {}", player_id.0, client_id);
+        debug!("{} not found for client ID {}", player_id, client_id);
         None
       }
     })
@@ -156,12 +195,20 @@ impl Lobby {
   /// for the client, `false` otherwise.
   pub fn validate_registration(&self, client_id: &ClientId, player_id: &PlayerId) -> bool {
     if let Some(players) = self.registered.get(client_id) {
-      players.contains(player_id)
+      players.iter().any(|registration| registration.player_id == *player_id)
     } else {
       false
     }
   }
 
+  /// Clears any registrations for the next round, so that players can register again. Use before starting a new round.
+  pub fn reinitialise(&mut self) {
+    for registrations in self.registered.values_mut() {
+      registrations.clear();
+    }
+  }
+
+  /// Clears all connected clients and registrations. Use when exiting an online game, not when starting a new round.
   pub fn clear(&mut self) {
     self.connected.clear();
     self.registered.clear();
@@ -184,8 +231,14 @@ mod tests {
     let mut lobby = Lobby::default();
     let client_id = ClientId::default_test();
     let player_id = PlayerId(42);
-    lobby.register_player(client_id, player_id);
-    assert_eq!(lobby.registered.get(&client_id), Some(&vec![player_id]));
+    lobby.register_player(client_id, player_id, 3);
+    assert_eq!(
+      lobby.registered.get(&client_id),
+      Some(&vec![RegisteredClientPlayer {
+        player_id,
+        control_scheme_id: 3,
+      }])
+    );
   }
 
   #[test]
@@ -193,7 +246,7 @@ mod tests {
     let mut lobby = Lobby::default();
     let client_id = ClientId::default_test();
     let player_id = PlayerId(42);
-    lobby.register_player(client_id, player_id);
+    lobby.register_player(client_id, player_id, 1);
     lobby.unregister_player(client_id, player_id);
     assert!(!lobby.registered.contains_key(&client_id));
   }
@@ -204,10 +257,16 @@ mod tests {
     let client_id = ClientId::default_test();
     let player_id1 = PlayerId(42);
     let player_id2 = PlayerId(43);
-    lobby.register_player(client_id, player_id1);
-    lobby.register_player(client_id, player_id2);
+    lobby.register_player(client_id, player_id1, 1);
+    lobby.register_player(client_id, player_id2, 2);
     lobby.unregister_player(client_id, player_id1);
-    assert_eq!(lobby.registered.get(&client_id), Some(&vec![player_id2]));
+    assert_eq!(
+      lobby.registered.get(&client_id),
+      Some(&vec![RegisteredClientPlayer {
+        player_id: player_id2,
+        control_scheme_id: 2,
+      }])
+    );
   }
 
   #[test]
@@ -224,10 +283,19 @@ mod tests {
     let client_id = ClientId::default_test();
     let player_id1 = PlayerId(42);
     let player_id2 = PlayerId(43);
-    lobby.register_player(client_id, player_id1);
-    lobby.register_player(client_id, player_id2);
+    lobby.register_player(client_id, player_id1, 1);
+    lobby.register_player(client_id, player_id2, 2);
     let players = lobby.get_registered_players_cloned(&client_id);
     assert_eq!(players, vec![player_id1, player_id2]);
+  }
+
+  #[test]
+  fn is_control_scheme_registered_returns_true_for_registered_control_scheme() {
+    let mut lobby = Lobby::default();
+    let client_id = ClientId::default_test();
+    lobby.register_player(client_id, PlayerId(42), 2);
+    assert!(lobby.is_control_scheme_registered(&client_id, 2));
+    assert!(!lobby.is_control_scheme_registered(&client_id, 1));
   }
 
   #[test]
@@ -235,7 +303,7 @@ mod tests {
     let mut lobby = Lobby::default();
     let client_id = test_client_id(6);
     let player_id = PlayerId(42);
-    lobby.register_player(client_id, player_id);
+    lobby.register_player(client_id, player_id, 0);
     assert!(lobby.validate_registration(&client_id, &player_id));
   }
 
@@ -253,7 +321,7 @@ mod tests {
     let registered_client = test_client_id(1);
     let other_client = test_client_id(2);
     let registered_player = PlayerId(42);
-    lobby.register_player(registered_client, registered_player);
+    lobby.register_player(registered_client, registered_player, 0);
     assert!(!lobby.validate_registration(&other_client, &registered_player));
   }
 
@@ -263,7 +331,7 @@ mod tests {
     let client_id = ClientId::default_test();
     let registered_player = PlayerId(42);
     let other_player = PlayerId(43);
-    lobby.register_player(client_id, registered_player);
+    lobby.register_player(client_id, registered_player, 0);
     assert!(!lobby.validate_registration(&client_id, &other_player));
   }
 
@@ -273,8 +341,8 @@ mod tests {
     let client_id = ClientId::default_test();
     let player_id_1 = PlayerId(42);
     let player_id_2 = PlayerId(43);
-    lobby.register_player(client_id, player_id_1);
-    lobby.register_player(client_id, player_id_2);
+    lobby.register_player(client_id, player_id_1, 0);
+    lobby.register_player(client_id, player_id_2, 1);
     lobby.unregister_player(client_id, player_id_1);
     assert!(!lobby.validate_registration(&client_id, &player_id_1));
     assert!(lobby.validate_registration(&client_id, &player_id_2));

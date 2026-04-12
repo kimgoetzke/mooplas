@@ -1,7 +1,10 @@
+#[cfg(feature = "online")]
+use crate::prelude::LocalPlayerRegistrationRequestMessage;
 use crate::prelude::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::prelude::{
-  AppState, AvailablePlayerConfigs, ContinueMessage, ExitLobbyMessage, PlayerId, PlayerRegistrationMessage,
-  RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, has_registered_players,
+  AppState, AvailableControlSchemes, ContinueMessage, ControlSchemeId, ExitLobbyMessage, PlayerId,
+  PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, colour_for_player_id,
+  has_registered_players,
 };
 use crate::shared::{InputMessage, Player};
 use avian2d::prelude::Collisions;
@@ -81,51 +84,75 @@ fn handle_exit_lobby_message(
 fn player_registration_system(
   mut input_messages: MessageReader<InputMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
-  available_configs: Res<AvailablePlayerConfigs>,
+  available_control_schemes: Res<AvailableControlSchemes>,
+  #[cfg(feature = "online")] mut local_player_registration_request_message: MessageWriter<
+    LocalPlayerRegistrationRequestMessage,
+  >,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
-  network_role: Res<NetworkRole>,
+  _network_role: Res<NetworkRole>,
 ) {
   for input_action in input_messages.read() {
     if let InputMessage::Action(player_id) = input_action {
-      let Some(available_config) = available_configs.configs.iter().find(|config| config.id == *player_id) else {
-        warn!("Received registration action for unknown player ID [{:?}]", player_id);
+      let control_scheme_id = ControlSchemeId(player_id.0);
+      let Some(control_scheme) = available_control_schemes.find_by_id(control_scheme_id) else {
+        warn!(
+          "Received registration action for unknown control scheme [{:?}]",
+          control_scheme_id
+        );
         continue;
       };
 
-      let is_now_registered = if let Some(registered_player_id) = registered_players
+      #[cfg(feature = "online")]
+      if _network_role.is_client() || _network_role.is_server() {
+        let is_registered_locally = registered_players
+          .players
+          .iter()
+          .any(|registered_player| registered_player.is_local() && registered_player.input.id == control_scheme_id);
+        local_player_registration_request_message.write(LocalPlayerRegistrationRequestMessage {
+          control_scheme_id,
+          has_registered: !is_registered_locally,
+        });
+        continue;
+      }
+
+      let affected_player_id = if let Some(registered_player_id) = registered_players
         .players
         .iter()
-        .find(|registered_player| registered_player.id == available_config.id)
+        .find(|registered_player| registered_player.id == *player_id)
         .map(|registered_player| registered_player.id)
       {
         // Unregister
         match registered_players.unregister_mutable(registered_player_id) {
-          Ok(_) => debug!("[Player {}] has unregistered", available_config.id.0),
+          Ok(_) => debug!("[Player {}] has unregistered", player_id.0),
           Err(e) => {
-            warn!("Failed to unregister [Player {}]: {}", available_config.id.0, e);
+            warn!("Failed to unregister [Player {}]: {}", player_id.0, e);
             continue;
           }
         }
 
-        false
+        registered_player_id
       } else {
-        // Register
-        match registered_players.register(RegisteredPlayer::new_mutable_from(available_config)) {
-          Ok(_) => debug!("[Player {}] has registered", available_config.id.0),
+        // Register — in local mode, ControlSchemeId maps implicitly to PlayerId
+        let colour = colour_for_player_id(*player_id);
+        match registered_players.register(RegisteredPlayer::new_mutable(
+          *player_id,
+          control_scheme.clone(),
+          colour,
+        )) {
+          Ok(_) => debug!("[Player {}] has registered", player_id.0),
           Err(e) => {
-            warn!("Failed to register [Player {}]: {}", available_config.id.0, e);
+            warn!("Failed to register [Player {}]: {}", player_id.0, e);
             continue;
           }
         }
 
-        true
+        *player_id
       };
 
       player_registration_message.write(PlayerRegistrationMessage {
-        player_id: available_config.id,
-        has_registered: is_now_registered,
+        player_id: affected_player_id,
+        control_scheme_id: Some(control_scheme_id),
         is_anyone_registered: !registered_players.players.is_empty(),
-        network_role: (*network_role).into(),
       });
     }
   }
@@ -265,7 +292,9 @@ fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner:
 #[cfg(test)]
 mod tests {
   use super::*;
-  use crate::prelude::{AvailablePlayerConfig, PlayerInput, SharedMessagesPlugin, SharedResourcesPlugin};
+  use crate::prelude::{
+    AvailableControlSchemes, ControlScheme, ControlSchemeId, SharedMessagesPlugin, SharedResourcesPlugin,
+  };
   use bevy::state::app::StatesPlugin;
 
   fn setup() -> App {
@@ -284,17 +313,19 @@ mod tests {
   fn player_registration_registers_and_unregisters() {
     let mut app = setup();
 
-    // Prepare an available player config
-    let mut available_configs = app
-      .world_mut()
-      .get_resource_mut::<AvailablePlayerConfigs>()
-      .expect("AvailablePlayerConfigs resource missing");
-    available_configs.configs.push(AvailablePlayerConfig {
-      id: PlayerId(0),
-      input: PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD),
-      colour: Color::WHITE,
-    });
-    drop(available_configs);
+    // Prepare an available control scheme
+    {
+      let mut available_schemes = app
+        .world_mut()
+        .get_resource_mut::<AvailableControlSchemes>()
+        .expect("AvailableControlSchemes resource missing");
+      available_schemes.schemes.push(ControlScheme::new(
+        ControlSchemeId(0),
+        KeyCode::KeyA,
+        KeyCode::KeyS,
+        KeyCode::KeyD,
+      ));
+    }
 
     // Send an input action to register the player
     app
@@ -305,6 +336,25 @@ mod tests {
     // Add and run the registration system once
     app.add_systems(Update, player_registration_system);
     app.update();
+
+    {
+      let mut registration_messages = app
+        .world_mut()
+        .get_resource_mut::<Messages<PlayerRegistrationMessage>>()
+        .expect("Messages<PlayerRegistrationMessage> missing");
+      let queued_registration_messages: Vec<_> =
+        registration_messages.iter_current_update_messages().copied().collect();
+      assert_eq!(queued_registration_messages.len(), 1);
+      assert_eq!(
+        queued_registration_messages[0],
+        PlayerRegistrationMessage {
+          player_id: PlayerId(0),
+          control_scheme_id: Some(ControlSchemeId(0)),
+          is_anyone_registered: true,
+        }
+      );
+      registration_messages.drain().for_each(drop);
+    }
 
     // Player should now be registered
     let registered_players = app
@@ -321,6 +371,25 @@ mod tests {
       .expect("Failed to write InputAction message");
     app.update();
 
+    {
+      let mut registration_messages = app
+        .world_mut()
+        .get_resource_mut::<Messages<PlayerRegistrationMessage>>()
+        .expect("Messages<PlayerRegistrationMessage> missing");
+      let queued_registration_messages: Vec<_> =
+        registration_messages.iter_current_update_messages().copied().collect();
+      assert_eq!(queued_registration_messages.len(), 1);
+      assert_eq!(
+        queued_registration_messages[0],
+        PlayerRegistrationMessage {
+          player_id: PlayerId(0),
+          control_scheme_id: Some(ControlSchemeId(0)),
+          is_anyone_registered: false,
+        }
+      );
+      registration_messages.drain().for_each(drop);
+    }
+
     let registered_players = app
       .world()
       .get_resource::<RegisteredPlayers>()
@@ -328,17 +397,63 @@ mod tests {
     assert!(registered_players.players.is_empty());
   }
 
+  #[cfg(feature = "online")]
+  #[test]
+  fn player_registration_in_client_mode_does_not_register_locally() {
+    let mut app = setup();
+    *app.world_mut().resource_mut::<NetworkRole>() = NetworkRole::Client;
+
+    {
+      let mut available_schemes = app
+        .world_mut()
+        .get_resource_mut::<AvailableControlSchemes>()
+        .expect("AvailableControlSchemes resource missing");
+      available_schemes.schemes.push(ControlScheme::new(
+        ControlSchemeId(0),
+        KeyCode::KeyA,
+        KeyCode::KeyS,
+        KeyCode::KeyD,
+      ));
+    }
+
+    app
+      .world_mut()
+      .write_message(InputMessage::Action(PlayerId(0)))
+      .expect("Failed to write InputAction message");
+
+    app.add_systems(Update, player_registration_system);
+    app.update();
+
+    let registered_players = app
+      .world()
+      .get_resource::<RegisteredPlayers>()
+      .expect("RegisteredPlayers missing");
+    assert!(registered_players.players.is_empty());
+
+    let registration_messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<PlayerRegistrationMessage>>()
+      .expect("Messages<PlayerRegistrationMessage> missing");
+    assert_eq!(registration_messages.iter_current_update_messages().count(), 0);
+
+    let local_registration_requests = app
+      .world_mut()
+      .get_resource_mut::<Messages<LocalPlayerRegistrationRequestMessage>>()
+      .expect("Messages<LocalPlayerRegistrationRequestMessage> missing");
+    assert_eq!(local_registration_requests.iter_current_update_messages().count(), 1);
+  }
+
   #[cfg(not(feature = "online"))]
   #[test]
   fn handle_continue_message_transitions_to_playing() {
     let mut app = setup();
 
-    // Ensure we start in the initialising state
+    // Ensure we start in the loading state.
     let state = app
       .world()
       .get_resource::<State<AppState>>()
       .expect("AppState State resource missing");
-    assert_eq!(state, &AppState::Initialising);
+    assert_eq!(state, &AppState::Loading);
 
     // Send the message
     app
@@ -370,16 +485,16 @@ mod tests {
     registered_players.players = vec![
       RegisteredPlayer::new_mutable_dead(
         PlayerId(0),
-        PlayerInput::new(PlayerId(0), KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD),
+        ControlScheme::new(ControlSchemeId(0), KeyCode::KeyA, KeyCode::KeyS, KeyCode::KeyD),
         Color::WHITE,
       ),
       RegisteredPlayer::new_mutable(
         PlayerId(1),
-        PlayerInput::new(PlayerId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
+        ControlScheme::new(ControlSchemeId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
         Color::BLACK,
       ),
     ];
-    drop(registered_players);
+    let _ = registered_players;
 
     // Add and run the transition to game over system
     app.add_systems(Update, transition_to_game_over_system);
