@@ -12,7 +12,7 @@ use mooplas_networking::prelude::{
 use mooplas_networking_matchbox::prelude::start_signaling_server;
 use mooplas_networking_matchbox::prelude::{
   MatchboxClientPlugin, ServerMatchboxPlugin, generate_room_url, remove_all_matchbox_resources, resolve_room_url,
-  room_id_from_room_url, start_socket,
+  start_socket,
 };
 
 /// Plugin that adds online multiplayer capabilities for WASM targets using websocket/`bevy_matchbox` to the game.
@@ -54,16 +54,9 @@ fn handle_toggle_menu_message(
       NetworkRole::Server => {
         #[cfg(not(target_arch = "wasm32"))]
         start_signaling_server(&mut commands);
-        let room_url = generate_room_url(signalling_server_url.as_str());
-        let connection_info = match connection_info_message_from_room_url(&room_url) {
-          Ok(connection_info) => connection_info,
-          Err(error) => {
-            error!("Failed to determine room ID from room URL: {}", error);
-            ui_message.write(UiNotification::error(error));
-            *network_role = NetworkRole::None;
-            continue;
-          }
-        };
+        let room_id = generate_room_url();
+        let room_url = format!("{}/{}", signalling_server_url.as_str().trim_end_matches('/'), &room_id);
+        let connection_info = ConnectionInfoMessage::new(room_id);
         match start_socket(&mut commands, &room_url) {
           Ok(()) => {
             debug!("Server started with room URL [{}]", room_url);
@@ -81,13 +74,6 @@ fn handle_toggle_menu_message(
     }
     debug!("Network role set to [{:?}]", network_role);
   }
-}
-
-fn connection_info_message_from_room_url(room_url: &str) -> Result<ConnectionInfoMessage, String> {
-  let room_id = room_id_from_room_url(room_url)?;
-  Ok(ConnectionInfoMessage {
-    connection_string: room_id,
-  })
 }
 
 fn handle_connection_info_message(
@@ -164,31 +150,4 @@ fn receive_network_error_event(
   }
   error!("Networking error occurred: [{}], panicking now...", error);
   panic!("{}", error);
-}
-
-#[cfg(test)]
-mod tests {
-  use super::*;
-
-  #[test]
-  fn connection_info_message_from_room_url_returns_room_id_only() {
-    let message = connection_info_message_from_room_url("wss://signal.example.com/room-456")
-      .expect("Expected a valid room URL to produce a room ID message");
-    assert_eq!(message.connection_string, "room-456");
-  }
-
-  #[test]
-  fn connection_info_message_from_room_url_returns_error_for_invalid_url() {
-    let error = connection_info_message_from_room_url("invalid-url")
-      .err()
-      .expect("Expected an invalid room URL to produce an error");
-    assert_eq!(error.as_str(), "URL is not valid: relative URL without a base");
-  }
-
-  #[test]
-  fn connection_info_message_from_room_url_returns_connection_info_message() {
-    let message = connection_info_message_from_room_url("wss://signal.example.com/room-123")
-      .expect("Expected a valid room URL to produce a ConnectionInfoMessage");
-    assert_eq!(message.connection_string, "room-123");
-  }
 }

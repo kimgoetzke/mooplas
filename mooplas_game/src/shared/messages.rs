@@ -132,6 +132,12 @@ pub struct ConnectionInfoMessage {
   pub connection_string: String,
 }
 
+impl ConnectionInfoMessage {
+  pub fn new(connection_string: String) -> Self {
+    Self { connection_string }
+  }
+}
+
 /// A [`Message`] for displaying an error message in the UI.
 #[cfg(feature = "online")]
 #[derive(Message, Clone)]

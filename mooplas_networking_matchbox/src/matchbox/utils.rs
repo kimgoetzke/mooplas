@@ -11,24 +11,13 @@ const ROOM_NAME_LENGTH: usize = 8;
 const STUN_ICE_SERVER_URL: &str = "stun:stun.l.google.com:19302";
 
 /// Generates a WebSocket room URL with a random room identifier appended to the given signalling server base URL.
-pub fn generate_room_url(signalling_server_base_url: &str) -> String {
-  let room_id: String = rand::rng()
+pub fn generate_room_url() -> String {
+  rand::rng()
     .sample_iter(&Alphanumeric)
     .take(ROOM_NAME_LENGTH)
     .map(char::from)
     .map(|c| c.to_ascii_lowercase())
-    .collect();
-  format!("{}/{}", signalling_server_base_url.trim_end_matches('/'), room_id)
-}
-
-pub fn room_id_from_room_url(room_url: &str) -> Result<String, String> {
-  validate_websocket_url(room_url)?;
-  let parsed_url = Url::parse(room_url).map_err(|error| format!("URL is not valid: {error}"))?;
-  let room_id = parsed_url
-    .path_segments()
-    .and_then(|mut segments| segments.rfind(|segment| !segment.is_empty()))
-    .ok_or("URL must include a room identifier path (e.g., /room-id)".to_string())?;
-  Ok(room_id.to_string())
+    .collect()
 }
 
 /// Give it the signalling server base URL and a connection string (either a full room URL or just a room ID) and it
@@ -129,36 +118,17 @@ mod tests {
   use super::*;
 
   #[test]
-  fn generate_room_url_returns_valid_format() {
-    let url = generate_room_url("wss://signal.example.com");
-    let parts: Vec<&str> = url.split('/').collect();
-    let room_id = parts[3];
-    assert!(url.starts_with("wss://signal.example.com/"));
-    assert_eq!(parts.len(), 4); // ["wss:", "", "signal.example.com", "<room-id>"]
-    assert!(!room_id.is_empty());
+  fn generate_room_url_returns_lowercase_alphanumeric_room_id() {
+    let room_id = generate_room_url();
     assert_eq!(room_id.len(), ROOM_NAME_LENGTH);
+    assert!(room_id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
   }
 
   #[test]
-  fn generate_room_url_generates_unique_urls() {
-    let url1 = generate_room_url("ws://localhost:3536");
-    let url2 = generate_room_url("ws://localhost:3536");
-    assert_ne!(url1, url2, "Should generate unique room URLs");
-  }
-
-  #[test]
-  fn generate_room_url_strips_trailing_slash_from_base_url() {
-    let url = generate_room_url("wss://signal.example.com/");
-    assert!(url.starts_with("wss://signal.example.com/"));
-    let url_suffix = url.trim_start_matches("wss://");
-    assert!(!url_suffix.contains("//"));
-  }
-
-  #[test]
-  fn room_id_from_room_url_returns_room_id() {
-    let room_id = room_id_from_room_url("wss://signal.example.com/room-456")
-      .expect("Expected a room ID to be extracted from a valid room URL");
-    assert_eq!(room_id, "room-456");
+  fn generate_room_url_generates_unique_room_ids() {
+    let room_id_1 = generate_room_url();
+    let room_id_2 = generate_room_url();
+    assert_ne!(room_id_1, room_id_2, "Should generate unique room IDs");
   }
 
   #[test]
