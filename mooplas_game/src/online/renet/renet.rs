@@ -51,7 +51,7 @@ fn handle_toggle_menu_message(
 ) {
   for message in messages.read() {
     match message.active {
-      MenuName::MainMenu | MenuName::PlayOnlineMenu => *network_role = NetworkRole::None,
+      MenuName::MainMenu | MenuName::PlayOnlineMenu | MenuName::EnterNameMenu => *network_role = NetworkRole::None,
       MenuName::HostGameMenu => *network_role = NetworkRole::Server,
       MenuName::JoinGameMenu => *network_role = NetworkRole::Client,
     }

@@ -89,6 +89,7 @@ impl ToggleMenuMessage {
 pub enum MenuName {
   MainMenu,
   PlayOnlineMenu,
+  EnterNameMenu,
   HostGameMenu,
   JoinGameMenu,
 }

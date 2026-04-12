@@ -12,6 +12,9 @@ use bevy::prelude::{
   TextureAtlasLayout, Update, With, default, in_state, px,
 };
 
+#[cfg(feature = "online")]
+use crate::prelude::PlayerName;
+
 /// Plugin that provides and manages the main menu UI.
 pub struct MainMenuPlugin;
 
@@ -108,6 +111,7 @@ fn handle_button_interactions_system(
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
   menu_root_query: Query<Entity, With<MainMenuRoot>>,
   mut next_state: ResMut<NextState<AppState>>,
+  #[cfg(feature = "online")] player_name: Res<PlayerName>,
 ) {
   for interaction in &mut exit_button_query {
     if *interaction == CustomInteraction::Released {
@@ -127,6 +131,11 @@ fn handle_button_interactions_system(
   for interaction in &mut play_online_query {
     if *interaction == CustomInteraction::Released {
       debug!("[Menu] Selected \"Play Online\"");
+      #[cfg(feature = "online")]
+      if !player_name.is_confirmed() {
+        toggle_menu_message.write(ToggleMenuMessage::set(MenuName::EnterNameMenu));
+        return;
+      }
       toggle_menu_message.write(ToggleMenuMessage::set(MenuName::PlayOnlineMenu));
     }
   }
