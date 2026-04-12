@@ -10,8 +10,8 @@ use url::Url;
 const ROOM_NAME_LENGTH: usize = 8;
 const STUN_ICE_SERVER_URL: &str = "stun:stun.l.google.com:19302";
 
-/// Generates a WebSocket room URL with a random room identifier appended to the given signalling server base URL.
-pub fn generate_room_url() -> String {
+/// Generates a WebSocket room ID such as 'psda7ash'.
+pub fn generate_room_id() -> String {
   rand::rng()
     .sample_iter(&Alphanumeric)
     .take(ROOM_NAME_LENGTH)
@@ -118,16 +118,16 @@ mod tests {
   use super::*;
 
   #[test]
-  fn generate_room_url_returns_lowercase_alphanumeric_room_id() {
-    let room_id = generate_room_url();
+  fn generate_room_id_returns_lowercase_alphanumeric_room_id() {
+    let room_id = generate_room_id();
     assert_eq!(room_id.len(), ROOM_NAME_LENGTH);
     assert!(room_id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
   }
 
   #[test]
-  fn generate_room_url_generates_unique_room_ids() {
-    let room_id_1 = generate_room_url();
-    let room_id_2 = generate_room_url();
+  fn generate_room_id_generates_unique_room_ids() {
+    let room_id_1 = generate_room_id();
+    let room_id_2 = generate_room_id();
     assert_ne!(room_id_1, room_id_2, "Should generate unique room IDs");
   }
 

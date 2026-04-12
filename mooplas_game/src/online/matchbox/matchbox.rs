@@ -11,7 +11,7 @@ use mooplas_networking::prelude::{
 #[cfg(not(target_arch = "wasm32"))]
 use mooplas_networking_matchbox::prelude::start_signaling_server;
 use mooplas_networking_matchbox::prelude::{
-  MatchboxClientPlugin, ServerMatchboxPlugin, generate_room_url, remove_all_matchbox_resources, resolve_room_url,
+  MatchboxClientPlugin, ServerMatchboxPlugin, generate_room_id, remove_all_matchbox_resources, resolve_room_url,
   start_socket,
 };
 
@@ -54,7 +54,7 @@ fn handle_toggle_menu_message(
       NetworkRole::Server => {
         #[cfg(not(target_arch = "wasm32"))]
         start_signaling_server(&mut commands);
-        let room_id = generate_room_url();
+        let room_id = generate_room_id();
         let room_url = format!("{}/{}", signalling_server_url.as_str().trim_end_matches('/'), &room_id);
         let connection_info = ConnectionInfoMessage::new(room_id);
         match start_socket(&mut commands, &room_url) {
