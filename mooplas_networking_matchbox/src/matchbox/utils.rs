@@ -16,6 +16,7 @@ pub fn generate_room_url(signalling_server_base_url: &str) -> String {
     .sample_iter(&Alphanumeric)
     .take(ROOM_NAME_LENGTH)
     .map(char::from)
+    .map(|c| c.to_ascii_lowercase())
     .collect();
   format!("{}/{}", signalling_server_base_url.trim_end_matches('/'), room_id)
 }
@@ -157,7 +158,6 @@ mod tests {
   fn room_id_from_room_url_returns_room_id() {
     let room_id = room_id_from_room_url("wss://signal.example.com/room-456")
       .expect("Expected a room ID to be extracted from a valid room URL");
-
     assert_eq!(room_id, "room-456");
   }
 
@@ -165,7 +165,6 @@ mod tests {
   fn resolve_room_url_appends_room_id_to_signalling_server_url() {
     let room_url = resolve_room_url("wss://signal.example.com", "room-456")
       .expect("Expected a room ID to resolve against the signalling server URL");
-
     assert_eq!(room_url, "wss://signal.example.com/room-456");
   }
 
@@ -173,7 +172,6 @@ mod tests {
   fn resolve_room_url_accepts_full_room_url() {
     let room_url = resolve_room_url("ws://localhost:3536", "wss://signal.example.com/room-456")
       .expect("Expected a full room URL to be accepted unchanged");
-
     assert_eq!(room_url, "wss://signal.example.com/room-456");
   }
 
