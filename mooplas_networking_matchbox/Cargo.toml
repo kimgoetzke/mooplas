@@ -12,7 +12,7 @@ bevy = { version = "0.18.1", default-features = false, features = [
 
 # Other dependencies
 mooplas_networking = { path = "../mooplas_networking_shared", default-features = false }
-rand = { version = "0.10.0", default-features = false, features = ["thread_rng"] }
+rand = { version = "0.10.1", default-features = false, features = ["thread_rng"] }
 url = { version = "2.5.8" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
