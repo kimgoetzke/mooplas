@@ -126,7 +126,6 @@ impl ExitLobbyMessage {
 
 /// A [`Message`] indicating that connection info should be updated, wherever it may be used.
 /// For Matchbox this may be either a room ID or a full room URL, while Renet uses a full server IP address.
-#[cfg(feature = "online")]
 #[derive(Message, Clone)]
 pub struct ConnectionInfoMessage {
   pub connection_string: String,

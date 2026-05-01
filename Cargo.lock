@@ -5054,6 +5054,7 @@ dependencies = [
  "bevy",
  "bevy-inspector-egui",
  "bevy_ui_text_input",
+ "getrandom 0.4.1",
  "mooplas_networking",
  "mooplas_networking_matchbox",
  "mooplas_networking_renet",
