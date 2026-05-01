@@ -9,24 +9,37 @@ of the project was to explore network programming when real-time movement is inv
 
 [<img src="mooplas_game/assets/ignore/itch-io-button.png">](https://captainhindsight.itch.io/mooplas)
 
+⬆️ Play the _**local**_ multiplayer build on itch.io. A signalling server for the online multiplayer build is not
+currently deployed.
+
 ## Features
 
 - Implementation of _Achtung, die Kurve!_ (also known as _Curve Fever_)
 - Local multiplayer (up to 5 players)
-- Native online multiplayer (up to 5 players) over UDP using `bevy_renet`
-- Browser-friendly online multiplayer using `bevy_matchbox` (plus a standalone signalling server)
+- Online multiplayer (up to 8 players)
+- Native and browser-friendly online multiplayer (plus a standalone signalling server)
 - You can mix and match local and online players in the same game
 - Touch controls for mobile devices
 - Cross-platform (Linux, Windows, WebAssembly)
 
 ## Networking overview
 
-- `online_renet` is the native UDP transport
-- `online_matchbox` is the browser-friendly WASM transport
-    - Matchbox sessions share a short room ID; the game expands that against `SIGNALLING_SERVER_URL`
-    - `SIGNALLING_SERVER_URL` defaults to `ws://localhost:3536` for local development
-    - `mooplas_signalling_server` only handles the WASM signalling handshake; once peers connect, gameplay traffic is
-      P2P
+- Two compile-time backends, selected via Cargo feature flags:
+    - `online_renet` — native only; UDP transport via [`bevy_renet`](https://github.com/lucaspoffo/renet) with a
+      `netcode` protocol
+    - `online_matchbox` — native and WASM; WebRTC data channels via
+      [`bevy_matchbox`](https://github.com/johanhelsing/matchbox), required for browser builds
+- Both backends use a **client-server topology**: one instance acts as host, all others connect as clients
+- Wire data is serialised with [`postcard`](https://github.com/jamesmunns/postcard) and sent over three channels:
+  `Unreliable`, `ReliableUnordered`, and `ReliableOrdered`
+- The matchbox backend brokers initial WebRTC connections through a WebSocket signalling server
+  (`mooplas_signalling_server`,
+  see [README](https://github.com/kimgoetzke/mooplas/blob/main/mooplas_signalling_server/README.md)); ICE uses Google's
+  public STUN (`stun.l.google.com:19302`)
+- The WASM implementation supports room joining: the host generates an 8-character room ID and shares it with clients;
+  clients enter it in the join menu to connect
+- `SIGNALLING_SERVER_URL` is baked in at build time (defaults to `ws://localhost:3536`); for native development the
+  signalling server starts embedded in the host process
 
 ## Demo
 
