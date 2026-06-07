@@ -121,6 +121,7 @@ pub enum InboundServerMessage {
     client_id: ClientId,
     player_id: u8,
     control_scheme_id: u8,
+    name: String,
   },
   /// Informs clients that a player has unregistered from the lobby.
   PlayerUnregistered { client_id: ClientId, player_id: u8 },

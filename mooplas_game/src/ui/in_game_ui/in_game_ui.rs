@@ -5,7 +5,9 @@ use crate::ui::in_game_ui::in_game_buttons::InGameButtonsPlugin;
 use crate::ui::in_game_ui::in_game_local_ui::InGameLocalUiPlugin;
 use crate::ui::in_game_ui::in_game_online_ui::{self, InGameOnlineUiPlugin};
 use crate::ui::in_game_ui::{in_game_buttons, in_game_local_ui};
-use crate::ui::shared::{LobbyUiCta, default_font, default_shadow, despawn_children, despawn_menu, large_font};
+use crate::ui::shared::{
+  LobbyUiCta, default_font, default_shadow, despawn_children, despawn_menu, large_font, player_display_name,
+};
 use bevy::app::Update;
 use bevy::ecs::children;
 use bevy::ecs::relationship::RelatedSpawnerCommands;
@@ -311,6 +313,7 @@ fn spawn_game_over_ui_system(
       let large_font = large_font(&font);
       match winner.get() {
         Some(id) => {
+          let display_name = player_display_name(id, &registered_players);
           let colour = registered_players
             .players
             .iter()
@@ -326,7 +329,7 @@ fn spawn_game_over_ui_system(
             },
             children![
               (
-                Text::new(format!("  Player {}", id.0)),
+                Text::new(format!("  {}", display_name)),
                 large_font.clone(),
                 TextColor(colour),
                 default_shadow,

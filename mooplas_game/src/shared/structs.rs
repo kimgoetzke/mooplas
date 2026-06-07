@@ -33,6 +33,7 @@ impl ControlScheme {
 #[derive(Clone)]
 pub struct RegisteredPlayer {
   pub id: PlayerId,
+  pub name: String,
   pub input: ControlScheme,
   pub colour: Color,
   pub alive: bool,
@@ -40,9 +41,10 @@ pub struct RegisteredPlayer {
 }
 
 impl RegisteredPlayer {
-  pub fn new_mutable(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
+  pub fn new_mutable(id: PlayerId, name: String, input: ControlScheme, colour: Color) -> Self {
     Self {
       id,
+      name,
       input,
       colour,
       alive: true,
@@ -51,9 +53,10 @@ impl RegisteredPlayer {
   }
 
   #[cfg(feature = "online")]
-  pub fn new_immutable(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
+  pub fn new_immutable(id: PlayerId, name: String, input: ControlScheme, colour: Color) -> Self {
     Self {
       id,
+      name,
       input,
       colour,
       alive: true,
@@ -89,6 +92,7 @@ mod tests {
     pub fn new_immutable_for_test(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
       Self {
         id,
+        name: format!("Player {}", id.0),
         input,
         colour,
         alive: true,
@@ -99,6 +103,7 @@ mod tests {
     pub fn new_mutable_dead(id: PlayerId, input: ControlScheme, colour: Color) -> Self {
       Self {
         id,
+        name: format!("Player {}", id.0),
         input,
         colour,
         alive: false,

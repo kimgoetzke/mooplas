@@ -28,7 +28,7 @@ mod tests {
 
     #[test]
     fn encode_to_bytes_and_decode_from_bytes_client_message_round_trip() {
-      let original = ClientMessage::RegistrationRequest(SerialisableRegistrationRequest { control_scheme_id: 7 });
+      let original = ClientMessage::RegistrationRequest(SerialisableRegistrationRequest { control_scheme_id: 7, name: "Test 1".to_string() });
       let bytes = encode_to_bytes(&original).expect("Encode should succeed");
       let decoded: ClientMessage = decode_from_bytes(&bytes).expect("Decode should succeed");
       assert_eq!(format!("{original:?}"), format!("{decoded:?}"));

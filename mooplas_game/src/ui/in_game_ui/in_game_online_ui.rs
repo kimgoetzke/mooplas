@@ -6,7 +6,9 @@ use crate::prelude::{
 };
 use crate::shared::PlayerRegistrationMessage;
 use crate::ui::in_game_ui::in_game_ui;
-use crate::ui::shared::{LobbyUiCta, default_font, default_shadow, despawn_children, player_slot_label};
+use crate::ui::shared::{
+  LobbyUiCta, default_font, default_shadow, despawn_children, player_display_name, player_slot_label,
+};
 use bevy::app::{App, Plugin, Update};
 use bevy::asset::AssetServer;
 use bevy::ecs::children;
@@ -172,8 +174,9 @@ fn spawn_online_lobby_ui_entry_children(
   registered_players: &RegisteredPlayers,
 ) {
   let entry_state = online_lobby_ui_entry_state(player_id, registered_players);
+  let display_name = player_display_name(player_id, registered_players);
   commands.entity(entity).with_children(|parent| {
-    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
+    parent.spawn(player_slot_label(font, &display_name, colour_for_player_id(player_id)));
     match entry_state {
       PlayerEntryState::NotRegistered => {
         parent.spawn(player_not_registered_label(font));
@@ -438,6 +441,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_mutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))
@@ -457,6 +461,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_immutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))
@@ -477,6 +482,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_immutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))
@@ -497,6 +503,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_mutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))
@@ -517,6 +524,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_mutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))
@@ -524,6 +532,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_mutable(
         PlayerId(5),
+        "Player 5".to_string(),
         test_control_scheme(1),
         colour_for_player_id(PlayerId(5)),
       ))

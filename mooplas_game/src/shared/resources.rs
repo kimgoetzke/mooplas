@@ -415,7 +415,7 @@ mod tests {
   #[test]
   fn unregister_mutable_removes_player_when_registered_and_mutable() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), ControlScheme::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), "Player 1".to_string(), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");
@@ -482,7 +482,7 @@ mod tests {
   #[test]
   fn unregister_immutable_returns_error_when_player_is_local() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), ControlScheme::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), "Player 1".to_string(), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");

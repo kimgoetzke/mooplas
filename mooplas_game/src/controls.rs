@@ -336,6 +336,7 @@ mod tests {
       .expect("RegisteredPlayers resource missing");
     registered_players.players.push(RegisteredPlayer::new_mutable(
       PlayerId(control_scheme.id.0),
+      format!("Player {}", control_scheme.id.0),
       control_scheme.clone(),
       Color::WHITE,
     ));

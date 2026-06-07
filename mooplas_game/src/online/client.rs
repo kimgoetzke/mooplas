@@ -3,7 +3,8 @@ use crate::online::structs::{LocalInputMapping, NetworkTransformInterpolation};
 use crate::online::utils;
 use crate::prelude::{
   AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalPlayerRegistrationRequestMessage,
-  MenuName, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage, WinnerInfo,
+  MenuName, PlayerId, PlayerName, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
+  WinnerInfo,
 };
 use bevy::app::Update;
 use bevy::log::{debug, error_once, info, warn};
@@ -84,6 +85,7 @@ fn handle_inbound_server_message(
         client_id,
         player_id,
         control_scheme_id,
+        name,
       } => {
         let player_id = PlayerId(*player_id);
         let control_scheme_id = ControlSchemeId(*control_scheme_id);
@@ -95,6 +97,7 @@ fn handle_inbound_server_message(
             Some(&mut local_input_mapping),
             player_id,
             control_scheme_id,
+            name.clone(),
           );
         } else {
           utils::register_remote_player_locally(
@@ -103,6 +106,7 @@ fn handle_inbound_server_message(
             &mut registration_message,
             player_id,
             control_scheme_id,
+            name.clone(),
           );
         }
       }
@@ -149,11 +153,13 @@ fn handle_local_player_registration_request_message(
   mut messages: MessageReader<LocalPlayerRegistrationRequestMessage>,
   local_input_mapping: Res<LocalInputMapping>,
   mut outbound_client_message: MessageWriter<OutboundClientMessage>,
+  player_name: Res<PlayerName>,
 ) {
   for request in messages.read() {
     let client_message = if request.has_registered {
       ClientMessage::RegistrationRequest(SerialisableRegistrationRequest {
         control_scheme_id: request.control_scheme_id.0,
+        name: player_name.get().to_string(),
       })
     } else {
       let Some(player_id) = local_input_mapping.get_player_id(&request.control_scheme_id) else {
@@ -416,6 +422,7 @@ mod tests {
         client_id,
         player_id: 4,
         control_scheme_id: 0,
+        name: "Test".to_string(),
       })
       .expect("Failed to write PlayerRegistered message");
     app.update();
