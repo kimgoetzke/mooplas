@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="mooplas_game/assets/ignore/logo.png" width="400" height="100" alt="Randolf"/>
+  <img src="mooplas_game/assets/ignore/logo.png" width="400" height="100" alt="Mooplas Logo"/>
 </p>
 
 This repository contains a basic multiplayer game inspired
@@ -8,6 +8,9 @@ using [Bevy Engine](https://bevy.org/) (v0.18) and [Avian Physics](https://githu
 of the project was to explore network programming when real-time movement is involved.
 
 [<img src="mooplas_game/assets/ignore/itch-io-button.png">](https://captainhindsight.itch.io/mooplas)
+
+⬆️ Play the _**local**_ multiplayer build on itch.io. A signalling server for the online multiplayer build is not
+currently deployed.
 
 ## Features
 
