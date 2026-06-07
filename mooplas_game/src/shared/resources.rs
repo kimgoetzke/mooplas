@@ -9,6 +9,9 @@ use bevy_inspector_egui::prelude::ReflectInspectorOptions;
 use mooplas_networking::prelude::NetworkRole;
 use std::fmt::Display;
 
+#[cfg(feature = "online")]
+use crate::shared::utils::generate_random_name;
+
 /// A plugin that registers and initialises shared resources used across the entire application such as [`Settings`].
 pub struct SharedResourcesPlugin;
 
@@ -26,6 +29,9 @@ impl Plugin for SharedResourcesPlugin {
       .init_resource::<RegisteredPlayers>()
       .init_resource::<WinnerInfo>()
       .init_resource::<NetworkRole>();
+
+    #[cfg(feature = "online")]
+    app.init_resource::<PlayerName>();
   }
 }
 
@@ -210,6 +216,49 @@ impl Display for ErrorKind {
   }
 }
 
+/// A resource that holds the local player's chosen name for online multiplayer. Pre-populated with
+/// a randomly generated name. The `is_confirmed` flag tracks whether the player has passed through
+/// the name entry screen.
+#[cfg(feature = "online")]
+#[derive(Resource)]
+pub struct PlayerName {
+  name: String,
+  is_confirmed: bool,
+}
+
+#[cfg(feature = "online")]
+impl Default for PlayerName {
+  fn default() -> Self {
+    Self {
+      name: generate_random_name(),
+      is_confirmed: false,
+    }
+  }
+}
+
+#[cfg(feature = "online")]
+impl PlayerName {
+  /// Gets the player's name.
+  pub fn get(&self) -> &str {
+    &self.name
+  }
+
+  /// Sets the player's name.
+  pub fn set(&mut self, name: String) {
+    self.name = name;
+  }
+
+  /// Returns whether the player has confirmed their name via the name entry screen.
+  pub fn is_confirmed(&self) -> bool {
+    self.is_confirmed
+  }
+
+  /// Marks the name as confirmed.
+  pub fn confirm(&mut self) {
+    self.is_confirmed = true;
+  }
+}
+
 /// A resource that holds information about the winner of the last round.
 #[derive(Resource, Default)]
 pub struct WinnerInfo {
@@ -366,7 +415,7 @@ mod tests {
   #[test]
   fn unregister_mutable_removes_player_when_registered_and_mutable() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), ControlScheme::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), "Player 1".to_string(), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");
@@ -433,7 +482,7 @@ mod tests {
   #[test]
   fn unregister_immutable_returns_error_when_player_is_local() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), ControlScheme::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(PlayerId(1), "Player 1".to_string(), ControlScheme::test(1), Color::default());
     registered_players
       .register(player)
       .expect("Failed to registered player");

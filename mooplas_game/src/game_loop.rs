@@ -136,6 +136,7 @@ fn player_registration_system(
         let colour = colour_for_player_id(*player_id);
         match registered_players.register(RegisteredPlayer::new_mutable(
           *player_id,
+          format!("Player {}", player_id.0),
           control_scheme.clone(),
           colour,
         )) {
@@ -490,6 +491,7 @@ mod tests {
       ),
       RegisteredPlayer::new_mutable(
         PlayerId(1),
+        "Player 1".to_string(),
         ControlScheme::new(ControlSchemeId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
         Color::BLACK,
       ),

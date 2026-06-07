@@ -13,10 +13,11 @@ pub(crate) fn register_remote_player_locally(
   player_registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
   player_id: PlayerId,
   control_scheme_id: ControlSchemeId,
+  name: String,
 ) {
   let control_scheme = control_scheme_for_id(available_control_schemes, control_scheme_id);
   let colour = colour_for_player_id(player_id);
-  match registered_players.register(RegisteredPlayer::new_immutable(player_id, control_scheme, colour)) {
+  match registered_players.register(RegisteredPlayer::new_immutable(player_id, name, control_scheme, colour)) {
     Ok(()) => {
       info!("[{}] has registered (remotely)", player_id);
       player_registration_message.write(PlayerRegistrationMessage {
@@ -36,10 +37,11 @@ pub(crate) fn register_local_player_locally(
   local_input_mapping: Option<&mut ResMut<LocalInputMapping>>,
   player_id: PlayerId,
   control_scheme_id: ControlSchemeId,
+  name: String,
 ) {
   let control_scheme = control_scheme_for_id(available_control_schemes, control_scheme_id);
   let colour = colour_for_player_id(player_id);
-  match registered_players.register(RegisteredPlayer::new_mutable(player_id, control_scheme, colour)) {
+  match registered_players.register(RegisteredPlayer::new_mutable(player_id, name, control_scheme, colour)) {
     Ok(()) => {
       info!("[{}] has registered (locally)", player_id);
       if let Some(local_input_mapping) = local_input_mapping {

@@ -4,6 +4,9 @@ use crate::ui::shared::ButtonAnimation;
 mod join_game_menu;
 
 #[cfg(feature = "online")]
+mod enter_name_menu;
+
+#[cfg(feature = "online")]
 mod host_game_menu;
 
 mod in_game_ui;

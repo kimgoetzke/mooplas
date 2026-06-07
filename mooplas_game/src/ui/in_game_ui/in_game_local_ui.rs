@@ -143,8 +143,9 @@ fn spawn_local_lobby_ui_entry_children(
     .get_local_player_id_for_control_scheme(control_scheme.id)
     .is_some();
   let join_prompt_colour = colour_for_player_id(player_id);
+  let display_name = format!("Player {}", player_id.0);
   commands.entity(entity).with_children(|parent| {
-    parent.spawn(player_slot_label(font, player_id, colour_for_player_id(player_id)));
+    parent.spawn(player_slot_label(font, &display_name, colour_for_player_id(player_id)));
     if is_registered {
       parent.spawn(player_registered_prompt(font));
       return;

@@ -2,6 +2,8 @@ use crate::app_state::AppState;
 use crate::prelude::constants::{BUTTON_ALPHA_DEFAULT, BUTTON_ALPHA_PRESSED};
 use crate::prelude::{CustomInteraction, RegularButton, Settings, TouchControlButton};
 #[cfg(feature = "online")]
+use crate::ui::enter_name_menu::EnterNameMenuPlugin;
+#[cfg(feature = "online")]
 use crate::ui::host_game_menu::HostGameMenuPlugin;
 use crate::ui::in_game_ui::InGameUiPlugin;
 #[cfg(feature = "online")]
@@ -43,7 +45,7 @@ impl Plugin for UiPlugin {
       .add_systems(OnExit(AppState::Preparing), despawn_background_system);
 
     #[cfg(feature = "online")]
-    app.add_plugins((HostGameMenuPlugin, JoinGameMenuPlugin, TextInputPlugin));
+    app.add_plugins((EnterNameMenuPlugin, HostGameMenuPlugin, JoinGameMenuPlugin, TextInputPlugin));
   }
 }
 

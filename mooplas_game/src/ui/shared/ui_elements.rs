@@ -2,7 +2,9 @@ use crate::prelude::constants::{
   BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER,
   RESOLUTION_HEIGHT, RESOLUTION_WIDTH, TEXT_COLOUR,
 };
-use crate::prelude::{AnimationIndices, AnimationTimer, CustomInteraction, PlayerId, RegularButton};
+use crate::prelude::{
+  AnimationIndices, AnimationTimer, CustomInteraction, PlayerId, RegisteredPlayers, RegularButton,
+};
 use crate::ui;
 use crate::ui::ButtonAnimation;
 use crate::ui::shared::BackgroundRoot;
@@ -189,15 +191,25 @@ pub(crate) fn default_gradient(transparency: f32) -> BorderGradient {
   })
 }
 
-/// Returns a bundle containing the text "Player {id}" in the given colour. Used in the player registration phase/lobby
-/// to label player slots.
+/// Returns the registered player's chosen name, or the default "Player {id}" label when the slot is empty.
+pub(crate) fn player_display_name(player_id: PlayerId, registered_players: &RegisteredPlayers) -> String {
+  registered_players
+    .players
+    .iter()
+    .find(|player| player.id == player_id)
+    .map(|player| player.name.clone())
+    .unwrap_or_else(|| format!("Player {}", player_id.0))
+}
+
+/// Returns a bundle containing the given player display name in the given colour. Used in the player registration
+/// phase/lobby to label player slots.
 pub(crate) fn player_slot_label(
   font: &Handle<Font>,
-  player_id: PlayerId,
+  display_name: &str,
   slot_label_colour: Color,
 ) -> (Text, TextFont, TextLayout, TextColor, TextShadow) {
   (
-    Text::new(format!("Player {}", player_id.0)),
+    Text::new(display_name),
     default_font(font),
     TextLayout::new(Justify::Center, LineBreak::WordBoundary),
     TextColor(slot_label_colour),
@@ -226,4 +238,38 @@ pub(crate) fn large_font(font: &Handle<Font>) -> TextFont {
 /// Returns the [`TextShadow`] for regular in-game text. Used to make text more visible against the background.
 pub(crate) fn default_shadow() -> TextShadow {
   TextShadow::default()
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn player_slot_label_uses_given_display_name() {
+    let font = Handle::<Font>::default();
+
+    let (text, _, _, _, _) = player_slot_label(&font, "Potato 2", Color::WHITE);
+
+    assert_eq!(text.0, "Potato 2");
+  }
+
+  #[test]
+  fn player_display_name_returns_registered_name_when_player_exists() {
+    let mut registered_players = RegisteredPlayers::default();
+    registered_players.players.push(crate::shared::RegisteredPlayer::new_mutable(
+      PlayerId(2),
+      "Potato 2".to_string(),
+      crate::shared::ControlScheme::test(0),
+      Color::WHITE,
+    ));
+
+    assert_eq!(player_display_name(PlayerId(2), &registered_players), "Potato 2");
+  }
+
+  #[test]
+  fn player_display_name_returns_default_label_when_player_is_missing() {
+    let registered_players = RegisteredPlayers::default();
+
+    assert_eq!(player_display_name(PlayerId(2), &registered_players), "Player 2");
+  }
 }

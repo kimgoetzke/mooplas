@@ -559,6 +559,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_mutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))
@@ -714,6 +715,7 @@ mod tests {
     registered_players
       .register(RegisteredPlayer::new_mutable(
         PlayerId(4),
+        "Player 4".to_string(),
         test_control_scheme(0),
         colour_for_player_id(PlayerId(4)),
       ))

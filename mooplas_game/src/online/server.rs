@@ -2,8 +2,8 @@ use crate::app_state::AppState;
 use crate::online::utils;
 use crate::prelude::{
   AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalPlayerRegistrationRequestMessage,
-  MAX_PLAYERS, MenuName, PlayerId, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
-  WinnerInfo,
+  MAX_PLAYERS, MenuName, PlayerId, PlayerName, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead,
+  ToggleMenuMessage, WinnerInfo,
 };
 use bevy::log::{debug, info, warn};
 use bevy::prelude::{
@@ -72,11 +72,13 @@ fn broadcast_player_registered(
   client_id: ClientId,
   player_id: PlayerId,
   control_scheme_id: ControlSchemeId,
+  name: String,
 ) {
   let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
     client_id,
     player_id: player_id.0,
     control_scheme_id: control_scheme_id.0,
+    name,
   })
   .expect(CLIENT_MESSAGE_SERIALISATION);
   outbound_server_message.write(OutboundServerMessage::Broadcast {
@@ -110,6 +112,7 @@ fn handle_registration_request(
   control_scheme_id: ControlSchemeId,
   lobby: &mut ResMut<Lobby>,
   registers_local_player: bool,
+  name: String,
 ) {
   if lobby.is_control_scheme_registered(&client_id, control_scheme_id.0) {
     warn!(
@@ -130,6 +133,7 @@ fn handle_registration_request(
       None,
       player_id,
       control_scheme_id,
+      name.clone(),
     );
   } else {
     utils::register_remote_player_locally(
@@ -138,11 +142,12 @@ fn handle_registration_request(
       player_registration_message,
       player_id,
       control_scheme_id,
+      name.clone(),
     );
   }
 
   lobby.register_player(client_id, player_id.into(), control_scheme_id.0);
-  broadcast_player_registered(outbound_server_message, client_id, player_id, control_scheme_id);
+  broadcast_player_registered(outbound_server_message, client_id, player_id, control_scheme_id, name);
 }
 
 /// Returns the first [`PlayerId`] that is not registered, or `None` if all possible player IDs are taken.
@@ -210,6 +215,7 @@ fn handle_inbound_client_message(
           ControlSchemeId(message.control_scheme_id),
           &mut lobby,
           false,
+          message.name.clone(),
         );
       }
       InboundClientMessage::UnregistrationRequest(message, client_id) => {
@@ -325,6 +331,7 @@ fn handle_local_player_registration_request_message(
   available_control_schemes: Res<AvailableControlSchemes>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
   mut outbound_server_message: MessageWriter<OutboundServerMessage>,
+  player_name: Res<PlayerName>,
 ) {
   for request in messages.read() {
     if request.has_registered {
@@ -337,6 +344,7 @@ fn handle_local_player_registration_request_message(
         request.control_scheme_id,
         &mut lobby,
         true,
+        player_name.get().to_string(),
       );
       continue;
     }
@@ -531,6 +539,7 @@ mod tests {
       registered_players
         .register(crate::prelude::RegisteredPlayer::new_mutable(
           PlayerId(0),
+          "Player 0".to_string(),
           ControlScheme::test(0),
           Color::WHITE,
         ))
@@ -540,7 +549,7 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 0 },
+        SerialisableRegistrationRequest { control_scheme_id: 0, name: "Test".to_string() },
         ClientId::from_renet_u64(42),
       ))
       .expect("Failed to queue InboundClientMessage");
@@ -570,6 +579,7 @@ mod tests {
             client_id,
             player_id: 1,
             control_scheme_id: 0,
+            ..
           } if client_id == ClientId::from_renet_u64(42)
         ));
       }
@@ -589,6 +599,7 @@ mod tests {
         registered_players
           .register(crate::prelude::RegisteredPlayer::new_mutable(
             PlayerId(id),
+            format!("Player {}", id),
             ControlScheme::test(id),
             Color::WHITE,
           ))
@@ -599,7 +610,7 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 0 },
+        SerialisableRegistrationRequest { control_scheme_id: 0, name: "Test".to_string() },
         ClientId::from_renet_u64(42),
       ))
       .expect("Failed to queue InboundClientMessage");
@@ -652,7 +663,7 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 0 },
+        SerialisableRegistrationRequest { control_scheme_id: 0, name: "Test".to_string() },
         first_client_id,
       ))
       .expect("Failed to queue initial registration request");
@@ -672,7 +683,7 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 1 },
+        SerialisableRegistrationRequest { control_scheme_id: 1, name: "Test".to_string() },
         second_client_id,
       ))
       .expect("Failed to queue replacement registration request");

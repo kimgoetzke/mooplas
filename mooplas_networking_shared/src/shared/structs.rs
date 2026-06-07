@@ -150,9 +150,10 @@ pub enum SerialisableInput {
 }
 
 /// A type that communicates a local control scheme registration request.
-#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct SerialisableRegistrationRequest {
   pub control_scheme_id: u8,
+  pub name: String,
 }
 
 /// A type that communicates an unregistration request for an authoritative player identity.
