@@ -27,19 +27,19 @@
           version,
           profile,
         }: let
-            rust = pkgs.rust-bin.${version}.latest.${profile}.override {
-              extensions = [ "rust-src" ];
-              targets = [ "wasm32-unknown-unknown" ];
-            };
+          rust = pkgs.rust-bin.${version}.latest.${profile}.override {
+            extensions = ["rust-src"];
+            targets = ["wasm32-unknown-unknown"];
+          };
         in {
           name = "rust-" + version + "-" + profile;
           path = "${rust}/lib/rustlib/src/rust/library";
           drvs = [
+            rust
             pkgs.just
             pkgs.openssl
             pkgs.pkg-config
             pkgs.rust-analyzer
-            rust
             pkgs.udev
             pkgs.libudev-zero
             pkgs.alsa-lib
@@ -60,6 +60,7 @@
             pkgs.wasm-bindgen-cli_0_2_108
             pkgs.nodejs
             pkgs.bashInteractive
+            pkgs.opentofu
           ];
         };
 
@@ -105,8 +106,7 @@
       in {
         formatter = pkgs.alejandra;
         devShells =
-          builtins.mapAttrs
-          (
+          builtins.mapAttrs (
             name: value: let
               version = value.version;
               profile = value.profile;
