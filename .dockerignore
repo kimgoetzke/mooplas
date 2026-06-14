@@ -14,6 +14,13 @@ LICENSE
 rustfmt.toml
 mooplas_game/Cargo.lock
 mooplas_game/assets
+mooplas_signalling_server/deploy/opentofu/
 .env
 .envrc
 .env.*
+**/*.tfvars
+!**/*.tfvars.example
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfplan
