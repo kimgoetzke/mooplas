@@ -1,17 +1,3 @@
-/.direnv/*
-/target
-/.idea/
-nohup.out
-/www/public/assets/
-/www/public/mooplas_game.d.ts
-/www/public/mooplas_game.js
-/www/public/mooplas_game.wasm.d.ts
-/www/public/mooplas_game.wasm
-/www/public/mooplas_game_bg.wasm
-/www/public/mooplas_game_bg.wasm.d.ts
-/mooplas-signalling-server.tar.gz
-/mooplas.zip
-
 # OpenTofu / Terraform-compatible local files
 **/.terraform/*
 **/.tofu/*
@@ -29,3 +15,19 @@ override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# General
+/.direnv/*
+/target
+/.idea/
+nohup.out
+/www/public/assets/
+/www/public/mooplas_game.d.ts
+/www/public/mooplas_game.js
+/www/public/mooplas_game.wasm.d.ts
+/www/public/mooplas_game.wasm
+/www/public/mooplas_game_bg.wasm
+/www/public/mooplas_game_bg.wasm.d.ts
+/mooplas-signalling-server.tar.gz
+/mooplas.zip
+*.txt
