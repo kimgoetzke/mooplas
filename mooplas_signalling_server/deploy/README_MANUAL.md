@@ -15,12 +15,14 @@ TLS is terminated by CloudFront, so the container runs in plain `ws://` mode.
 3. Enter a name
 4. Select aa as the key pair type and a file format
 5. Click **Create key pair** - the `.pem` file downloads automatically
-6. Move it somewhere safe and restrict permissions:
+6. Move it somewhere safe and restrict permissions - example:
 
    ```bash
    mv ~/Downloads/mooplas-signalling-server-man.pem ~/.ssh/
    chmod 400 ~/.ssh/mooplas-signalling-server-man.pem
    ```
+
+Note: For ease of use, replace `~/.ssh/mooplas-signalling-server-man.pem` in this file with the actual location/name.
 
 ### 1B. Create a security group
 
@@ -61,8 +63,7 @@ Note the Elastic IP - this is what is used as `<EC2_ELASTIC_IP>` throughout this
 ## 2 SSH into the instance
 
 ```bash
-chmod 400 ~/path/to/key.pem
-ssh -i ~/path/to/key.pem <EC2_USER>@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+ssh -i ~/.ssh/mooplas-signalling-server-man.pem <EC2_USER>@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
 ```
 
 `<EC2_USER>` is `ubuntu` on Ubuntu images or `ec2-user` on Amazon Linux.
@@ -93,7 +94,7 @@ Log out and back in for the group change to take effect:
 
 ```bash
 exit
-ssh -i ~/path/to/key.pem <EC2_USER>@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+ssh -i ~/.ssh/mooplas-signalling-server-man.pem <EC2_USER>@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
 ```
 
 Verify Docker is working:
@@ -133,7 +134,7 @@ docker save mooplas-signalling-server:latest | gzip > mooplas-signalling-server.
 Copy the compressed image to the EC2 instance:
 
 ```bash
-scp -i ~/path/to/key.pem mooplas-signalling-server.tar.gz <EC2_USER>@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
+scp -i ~/.ssh/mooplas-signalling-server-man.pem mooplas-signalling-server.tar.gz <EC2_USER>@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
 ```
 
 ## 7 Load the image on EC2
@@ -141,7 +142,7 @@ scp -i ~/path/to/key.pem mooplas-signalling-server.tar.gz <EC2_USER>@<EC2_ELASTI
 SSH into the instance and load the image:
 
 ```bash
-ssh -i ~/path/to/key.pem <EC2_USER>@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+ssh -i ~/.ssh/mooplas-signalling-server-man.pem <EC2_USER>@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
 cd /opt/mooplas-signalling
 docker load < mooplas-signalling-server.tar.gz
 ```
@@ -157,7 +158,7 @@ docker images mooplas-signalling-server
 On the local machine, copy the Compose file to EC2:
 
 ```bash
-scp -i ~/path/to/key.pem mooplas_signalling_server/deploy/docker-compose.yml <EC2_USER>@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
+scp -i ~/.ssh/mooplas-signalling-server-man.pem mooplas_signalling_server/deploy/docker-compose.yml <EC2_USER>@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
 ```
 
 Then on the EC2 instance, create the `.env` file:
@@ -257,7 +258,7 @@ When you want to deploy a new version, repeat steps 5-7 and restart:
 
    ```bash
    docker save mooplas-signalling-server:latest | gzip > mooplas-signalling-server.tar.gz
-   scp -i ~/path/to/key.pem mooplas-signalling-server.tar.gz <EC2_USER>@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
+   scp -i ~/.ssh/mooplas-signalling-server-man.pem mooplas-signalling-server.tar.gz <EC2_USER>@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
    ```
 
 3. **Load and restart** on the EC2 instance:
