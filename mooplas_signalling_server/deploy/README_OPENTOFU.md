@@ -13,6 +13,8 @@ ssh-keygen -t ed25519 -f ~/.ssh/mooplas-signalling-server-ot -C "mooplas-signall
 chmod 600 ~/.ssh/mooplas-signalling-server-ot
 ```
 
+Note: For ease of use, replace `~/.ssh/mooplas-signalling-server-ot` in this file with the actual location/name.
+
 This creates two files:
 
 ```text
@@ -78,7 +80,7 @@ From the repository root:
 
 ```bash
 docker save mooplas-signalling-server:latest | gzip > mooplas-signalling-server.tar.gz
-scp -i ~/.ssh/mooplas-signalling mooplas-signalling-server.tar.gz ec2-user@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
+scp -i ~/.ssh/mooplas-signalling-server-ot mooplas-signalling-server.tar.gz ec2-user@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
 ```
 
 You can get `<EC2_ELASTIC_IP>` with:
@@ -93,7 +95,7 @@ tofu output -raw elastic_ip
 SSH into the instance and load the image:
 
 ```bash
-ssh -i ~/.ssh/mooplas-signalling ec2-user@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+ssh -i ~/.ssh/mooplas-signalling-server-ot ec2-user@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
 cd /opt/mooplas-signalling
 docker load < mooplas-signalling-server.tar.gz
 ```
@@ -159,8 +161,8 @@ When you want to deploy a new version, repeat the image build and transfer steps
 ```bash
 docker build -f mooplas_signalling_server/Dockerfile -t mooplas-signalling-server:latest .
 docker save mooplas-signalling-server:latest | gzip > mooplas-signalling-server.tar.gz
-scp -i ~/.ssh/mooplas-signalling mooplas-signalling-server.tar.gz ec2-user@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
-ssh -i ~/.ssh/mooplas-signalling ec2-user@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+scp -i ~/.ssh/mooplas-signalling-server-ot mooplas-signalling-server.tar.gz ec2-user@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
+ssh -i ~/.ssh/mooplas-signalling-server-ot ec2-user@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
 cd /opt/mooplas-signalling
 docker load < mooplas-signalling-server.tar.gz
 docker compose up -d

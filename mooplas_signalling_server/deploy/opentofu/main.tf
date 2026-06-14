@@ -141,7 +141,7 @@ resource "aws_instance" "signalling" {
   user_data                   = local.user_data
 
   root_block_device {
-    volume_type = "gp3"
+    volume_type = "standard"
     volume_size = 8
     encrypted   = true
 
