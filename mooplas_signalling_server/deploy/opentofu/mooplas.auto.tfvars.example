@@ -1,0 +1,24 @@
+# Copy to mooplas.auto.tfvars and edit before running `tofu plan`.
+# Do not commit the copied file.
+
+aws_region  = "eu-west-1"
+environment = "prod"
+
+# Use your own current public IP with /32.
+ssh_allowed_cidr = "203.0.113.10/32"
+
+# Create this with:
+# ssh-keygen -t ed25519 -f ~/.ssh/mooplas-signalling -C "mooplas-signalling"
+ssh_public_key_path = "/home/you/.ssh/mooplas-signalling.pub"
+
+# Or paste public key content directly instead:
+# ssh_public_key = "ssh-ed25519 AAAA... your-name@example"
+
+instance_type = "t3.micro"
+
+# This image is expected to be loaded manually onto EC2; OpenTofu does not publish it.
+signalling_image = "mooplas-signalling-server:latest"
+signalling_port  = 3536
+
+cloudfront_price_class   = "PriceClass_100"
+cloudfront_ipv6_enabled = true

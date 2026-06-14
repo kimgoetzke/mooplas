@@ -18,8 +18,8 @@ TLS is terminated by CloudFront, so the container runs in plain `ws://` mode.
 6. Move it somewhere safe and restrict permissions:
 
    ```bash
-   mv ~/Downloads/mooplas-signalling.pem ~/.ssh/
-   chmod 400 ~/.ssh/mooplas-signalling.pem
+   mv ~/Downloads/mooplas-signalling-server-man.pem ~/.ssh/
+   chmod 400 ~/.ssh/mooplas-signalling-server-man.pem
    ```
 
 ### 1B. Create a security group

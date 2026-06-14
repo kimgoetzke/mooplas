@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+dnf update -y
+dnf install -y docker curl
+
+systemctl enable docker
+systemctl start docker
+usermod -aG docker ec2-user
+
+mkdir -p /usr/local/lib/docker/cli-plugins
+curl -fsSL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+mkdir -p '${deployment_directory}'
+chown ec2-user:ec2-user '${deployment_directory}'
+
+cat > '${deployment_directory}/docker-compose.yml' <<'COMPOSE'
+${docker_compose}
+COMPOSE
+
+cat > '${deployment_directory}/.env' <<'ENV'
+SIGNALLING_IMAGE=${signalling_image}
+HOST_PORT=${signalling_port}
+SIGNALLING_PORT=${signalling_port}
+ENV
+
+chown ec2-user:ec2-user '${deployment_directory}/docker-compose.yml' '${deployment_directory}/.env'
