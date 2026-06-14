@@ -60,7 +60,9 @@
             pkgs.wasm-bindgen-cli_0_2_108
             pkgs.nodejs
             pkgs.bashInteractive
+            # Signalling server infrastructure
             pkgs.opentofu
+            pkgs.awscli2
           ];
         };
 
