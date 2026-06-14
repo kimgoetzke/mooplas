@@ -13,8 +13,6 @@ ssh-keygen -t ed25519 -f ~/.ssh/mooplas-signalling-server-ot -C "mooplas-signall
 chmod 600 ~/.ssh/mooplas-signalling-server-ot
 ```
 
-Note: For ease of use, replace `~/.ssh/mooplas-signalling-server-ot` in this file with the actual location/name.
-
 This creates two files:
 
 ```text
@@ -49,24 +47,33 @@ OpenTofu creates:
 - Amazon Linux EC2 instance with Docker and Compose bootstrapped
 - Elastic IP
 - CloudFront distribution for `wss://`
-
+?
 OpenTofu does not build or publish the Docker image.
 
-## 3 Get connection details
+## 3 Export connection details
+
+Run this after `tofu apply`. Run it again in any new terminal before using later commands.
 
 ```bash
-cd mooplas_signalling_server/deploy/opentofu
-tofu output elastic_ip
-tofu output cloudfront_domain_name
-tofu output -raw signalling_server_url
-tofu output ssh_command
+cd ../../..
+export MOOPLAS_SIGNALLING_SSH_KEY="$HOME/.ssh/mooplas-signalling-server-ot"
+export MOOPLAS_SIGNALLING_OPENTOFU_DIR="$PWD/mooplas_signalling_server/deploy/opentofu"
+export EC2_ELASTIC_IP="$(tofu -chdir="$MOOPLAS_SIGNALLING_OPENTOFU_DIR" output -raw elastic_ip)"
+export CLOUDFRONT_DOMAIN="$(tofu -chdir="$MOOPLAS_SIGNALLING_OPENTOFU_DIR" output -raw cloudfront_domain_name)"
+export SIGNALLING_SERVER_URL="$(tofu -chdir="$MOOPLAS_SIGNALLING_OPENTOFU_DIR" output -raw signalling_server_url)"
+```
+
+Check the values:
+
+```bash
+printf 'EC2_ELASTIC_IP=%s\nCLOUDFRONT_DOMAIN=%s\nSIGNALLING_SERVER_URL=%s\n' "$EC2_ELASTIC_IP" "$CLOUDFRONT_DOMAIN" "$SIGNALLING_SERVER_URL"
 ```
 
 Use `ec2-user` for the Amazon Linux instance.
 
 ## 4 Build the image on the local machine
 
-Run these commands on the local machine, from the repository root:
+Run this from the repository root:
 
 ```bash
 docker build -f mooplas_signalling_server/Dockerfile -t mooplas-signalling-server:latest .
@@ -76,77 +83,59 @@ This compiles the Rust binary inside a container and produces a small runtime im
 
 ## 5 Transfer the image to EC2
 
-From the repository root:
+Run this from the repository root:
 
 ```bash
 docker save mooplas-signalling-server:latest | gzip > mooplas-signalling-server.tar.gz
-scp -i ~/.ssh/mooplas-signalling-server-ot mooplas-signalling-server.tar.gz ec2-user@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
-```
-
-You can get `<EC2_ELASTIC_IP>` with:
-
-```bash
-cd mooplas_signalling_server/deploy/opentofu
-tofu output -raw elastic_ip
+scp -i "$MOOPLAS_SIGNALLING_SSH_KEY" mooplas-signalling-server.tar.gz "ec2-user@$EC2_ELASTIC_IP:/opt/mooplas-signalling/mooplas-signalling-server.tar.gz"
 ```
 
 ## 6 Load the image on EC2
 
-SSH into the instance and load the image:
+Run this from the local machine:
 
 ```bash
-ssh -i ~/.ssh/mooplas-signalling-server-ot ec2-user@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+ssh -i "$MOOPLAS_SIGNALLING_SSH_KEY" "ec2-user@$EC2_ELASTIC_IP" -v -o IdentitiesOnly=yes <<'EOF'
 cd /opt/mooplas-signalling
 docker load < mooplas-signalling-server.tar.gz
-```
-
-Verify the image is available:
-
-```bash
 docker images mooplas-signalling-server
+EOF
 ```
 
 ## 7 Start the server
 
 OpenTofu writes `/opt/mooplas-signalling/docker-compose.yml` and `/opt/mooplas-signalling/.env` during EC2 bootstrap.
 
-On the EC2 instance:
+Run this from the local machine:
 
 ```bash
+ssh -i "$MOOPLAS_SIGNALLING_SSH_KEY" "ec2-user@$EC2_ELASTIC_IP" -v -o IdentitiesOnly=yes <<'EOF'
 cd /opt/mooplas-signalling
 docker compose up -d
-```
-
-Check it is running:
-
-```bash
 docker compose ps
 docker compose logs
 curl http://localhost:3536/health
+EOF
 ```
 
 ## 8 Verify end-to-end
 
-From the local machine:
+Run this from the local machine:
 
 ```bash
-# Direct to EC2, plain HTTP
-curl http://<EC2_ELASTIC_IP>:3536/health
-
-# Via CloudFront, TLS-terminated
-curl https://<CLOUDFRONT_DOMAIN>/health
+curl "http://$EC2_ELASTIC_IP:3536/health"
+curl "https://$CLOUDFRONT_DOMAIN/health"
 ```
 
 ## 9 Build the game with the signalling server URL
 
-Use the OpenTofu output as the signalling server URL in the game build:
+Use the exported OpenTofu output as the signalling server URL in the game build:
 
 ```bash
-cd mooplas_signalling_server/deploy/opentofu
-SIGNALLING_SERVER_URL=$(tofu output -raw signalling_server_url)
+printf 'SIGNALLING_SERVER_URL=%s\n' "$SIGNALLING_SERVER_URL"
 ```
 
-Example:
+Example value:
 
 ```text
 SIGNALLING_SERVER_URL=wss://d111111abcdef8.cloudfront.net
@@ -161,11 +150,12 @@ When you want to deploy a new version, repeat the image build and transfer steps
 ```bash
 docker build -f mooplas_signalling_server/Dockerfile -t mooplas-signalling-server:latest .
 docker save mooplas-signalling-server:latest | gzip > mooplas-signalling-server.tar.gz
-scp -i ~/.ssh/mooplas-signalling-server-ot mooplas-signalling-server.tar.gz ec2-user@<EC2_ELASTIC_IP>:/opt/mooplas-signalling/
-ssh -i ~/.ssh/mooplas-signalling-server-ot ec2-user@<EC2_ELASTIC_IP> -v -o IdentitiesOnly=yes
+scp -i "$MOOPLAS_SIGNALLING_SSH_KEY" mooplas-signalling-server.tar.gz "ec2-user@$EC2_ELASTIC_IP:/opt/mooplas-signalling/mooplas-signalling-server.tar.gz"
+ssh -i "$MOOPLAS_SIGNALLING_SSH_KEY" "ec2-user@$EC2_ELASTIC_IP" -v -o IdentitiesOnly=yes <<'EOF'
 cd /opt/mooplas-signalling
 docker load < mooplas-signalling-server.tar.gz
 docker compose up -d
+EOF
 ```
 
 ## 11 Destroying AWS infrastructure
@@ -173,8 +163,7 @@ docker compose up -d
 When you no longer need the server:
 
 ```bash
-cd mooplas_signalling_server/deploy/opentofu
-tofu destroy
+tofu -chdir="$MOOPLAS_SIGNALLING_OPENTOFU_DIR" destroy
 ```
 
 CloudFront deletion can take several minutes while AWS disables and propagates the distribution deletion.
