@@ -2,9 +2,7 @@ use crate::prelude::constants::{
   BUTTON_ALPHA_PRESSED, BUTTON_BORDER_WIDTH, DEFAULT_FONT, LARGE_FONT, NORMAL_FONT, PIXEL_PERFECT_LAYER,
   RESOLUTION_HEIGHT, RESOLUTION_WIDTH, TEXT_COLOUR,
 };
-use crate::prelude::{
-  AnimationIndices, AnimationTimer, CustomInteraction, PlayerId, RegisteredPlayers, RegularButton,
-};
+use crate::prelude::{AnimationIndices, AnimationTimer, CustomInteraction, PlayerId, RegisteredPlayers, RegularButton};
 use crate::ui;
 use crate::ui::ButtonAnimation;
 use crate::ui::shared::BackgroundRoot;
@@ -256,12 +254,14 @@ mod tests {
   #[test]
   fn player_display_name_returns_registered_name_when_player_exists() {
     let mut registered_players = RegisteredPlayers::default();
-    registered_players.players.push(crate::shared::RegisteredPlayer::new_mutable(
-      PlayerId(2),
-      "Potato 2".to_string(),
-      crate::shared::ControlScheme::test(0),
-      Color::WHITE,
-    ));
+    registered_players
+      .players
+      .push(crate::shared::RegisteredPlayer::new_mutable(
+        PlayerId(2),
+        "Potato 2".to_string(),
+        crate::shared::ControlScheme::test(0),
+        Color::WHITE,
+      ));
 
     assert_eq!(player_display_name(PlayerId(2), &registered_players), "Potato 2");
   }

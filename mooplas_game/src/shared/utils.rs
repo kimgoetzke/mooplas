@@ -32,9 +32,9 @@ pub fn colour_for_player_id(player_id: PlayerId) -> Color {
 /// Word list for random name generation. Each word is at most 6 characters to fit the
 /// "{Word} {d}" format within the 8-character limit.
 const NAME_WORDS: &[&str] = &[
-  "Potato", "Mango", "Pickle", "Waffle", "Noodle", "Turnip", "Cookie", "Pepper", "Cheese", "Breeze",
-  "Bumble", "Cuddle", "Doodle", "Fudge", "Muffin", "Pebble", "Rascal", "Sprout", "Wobble", "Zigzag",
-  "Bubble", "Crunch", "Flop", "Groove", "Jumble", "Nibble", "Rumble", "Snappy", "Tangle", "Wombat",
+  "Potato", "Mango", "Pickle", "Waffle", "Noodle", "Turnip", "Cookie", "Pepper", "Cheese", "Breeze", "Bumble",
+  "Cuddle", "Doodle", "Fudge", "Muffin", "Pebble", "Rascal", "Sprout", "Wobble", "Zigzag", "Bubble", "Crunch", "Flop",
+  "Groove", "Jumble", "Nibble", "Rumble", "Snappy", "Tangle", "Wombat",
 ];
 
 /// Generates a random player name in the format "{Word} {d}" where d is a digit 1-9.
@@ -75,7 +75,12 @@ mod tests {
   fn generate_random_name_is_at_most_8_characters() {
     for _ in 0..100 {
       let name = generate_random_name();
-      assert!(name.len() <= 8, "Name '{}' exceeds 8 characters (len={})", name, name.len());
+      assert!(
+        name.len() <= 8,
+        "Name '{}' exceeds 8 characters (len={})",
+        name,
+        name.len()
+      );
     }
   }
 
@@ -98,7 +103,12 @@ mod tests {
   #[test]
   fn all_name_words_are_at_most_6_characters() {
     for word in NAME_WORDS {
-      assert!(word.len() <= 6, "Word '{}' exceeds 6 characters (len={})", word, word.len());
+      assert!(
+        word.len() <= 6,
+        "Word '{}' exceeds 6 characters (len={})",
+        word,
+        word.len()
+      );
     }
   }
 }

@@ -45,7 +45,12 @@ impl Plugin for UiPlugin {
       .add_systems(OnExit(AppState::Preparing), despawn_background_system);
 
     #[cfg(feature = "online")]
-    app.add_plugins((EnterNameMenuPlugin, HostGameMenuPlugin, JoinGameMenuPlugin, TextInputPlugin));
+    app.add_plugins((
+      EnterNameMenuPlugin,
+      HostGameMenuPlugin,
+      JoinGameMenuPlugin,
+      TextInputPlugin,
+    ));
   }
 }
 
