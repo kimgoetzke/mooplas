@@ -1,8 +1,20 @@
 # Deployment of a Mooplas signalling server
 
-AWS infrastructure is managed with OpenTofu in [`opentofu/`](./opentofu/). Use that workflow instead of creating EC2, security groups, Elastic IPs, or CloudFront distributions in the AWS console.
+AWS infrastructure is managed with OpenTofu in [`opentofu/`](./opentofu/). Use that workflow instead of creating EC2,
+security groups, Elastic IPs, or CloudFront distributions in the AWS console.
 
 TLS is terminated by CloudFront, so the container runs in plain `ws://` mode on the EC2 instance.
+
+## Costs
+
+This configuration creates resources that can incur AWS charges:
+
+- EC2 instance
+- Elastic IP/public IPv4 address
+- CloudFront distribution and data transfer
+
+The dedicated VPC, subnet, route table, and internet gateway do not materially add cost by themselves. No NAT Gateway is
+created.
 
 ## 1 Create a local SSH key pair
 
@@ -26,7 +38,8 @@ Set this in `mooplas_signalling_server/deploy/opentofu/mooplas.auto.tfvars`:
 ssh_public_key_path = "/home/you/.ssh/mooplas-signalling-server-ot.pub"
 ```
 
-You can use an existing SSH public key instead, for example `~/.ssh/id_ed25519.pub`, as long as you use the matching private key for SSH.
+You can use an existing SSH public key instead, for example `~/.ssh/id_ed25519.pub`, as long as you use the matching
+private key for SSH.
 
 ## 2 Create the AWS infrastructure
 
@@ -47,15 +60,15 @@ OpenTofu creates:
 - Amazon Linux EC2 instance with Docker and Compose bootstrapped
 - Elastic IP
 - CloudFront distribution for `wss://`
-?
-OpenTofu does not build or publish the Docker image.
+  ?
+  OpenTofu does not build or publish the Docker image.
 
 ## 3 Export connection details
 
 Run this after `tofu apply`. Run it again in any new terminal before using later commands.
 
 ```bash
-cd ../../..
+cd ../../.. # Back to repo root
 export MOOPLAS_SIGNALLING_SSH_KEY="$HOME/.ssh/mooplas-signalling-server-ot"
 export MOOPLAS_SIGNALLING_OPENTOFU_DIR="$PWD/mooplas_signalling_server/deploy/opentofu"
 export EC2_ELASTIC_IP="$(tofu -chdir="$MOOPLAS_SIGNALLING_OPENTOFU_DIR" output -raw elastic_ip)"
