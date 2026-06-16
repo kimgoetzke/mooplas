@@ -36,7 +36,7 @@ impl Plugin for SharedResourcesPlugin {
 }
 
 /// The seed used for random number generation in the game.
-#[derive(Resource, Reflect, Clone, Copy)]
+#[derive(Resource, Reflect, Clone, Copy, Debug)]
 pub struct Seed {
   seed: u64,
 }
@@ -53,6 +53,11 @@ impl Seed {
   /// Gets the seed value.
   pub fn get(&self) -> u64 {
     self.seed
+  }
+
+  /// Advances the seed.
+  pub fn next(&mut self) {
+    self.seed = self.seed.wrapping_add(1);
   }
 
   /// Sets the seed value.
@@ -323,6 +328,16 @@ mod tests {
   }
 
   #[test]
+  fn next_advances_seed_deterministically() {
+    let mut seed = Seed::default();
+    seed.set(u64::MAX);
+    seed.next();
+    assert_eq!(seed.get(), 0);
+    seed.next();
+    assert_eq!(seed.get(), 1);
+  }
+
+  #[test]
   fn shared_messages_plugin_does_not_panic_on_empty_app() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);
@@ -415,7 +430,12 @@ mod tests {
   #[test]
   fn unregister_mutable_removes_player_when_registered_and_mutable() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), "Player 1".to_string(), ControlScheme::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(
+      PlayerId(1),
+      "Player 1".to_string(),
+      ControlScheme::test(1),
+      Color::default(),
+    );
     registered_players
       .register(player)
       .expect("Failed to registered player");
@@ -482,7 +502,12 @@ mod tests {
   #[test]
   fn unregister_immutable_returns_error_when_player_is_local() {
     let mut registered_players = RegisteredPlayers::default();
-    let player = RegisteredPlayer::new_mutable(PlayerId(1), "Player 1".to_string(), ControlScheme::test(1), Color::default());
+    let player = RegisteredPlayer::new_mutable(
+      PlayerId(1),
+      "Player 1".to_string(),
+      ControlScheme::test(1),
+      Color::default(),
+    );
     registered_players
       .register(player)
       .expect("Failed to registered player");

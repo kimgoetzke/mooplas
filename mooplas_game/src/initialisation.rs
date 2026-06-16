@@ -309,6 +309,67 @@ mod tests {
   }
 
   #[test]
+  fn generate_valid_spawn_points_system_uses_current_seed_without_advancing() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    let mut tracker = InitialisationTracker::default();
+    tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    let mut seed = Seed::default();
+    seed.set(77);
+    app
+      .insert_resource(tracker)
+      .insert_resource(seed)
+      .insert_resource(SpawnPoints::default());
+    app.add_systems(Update, generate_valid_spawn_points_system);
+
+    app.update();
+
+    let first_spawn_points = app.world().resource::<SpawnPoints>().data.clone();
+    assert_eq!(app.world().resource::<Seed>().get(), 77);
+
+    let mut replay_app = App::new();
+    replay_app.add_plugins(MinimalPlugins);
+    let mut replay_tracker = InitialisationTracker::default();
+    replay_tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    let mut replay_seed = Seed::default();
+    replay_seed.set(77);
+    replay_app
+      .insert_resource(replay_tracker)
+      .insert_resource(replay_seed)
+      .insert_resource(SpawnPoints::default());
+    replay_app.add_systems(Update, generate_valid_spawn_points_system);
+    replay_app.update();
+
+    assert_eq!(replay_app.world().resource::<SpawnPoints>().data, first_spawn_points);
+  }
+
+  #[test]
+  fn generate_valid_spawn_points_system_produces_different_points_after_seed_advance() {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    let mut tracker = InitialisationTracker::default();
+    tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    let mut seed = Seed::default();
+    seed.set(77);
+    app
+      .insert_resource(tracker)
+      .insert_resource(seed)
+      .insert_resource(SpawnPoints::default());
+    app.add_systems(Update, generate_valid_spawn_points_system);
+
+    app.update();
+    let first_spawn_points = app.world().resource::<SpawnPoints>().data.clone();
+
+    app.world_mut().resource_mut::<Seed>().next();
+    let mut tracker = InitialisationTracker::default();
+    tracker.reset(vec![InitialisationStep::GenerateSpawnPoints]);
+    app.insert_resource(tracker);
+    app.update();
+
+    assert_ne!(app.world().resource::<SpawnPoints>().data, first_spawn_points);
+  }
+
+  #[test]
   fn initialise_available_player_configurations_system_populates_configs() {
     let mut app = App::new();
     app.add_plugins(MinimalPlugins);

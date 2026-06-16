@@ -3,7 +3,7 @@ use crate::prelude::LocalPlayerRegistrationRequestMessage;
 use crate::prelude::constants::{RESOLUTION_HEIGHT, RESOLUTION_WIDTH};
 use crate::prelude::{
   AppState, AvailableControlSchemes, ContinueMessage, ControlSchemeId, ExitLobbyMessage, PlayerId,
-  PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, SnakeHead, WinnerInfo, colour_for_player_id,
+  PlayerRegistrationMessage, RegisteredPlayer, RegisteredPlayers, Seed, SnakeHead, WinnerInfo, colour_for_player_id,
   has_registered_players,
 };
 use crate::shared::{InputMessage, Player};
@@ -284,8 +284,13 @@ fn despawn_players_system(mut commands: Commands, players_query: Query<Entity, W
   }
 }
 
-/// Resets the registered players and winner information when entering the lobby/registering state.
-fn reset_for_lobby_system(mut registered: ResMut<RegisteredPlayers>, mut winner: ResMut<WinnerInfo>) {
+/// Resets round resources when returning to initialisation.
+fn reset_for_lobby_system(
+  mut registered: ResMut<RegisteredPlayers>,
+  mut winner: ResMut<WinnerInfo>,
+  mut seed: ResMut<Seed>,
+) {
+  seed.next();
   registered.players.clear();
   winner.clear();
 }
@@ -442,6 +447,30 @@ mod tests {
       .get_resource_mut::<Messages<LocalPlayerRegistrationRequestMessage>>()
       .expect("Messages<LocalPlayerRegistrationRequestMessage> missing");
     assert_eq!(local_registration_requests.iter_current_update_messages().count(), 1);
+  }
+
+  #[test]
+  fn reset_for_lobby_system_advances_seed_and_clears_round_state() {
+    let mut app = setup();
+    app.world_mut().resource_mut::<Seed>().set(41);
+    app.world_mut().resource_mut::<WinnerInfo>().set(PlayerId(1));
+    app
+      .world_mut()
+      .resource_mut::<RegisteredPlayers>()
+      .register(RegisteredPlayer::new_mutable(
+        PlayerId(1),
+        "Player 1".to_string(),
+        ControlScheme::new(ControlSchemeId(1), KeyCode::KeyJ, KeyCode::KeyK, KeyCode::KeyL),
+        Color::BLACK,
+      ))
+      .expect("Player should register");
+    app.add_systems(Update, reset_for_lobby_system);
+
+    app.update();
+
+    assert_eq!(app.world().resource::<Seed>().get(), 42);
+    assert!(app.world().resource::<RegisteredPlayers>().players.is_empty());
+    assert_eq!(app.world().resource::<WinnerInfo>().get(), None);
   }
 
   #[cfg(not(feature = "online"))]
