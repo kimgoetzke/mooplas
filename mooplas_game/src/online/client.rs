@@ -10,12 +10,13 @@ use bevy::app::Update;
 use bevy::log::{debug, error_once, info, warn};
 use bevy::math::Quat;
 use bevy::prelude::{
-  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, Plugin, Query, Res, ResMut,
-  Resource, State, Time, Transform, With, Without, in_state, resource_exists,
+  App, Commands, Entity, IntoScheduleConfigs, MessageReader, MessageWriter, NextState, OnExit, Plugin, Query, Res,
+  ResMut, Resource, State, Time, Transform, With, Without, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
   ChannelType, ClientId, ClientMessage, ClientNetworkingActive, InboundServerMessage, OutboundClientMessage,
-  PlayerStateUpdateMessage, SerialisableRegistrationRequest, SerialisableUnregistrationRequest, encode_to_bytes,
+  PlayerStateUpdateMessage, SerialisableRegisteredPlayer, SerialisableRegistrationRequest,
+  SerialisableUnregistrationRequest, encode_to_bytes,
 };
 
 /// A plugin that adds shared client-side online multiplayer capabilities to the game. Contains systems that are shared
@@ -25,6 +26,13 @@ pub struct ClientPlugin;
 #[derive(Resource, Default)]
 struct CurrentClientId(Option<ClientId>);
 
+#[derive(Resource)]
+struct PendingClientBootstrap {
+  target_state: AppState,
+  registered_players: Vec<SerialisableRegisteredPlayer>,
+  winner_info: Option<u8>,
+}
+
 impl Plugin for ClientPlugin {
   fn build(&self, app: &mut App) {
     app
@@ -33,6 +41,7 @@ impl Plugin for ClientPlugin {
         Update,
         handle_inbound_server_message.run_if(resource_exists::<ClientNetworkingActive>),
       )
+      .add_systems(OnExit(AppState::Initialising), apply_pending_client_bootstrap_system)
       .add_systems(
         Update,
         (
@@ -55,13 +64,71 @@ impl Plugin for ClientPlugin {
   }
 }
 
+fn register_player_locally(
+  mut registered_players: &mut ResMut<RegisteredPlayers>,
+  available_control_schemes: &Res<AvailableControlSchemes>,
+  mut local_input_mapping: &mut ResMut<LocalInputMapping>,
+  current_client_id: &CurrentClientId,
+  mut registration_message: &mut MessageWriter<PlayerRegistrationMessage>,
+  client_id: &ClientId,
+  player_id: &u8,
+  control_scheme_id: &u8,
+  name: &String,
+) {
+  let player_id = PlayerId(*player_id);
+  let control_scheme_id = ControlSchemeId(*control_scheme_id);
+  if current_client_id.0 == Some(*client_id) {
+    utils::register_local_player_locally(
+      &mut registered_players,
+      &available_control_schemes,
+      &mut registration_message,
+      Some(&mut local_input_mapping),
+      player_id,
+      control_scheme_id,
+      name.clone(),
+    );
+  } else {
+    utils::register_remote_player_locally(
+      &mut registered_players,
+      &available_control_schemes,
+      &mut registration_message,
+      player_id,
+      control_scheme_id,
+      name.clone(),
+    );
+  }
+}
+
+fn set_state_safely(current_state: AppState, next_state: &mut ResMut<NextState<AppState>>, target_state: AppState) {
+  if is_state_transition_permitted(&current_state, &target_state) {
+    next_state.set(target_state);
+  } else {
+    debug!(
+      "Ignoring state change to [{}] because [{}] is restricted or unchanged...",
+      target_state, current_state
+    );
+  }
+}
+
+/// Returns `true` if the current state is considered to be restricted. This includes states that the application
+/// automatically transitions to. Used to stop the server in a multiplayer context from causing an inconsistent state.
+/// - `Initialising`: It is not allowed to transition *out of* this state "manually" because this happens
+///   automatically once initialisation is complete.
+/// - `Registering`: It is not allowed to transition *into* this state "manually" because this state is automatically
+///   transitioned into from `Initialising`. You must transition to `Initialising` instead.
+/// - Transitions from one state to itself are also restricted.
+fn is_state_transition_permitted(from_state: &AppState, to_state: &AppState) -> bool {
+  !matches!(from_state, AppState::Initialising) && !matches!(to_state, AppState::Registering) && from_state != to_state
+}
+
 /// Processes any incoming server messages and acts on them, if required.
 fn handle_inbound_server_message(
+  mut commands: Commands,
   mut messages: MessageReader<InboundServerMessage>,
   mut registered_players: ResMut<RegisteredPlayers>,
   available_control_schemes: Res<AvailableControlSchemes>,
   mut local_input_mapping: ResMut<LocalInputMapping>,
-  current_state: ResMut<State<AppState>>,
+  current_state: Res<State<AppState>>,
   mut next_state: ResMut<NextState<AppState>>,
   mut current_client_id: ResMut<CurrentClientId>,
   mut winner: ResMut<WinnerInfo>,
@@ -77,9 +144,22 @@ fn handle_inbound_server_message(
       InboundServerMessage::ClientInitialised {
         seed: server_seed,
         client_id,
+        current_state: server_state,
+        registered_players: server_registered_players,
+        winner_info,
       } => {
         seed.set(*server_seed);
         current_client_id.0 = Some(*client_id);
+        registered_players.clear();
+        local_input_mapping.clear();
+        commands.insert_resource(PendingClientBootstrap {
+          target_state: AppState::from(server_state),
+          registered_players: server_registered_players.clone(),
+          winner_info: *winner_info,
+        });
+        if *current_state != AppState::Initialising {
+          next_state.set(AppState::Initialising);
+        }
       }
       InboundServerMessage::PlayerRegistered {
         client_id,
@@ -87,28 +167,17 @@ fn handle_inbound_server_message(
         control_scheme_id,
         name,
       } => {
-        let player_id = PlayerId(*player_id);
-        let control_scheme_id = ControlSchemeId(*control_scheme_id);
-        if current_client_id.0 == Some(*client_id) {
-          utils::register_local_player_locally(
-            &mut registered_players,
-            &available_control_schemes,
-            &mut registration_message,
-            Some(&mut local_input_mapping),
-            player_id,
-            control_scheme_id,
-            name.clone(),
-          );
-        } else {
-          utils::register_remote_player_locally(
-            &mut registered_players,
-            &available_control_schemes,
-            &mut registration_message,
-            player_id,
-            control_scheme_id,
-            name.clone(),
-          );
-        }
+        register_player_locally(
+          &mut registered_players,
+          &available_control_schemes,
+          &mut local_input_mapping,
+          &mut current_client_id,
+          &mut registration_message,
+          client_id,
+          player_id,
+          control_scheme_id,
+          name,
+        );
       }
       InboundServerMessage::PlayerUnregistered { client_id, player_id } => {
         let player_id = PlayerId(*player_id);
@@ -124,14 +193,8 @@ fn handle_inbound_server_message(
         }
       }
       InboundServerMessage::StateChanged { new_state, winner_info } => {
-        if !current_state.is_manual_transition_allowed_to(&AppState::from(new_state)) {
-          next_state.set(AppState::from(new_state));
-        } else {
-          debug!(
-            "Ignoring state change to [{}] because [{:?}] is restricted...",
-            new_state, *current_state
-          );
-        }
+        let new_state = AppState::from(new_state);
+        set_state_safely(*current_state.get(), &mut next_state, new_state);
         if let Some(player_id) = winner_info {
           winner.set((*player_id).into());
         }
@@ -146,6 +209,46 @@ fn handle_inbound_server_message(
       }
     }
   }
+}
+
+// TODO: Check if there are better ways to run this system conditionally
+fn apply_pending_client_bootstrap_system(
+  mut commands: Commands,
+  pending_bootstrap: Option<Res<PendingClientBootstrap>>,
+  mut registered_players: ResMut<RegisteredPlayers>,
+  available_control_schemes: Res<AvailableControlSchemes>,
+  mut local_input_mapping: ResMut<LocalInputMapping>,
+  current_client_id: Res<CurrentClientId>,
+  mut winner: ResMut<WinnerInfo>,
+  mut registration_message: MessageWriter<PlayerRegistrationMessage>,
+  current_state: Res<State<AppState>>,
+  mut next_state: ResMut<NextState<AppState>>,
+) {
+  let Some(pending_bootstrap) = pending_bootstrap else {
+    return;
+  };
+
+  for player in &pending_bootstrap.registered_players {
+    register_player_locally(
+      &mut registered_players,
+      &available_control_schemes,
+      &mut local_input_mapping,
+      &*current_client_id,
+      &mut registration_message,
+      &player.client_id,
+      &player.player_id,
+      &player.control_scheme_id,
+      &player.name,
+    );
+  }
+  if let Some(player_id) = pending_bootstrap.winner_info {
+    winner.set(player_id.into());
+  }
+  if pending_bootstrap.target_state != AppState::Registering {
+    next_state.set(pending_bootstrap.target_state);
+  }
+  set_state_safely(**current_state, &mut next_state, pending_bootstrap.target_state);
+  commands.remove_resource::<PendingClientBootstrap>();
 }
 
 /// A system that handles local player registration requests by sending them to the server.
@@ -287,6 +390,7 @@ fn apply_state_interpolation_system(
 mod tests {
   use super::*;
   use crate::app_state::AppStatePlugin;
+  use crate::initialisation::InitialisationPlugin;
   use crate::prelude::constants::RESOLUTION_WIDTH;
   use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
   use bevy::math::Vec3;
@@ -322,6 +426,11 @@ mod tests {
         .schemes
         .push(crate::prelude::ControlScheme::test(id));
     }
+  }
+
+  fn set_app_state(app: &mut App, state: AppState) {
+    app.world_mut().resource_mut::<NextState<AppState>>().set(state);
+    app.update();
   }
 
   fn advance_time_by(app: &mut App, duration: Duration) {
@@ -404,6 +513,121 @@ mod tests {
   }
 
   #[test]
+  fn handle_inbound_server_message_does_not_allow_late_joiner_to_enter_registering_directly() {
+    let mut app = setup();
+    set_app_state(&mut app, AppState::Preparing);
+    app.add_systems(Update, handle_inbound_server_message);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::StateChanged {
+        new_state: "Registering".to_string(),
+        winner_info: None,
+      })
+      .expect("Failed to write StateChanged message");
+    app.update();
+    app.update();
+
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Preparing);
+  }
+
+  #[test]
+  fn handle_inbound_server_message_does_not_advance_seed_before_server_driven_initialising() {
+    let mut app = setup();
+    set_app_state(&mut app, AppState::Registering);
+    app.world_mut().resource_mut::<Seed>().set(41);
+    app.add_systems(Update, handle_inbound_server_message);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::StateChanged {
+        new_state: "Initialising".to_string(),
+        winner_info: None,
+      })
+      .expect("Failed to write StateChanged message");
+    app.update();
+
+    assert_eq!(app.world().resource::<Seed>().get(), 41);
+  }
+
+  #[test]
+  fn handle_inbound_server_message_sets_seed_when_client_initialised_received() {
+    let mut app = setup();
+    app.world_mut().resource_mut::<Seed>().set(41);
+    app.add_systems(Update, handle_inbound_server_message);
+    set_app_state(&mut app, AppState::Preparing);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientInitialised {
+        seed: 123,
+        client_id: ClientId::from_renet_u64(7),
+        current_state: "Registering".to_string(),
+        registered_players: Vec::new(),
+        winner_info: None,
+      })
+      .expect("Failed to write ClientInitialised message");
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::StateChanged {
+        new_state: "Initialising".to_string(),
+        winner_info: None,
+      })
+      .expect("Failed to write StateChanged message");
+
+    app.update();
+
+    assert_eq!(app.world().resource::<Seed>().get(), 123);
+  }
+
+  #[test]
+  fn client_initialised_bootstrap_runs_initialising_before_registering() {
+    let mut app = setup();
+    app.add_plugins((InitialisationPlugin, ClientPlugin));
+    app.insert_resource(ClientNetworkingActive);
+    set_app_state(&mut app, AppState::Preparing);
+
+    let client_id = ClientId::from_renet_u64(7);
+    let host_client_id = ClientId::nil();
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientInitialised {
+        seed: 123,
+        client_id,
+        current_state: "Registering".to_string(),
+        registered_players: vec![SerialisableRegisteredPlayer {
+          client_id: host_client_id,
+          player_id: 0,
+          control_scheme_id: 0,
+          name: "Host".to_string(),
+        }],
+        winner_info: None,
+      })
+      .expect("Failed to write ClientInitialised message");
+
+    for _ in 0..4 {
+      app.update();
+    }
+
+    let state = app.world().resource::<State<AppState>>();
+    assert_eq!(state.get(), &AppState::Registering);
+    let available_control_schemes = app.world().resource::<AvailableControlSchemes>();
+    assert!(!available_control_schemes.schemes.is_empty());
+    let actual_spawn_points = app.world().resource::<crate::prelude::SpawnPoints>();
+    assert_eq!(actual_spawn_points.data.len(), 10);
+    assert_eq!(app.world().resource::<Seed>().get(), 123);
+    let registered_players = app.world().resource::<RegisteredPlayers>();
+    let player = registered_players
+      .players
+      .iter()
+      .find(|player| player.id == PlayerId(0))
+      .expect("Expected bootstrapped host player");
+    assert!(player.is_remote());
+    assert_eq!(player.name, "Host");
+  }
+
+  #[test]
   fn handle_inbound_server_message_registers_own_player_locally_from_assigned_player_id() {
     let mut app = setup();
     add_control_schemes(&mut app, 1);
@@ -412,7 +636,13 @@ mod tests {
     let client_id = ClientId::from_renet_u64(7);
     app
       .world_mut()
-      .write_message(InboundServerMessage::ClientInitialised { seed: 123, client_id })
+      .write_message(InboundServerMessage::ClientInitialised {
+        seed: 123,
+        client_id,
+        current_state: "Registering".to_string(),
+        registered_players: Vec::new(),
+        winner_info: None,
+      })
       .expect("Failed to write ClientInitialised message");
     app.update();
 

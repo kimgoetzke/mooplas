@@ -1,4 +1,4 @@
-use crate::prelude::{ChannelType, ClientId};
+use crate::prelude::{ChannelType, ClientId, SerialisableRegisteredPlayer};
 use crate::shared::structs::{SerialisableInput, SerialisableRegistrationRequest, SerialisableUnregistrationRequest};
 use bevy::app::{App, Plugin};
 use bevy::prelude::{Component, Message};
@@ -113,7 +113,13 @@ pub enum InboundServerMessage {
   ClientDisconnected { client_id: ClientId },
   /// Sent to a client when they have successfully initialised their connection to the server. Sent by the server in
   /// response to a [`InboundServerMessage::ClientConnected`] to the client that just connected.
-  ClientInitialised { seed: u64, client_id: ClientId },
+  ClientInitialised {
+    seed: u64,
+    client_id: ClientId,
+    current_state: String,
+    registered_players: Vec<SerialisableRegisteredPlayer>,
+    winner_info: Option<u8>,
+  },
   /// Indicates that the app state has changed on the server.
   StateChanged { new_state: String, winner_info: Option<u8> },
   /// Informs clients that a player has registered in the lobby.

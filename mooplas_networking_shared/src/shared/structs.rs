@@ -162,6 +162,16 @@ pub struct SerialisableUnregistrationRequest {
   pub player_id: PlayerId,
 }
 
+// TODO: Check if this struct is really required - probably not
+/// A player registration included in the authoritative client bootstrap.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct SerialisableRegisteredPlayer {
+  pub client_id: ClientId,
+  pub player_id: u8,
+  pub control_scheme_id: u8,
+  pub name: String,
+}
+
 /// The type sent by the networking code of the client. It's the same as [`InboundClientMessage`] but doesn't contain
 /// the [`ClientId`] of the sender. This is how the client communicates to the server. Deserialised by the networking
 /// code, not intended to be used by any application code. Converted to [`InboundClientMessage`] and then made

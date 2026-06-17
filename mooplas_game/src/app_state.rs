@@ -49,17 +49,6 @@ impl AppState {
   pub fn name() -> &'static str {
     "AppState"
   }
-
-  /// Returns `true` if the current state is considered to be restricted. This includes states that the application
-  /// automatically transitions to. Used to stop the server in a multiplayer context from causing an inconsistent state.
-  /// - `Initialising`: It is not allowed to transition *out of* this state "manually" because this happens
-  ///   automatically once initialisation is complete.
-  /// - `Registering`: It is not allowed to transition *into* this state "manually" because this state is automatically
-  ///   transitioned into from `Initialising`. You must transition to `Initialising` instead.
-  #[cfg(feature = "online")]
-  pub fn is_manual_transition_allowed_to(&self, to_state: &AppState) -> bool {
-    matches!(self, AppState::Initialising) || to_state == &AppState::Registering
-  }
 }
 
 impl Display for AppState {

@@ -12,7 +12,8 @@ use bevy::prelude::{
 };
 use mooplas_networking::prelude::{
   ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, OutboundServerMessage,
-  SerialisableUnregistrationRequest, ServerNetworkingActive, encode_to_bytes,
+  RegisteredClientPlayer, SerialisableRegisteredPlayer, SerialisableUnregistrationRequest, ServerNetworkingActive,
+  encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -67,42 +68,6 @@ fn host_client_id() -> ClientId {
   ClientId::nil()
 }
 
-fn broadcast_player_registered(
-  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
-  client_id: ClientId,
-  player_id: PlayerId,
-  control_scheme_id: ControlSchemeId,
-  name: String,
-) {
-  let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
-    client_id,
-    player_id: player_id.0,
-    control_scheme_id: control_scheme_id.0,
-    name,
-  })
-  .expect(CLIENT_MESSAGE_SERIALISATION);
-  outbound_server_message.write(OutboundServerMessage::Broadcast {
-    channel: ChannelType::ReliableOrdered,
-    payload,
-  });
-}
-
-fn broadcast_player_unregistered(
-  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
-  client_id: ClientId,
-  player_id: PlayerId,
-) {
-  let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
-    client_id,
-    player_id: player_id.0,
-  })
-  .expect(CLIENT_MESSAGE_SERIALISATION);
-  outbound_server_message.write(OutboundServerMessage::Broadcast {
-    channel: ChannelType::ReliableOrdered,
-    payload,
-  });
-}
-
 fn handle_registration_request(
   outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
   registered_players: &mut ResMut<RegisteredPlayers>,
@@ -150,6 +115,26 @@ fn handle_registration_request(
   broadcast_player_registered(outbound_server_message, client_id, player_id, control_scheme_id, name);
 }
 
+fn broadcast_player_registered(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  client_id: ClientId,
+  player_id: PlayerId,
+  control_scheme_id: ControlSchemeId,
+  name: String,
+) {
+  let payload = encode_to_bytes(&InboundServerMessage::PlayerRegistered {
+    client_id,
+    player_id: player_id.0,
+    control_scheme_id: control_scheme_id.0,
+    name,
+  })
+  .expect(CLIENT_MESSAGE_SERIALISATION);
+  outbound_server_message.write(OutboundServerMessage::Broadcast {
+    channel: ChannelType::ReliableOrdered,
+    payload,
+  });
+}
+
 /// Returns the first [`PlayerId`] that is not registered, or `None` if all possible player IDs are taken.
 fn next_available_player_id(registered_players: &RegisteredPlayers) -> Option<PlayerId> {
   (0..MAX_PLAYERS as usize)
@@ -190,6 +175,22 @@ fn handle_unregistration_request(
 
   lobby.unregister_player(client_id, request.player_id);
   broadcast_player_unregistered(outbound_server_message, client_id, request.player_id.into());
+}
+
+fn broadcast_player_unregistered(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  client_id: ClientId,
+  player_id: PlayerId,
+) {
+  let payload = encode_to_bytes(&InboundServerMessage::PlayerUnregistered {
+    client_id,
+    player_id: player_id.0,
+  })
+  .expect(CLIENT_MESSAGE_SERIALISATION);
+  outbound_server_message.write(OutboundServerMessage::Broadcast {
+    channel: ChannelType::ReliableOrdered,
+    payload,
+  });
 }
 
 /// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients,
@@ -253,6 +254,7 @@ fn handle_inbound_server_message(
   current_state: Res<State<AppState>>,
   mut next_state: ResMut<NextState<AppState>>,
   seed: Res<Seed>,
+  winner: Res<WinnerInfo>,
   mut registered_players: ResMut<RegisteredPlayers>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
 ) {
@@ -261,12 +263,19 @@ fn handle_inbound_server_message(
       InboundServerMessage::ClientConnected { client_id } => {
         info!("Client with ID [{}] connected", client_id);
 
-        // TODO: Communicate current state of the lobby (registered players, etc.) to the newly connected client
+        let target_state = if *current_state == AppState::Preparing {
+          AppState::Registering
+        } else {
+          *current_state.get()
+        };
         let seed_message = encode_to_bytes(&InboundServerMessage::ClientInitialised {
           seed: seed.get(),
           client_id: *client_id,
+          current_state: target_state.to_string(),
+          registered_players: lobby_snapshot(&lobby, &registered_players),
+          winner_info: winner.get_as_u8(),
         })
-        .expect("Failed to serialise seed message");
+        .expect(CLIENT_MESSAGE_SERIALISATION);
         outbound_server_message.write(OutboundServerMessage::Send {
           client_id: *client_id,
           channel: ChannelType::ReliableOrdered,
@@ -274,6 +283,7 @@ fn handle_inbound_server_message(
         });
 
         if *current_state == AppState::Preparing {
+          // Advance to lobby once the first player connects
           next_state.set(AppState::Initialising);
         }
       }
@@ -295,6 +305,44 @@ fn handle_inbound_server_message(
       _ => {}
     }
   }
+}
+
+fn lobby_snapshot(lobby: &Lobby, registered_players: &RegisteredPlayers) -> Vec<SerialisableRegisteredPlayer> {
+  let mut registrations: Vec<(ClientId, RegisteredClientPlayer)> = lobby
+    .registered
+    .iter()
+    .flat_map(|(registered_client_id, players)| {
+      players
+        .iter()
+        .map(|registration| (*registered_client_id, *registration))
+    })
+    .collect();
+  registrations.sort_by_key(|(_, registration)| (registration.player_id.0, registration.control_scheme_id));
+
+  registrations
+    .into_iter()
+    .filter_map(|(registered_client_id, registration)| {
+      let player_id = PlayerId(registration.player_id.0);
+      let Some(registered_player) = registered_players
+        .players
+        .iter()
+        .find(|registered_player| registered_player.id == player_id)
+      else {
+        warn!(
+          "Skipping bootstrap replay for lobby player [{}] with no registered player snapshot",
+          registration.player_id
+        );
+        return None;
+      };
+
+      Some(SerialisableRegisteredPlayer {
+        client_id: registered_client_id,
+        player_id: registration.player_id.0,
+        control_scheme_id: registration.control_scheme_id,
+        name: registered_player.name.clone(),
+      })
+    })
+    .collect()
 }
 
 /// Broadcasts the authoritative state (position and rotation) of all snake heads to all clients.
@@ -486,6 +534,115 @@ mod tests {
     }
   }
 
+  fn set_app_state(app: &mut App, state: AppState) {
+    app.world_mut().resource_mut::<NextState<AppState>>().set(state);
+    app.update();
+  }
+
+  #[test]
+  fn handle_inbound_server_message_sends_bootstrap_snapshot_to_late_joiner() {
+    let mut app = setup();
+    add_control_schemes(&mut app, 2);
+    set_app_state(&mut app, AppState::Registering);
+    app.add_systems(Update, handle_inbound_server_message);
+
+    let existing_client_id = ClientId::from_renet_u64(7);
+    let late_client_id = ClientId::from_renet_u64(8);
+    {
+      let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
+      registered_players
+        .register(crate::prelude::RegisteredPlayer::new_mutable(
+          PlayerId(0),
+          "Host".to_string(),
+          ControlScheme::test(0),
+          Color::WHITE,
+        ))
+        .expect("Host player should register");
+      registered_players
+        .register(crate::prelude::RegisteredPlayer::new_immutable(
+          PlayerId(1),
+          "Remote".to_string(),
+          ControlScheme::test(1),
+          Color::WHITE,
+        ))
+        .expect("Remote player should register");
+    }
+    {
+      let mut lobby = app.world_mut().resource_mut::<Lobby>();
+      lobby.register_player(host_client_id(), PlayerId(0).into(), 0);
+      lobby.register_player(existing_client_id, PlayerId(1).into(), 1);
+    }
+    app.world_mut().resource_mut::<Seed>().set(999);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientConnected {
+        client_id: late_client_id,
+      })
+      .expect("Failed to queue ClientConnected message");
+    app.update();
+
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
+      .expect("Messages<OutboundServerMessage> missing");
+    let decoded: Vec<_> = messages
+      .iter_current_update_messages()
+      .filter_map(|message| match message {
+        OutboundServerMessage::Send { client_id, payload, .. } if *client_id == late_client_id => {
+          Some(decode_from_bytes::<InboundServerMessage>(payload).expect("Expected decodable payload"))
+        }
+        _ => None,
+      })
+      .collect();
+
+    assert_eq!(decoded.len(), 1);
+    let InboundServerMessage::ClientInitialised {
+      seed,
+      client_id,
+      current_state,
+      registered_players,
+      ..
+    } = &decoded[0]
+    else {
+      panic!("Expected ClientInitialised for late joiner");
+    };
+    assert_eq!(*seed, 999);
+    assert_eq!(*client_id, late_client_id);
+    assert_eq!(current_state, "Registering");
+    let replayed_player_ids: Vec<_> = registered_players.iter().map(|player| player.player_id).collect();
+    assert_eq!(replayed_player_ids, vec![0, 1]);
+    assert!(
+      registered_players
+        .iter()
+        .any(|player| player.client_id == host_client_id()
+          && player.player_id == 0
+          && player.control_scheme_id == 0
+          && player.name == "Host"),
+      "Expected host registration replay"
+    );
+    assert!(
+      registered_players
+        .iter()
+        .any(|player| player.client_id == existing_client_id
+          && player.player_id == 1
+          && player.control_scheme_id == 1
+          && player.name == "Remote"),
+      "Expected remote registration replay"
+    );
+  }
+
+  #[test]
+  fn reinitialise_keeps_active_seed_unchanged() {
+    let mut app = setup();
+    app.world_mut().resource_mut::<Seed>().set(41);
+    app.add_systems(Update, reinitialise);
+
+    app.update();
+
+    assert_eq!(app.world().resource::<Seed>().get(), 41);
+  }
+
   #[test]
   fn broadcast_player_states_system_sends_state_updates_for_all_snake_heads() {
     let mut app = setup();
@@ -549,7 +706,10 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 0, name: "Test".to_string() },
+        SerialisableRegistrationRequest {
+          control_scheme_id: 0,
+          name: "Test".to_string(),
+        },
         ClientId::from_renet_u64(42),
       ))
       .expect("Failed to queue InboundClientMessage");
@@ -610,7 +770,10 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 0, name: "Test".to_string() },
+        SerialisableRegistrationRequest {
+          control_scheme_id: 0,
+          name: "Test".to_string(),
+        },
         ClientId::from_renet_u64(42),
       ))
       .expect("Failed to queue InboundClientMessage");
@@ -663,7 +826,10 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 0, name: "Test".to_string() },
+        SerialisableRegistrationRequest {
+          control_scheme_id: 0,
+          name: "Test".to_string(),
+        },
         first_client_id,
       ))
       .expect("Failed to queue initial registration request");
@@ -683,7 +849,10 @@ mod tests {
     app
       .world_mut()
       .write_message(InboundClientMessage::RegistrationRequest(
-        SerialisableRegistrationRequest { control_scheme_id: 1, name: "Test".to_string() },
+        SerialisableRegistrationRequest {
+          control_scheme_id: 1,
+          name: "Test".to_string(),
+        },
         second_client_id,
       ))
       .expect("Failed to queue replacement registration request");

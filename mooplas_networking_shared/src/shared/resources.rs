@@ -113,6 +113,7 @@ fn validate_signalling_server_base_url(url: &str) -> Result<(), String> {
   Ok(())
 }
 
+// TODO: Consider removing this resource altogether / merge with SerialisableRegisteredPlayer
 /// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct RegisteredClientPlayer {
