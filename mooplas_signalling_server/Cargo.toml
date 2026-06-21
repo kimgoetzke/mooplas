@@ -1,11 +1,14 @@
 [package]
 name = "mooplas_signalling_server"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 
 [dependencies]
-axum = { version = "0.8.8", features = ["http1"] }
+async-trait = "0.1.89"
+axum = { version = "0.8.8", features = ["http1", "ws"] }
 clap = { version = "4.6.0", features = ["derive"] }
+futures = "0.3.31"
+matchbox_protocol = { version = "0.14", features = ["json"] }
 matchbox_signaling = { version = "0.14" }
 rustls-pemfile = { version = "2.2.0" }
 tokio = { version = "1.50.1", features = ["macros", "rt-multi-thread"] }
@@ -15,3 +18,5 @@ tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
 reqwest = { version = "0.13.2", default-features = false, features = ["http2", "rustls"] }
+serde_json = "1.0.145"
+tokio-tungstenite = "0.28.0"

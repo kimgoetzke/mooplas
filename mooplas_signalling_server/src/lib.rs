@@ -2,7 +2,7 @@
 
 use axum::{Router, routing::get};
 use error::ServerError;
-use matchbox_signaling::SignalingServer;
+use room_aware_client_server::room_aware_client_server_builder;
 use server::StandaloneServer;
 use std::{
   fs::File,
@@ -19,9 +19,10 @@ use tokio_rustls::{
     pki_types::{CertificateDer, PrivateKeyDer},
   },
 };
-use tracing::*;
+use tracing::info;
 
 pub mod error;
+mod room_aware_client_server;
 mod server;
 
 pub const DEFAULT_PORT: u16 = 3536;
@@ -56,7 +57,7 @@ pub async fn run_server(config: ServerConfig) -> Result<(), ServerError> {
   build_server(config)?.serve().await
 }
 
-/// Builds a standalone Matchbox signalling server using client/server topology, with optional TLS termination.
+/// Builds a standalone Matchbox signalling server using room-aware client/server topology, with optional TLS termination.
 ///
 /// # Errors
 ///
@@ -75,23 +76,11 @@ pub fn build_server(config: ServerConfig) -> Result<StandaloneServer, ServerErro
   })
 }
 
-#[expect(
-  clippy::result_large_err,
-  reason = "matchbox_signaling requires axum::response::Response for connection rejection"
-)]
 fn build_router(requested_addr: SocketAddr) -> Router {
   let mut captured_router = None;
-  let _ = SignalingServer::client_server_builder(requested_addr)
+  let _ = room_aware_client_server_builder(requested_addr)
     .mutate_router(|router| router.route("/health", get(health_check)))
-    .on_connection_request(|connection| {
-      info!("Connecting: {connection:?}...");
-      Ok(true)
-    })
     .on_id_assignment(|(socket, id)| info!("Socket [{socket}] received ID [{id}]"))
-    .on_host_connected(|id| info!("Host joined and has ID [{id}]"))
-    .on_host_disconnected(|id| info!("Host [{id}] left"))
-    .on_client_connected(|id| info!("Client with ID [{id}] connected"))
-    .on_client_disconnected(|id| info!("Client [{id}] left"))
     .cors()
     .trace()
     .build_with(|router| {
