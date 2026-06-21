@@ -7,10 +7,10 @@ use rand::RngExt;
 use rand::distr::Alphanumeric;
 use url::Url;
 
-const ROOM_NAME_LENGTH: usize = 8;
+const ROOM_NAME_LENGTH: usize = 6;
 const STUN_ICE_SERVER_URL: &str = "stun:stun.l.google.com:19302";
 
-/// Generates a WebSocket room ID such as 'psda7ash'.
+/// Generates a WebSocket room ID such as 'psd7ah'.
 pub fn generate_room_id() -> String {
   rand::rng()
     .sample_iter(&Alphanumeric)
