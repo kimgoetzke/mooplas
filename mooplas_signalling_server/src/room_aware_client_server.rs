@@ -136,14 +136,15 @@ impl SignalingCallbacks for RoomAwareClientServerCallbacks {}
 /// Shared mutable signalling state for all rooms.
 #[derive(Debug, Default, Clone)]
 pub(crate) struct RoomAwareClientServerState {
-  state: StateObj<RoomsState>,
+  state: StateObj<GlobalServerState>,
 }
 
 impl SignalingState for RoomAwareClientServerState {}
 
-/// Registry of active rooms, peers, and approved role handshakes.
+/// Registry of active rooms, peers, and approved role handshakes. Intended to be used via
+/// [`RoomAwareClientServerState`].
 #[derive(Debug, Default, Clone)]
-struct RoomsState {
+struct GlobalServerState {
   rooms: HashMap<String, RoomState>,
   peers: HashMap<PeerId, PeerRoomMembership>,
   pending_roles: HashMap<String, VecDeque<PeerRole>>,
@@ -225,21 +226,11 @@ impl RoomAwareClientServerState {
     peer_id: PeerId,
     sender: SignalingChannel,
   ) -> Result<(), matchbox_signaling::SignalingError> {
-    let host_sender = {
-      let state = self.state.lock().expect(LOCK_ERROR);
-      state
-        .rooms
-        .get(room)
-        .and_then(|room_state| room_state.host.as_ref())
-        .map(|(_host_id, host_sender)| host_sender.clone())
-        .ok_or(matchbox_signaling::SignalingError::UnknownPeer)?
-    };
-
+    let host_sender = self.get_signalling_channel_sender(room)?;
     try_send(
       &host_sender,
       Message::Text(JsonPeerEvent::NewPeer(peer_id).to_string().into()),
     )?;
-
     let mut state = self.state.lock().expect(LOCK_ERROR);
     let room_state = state
       .rooms
@@ -258,15 +249,7 @@ impl RoomAwareClientServerState {
 
   /// Sends a signalling event to a room's host.
   fn try_send_to_host(&self, room: &str, message: Message) -> Result<(), matchbox_signaling::SignalingError> {
-    let host_sender = {
-      let state = self.state.lock().expect(LOCK_ERROR);
-      state
-        .rooms
-        .get(room)
-        .and_then(|room_state| room_state.host.as_ref())
-        .map(|(_host_id, sender)| sender.clone())
-        .ok_or(matchbox_signaling::SignalingError::UnknownPeer)?
-    };
+    let host_sender = self.get_signalling_channel_sender(room)?;
     try_send(&host_sender, message)
   }
 
@@ -365,6 +348,17 @@ impl RoomAwareClientServerState {
         error!("Failure sending host remove to client: {error:?}");
       }
     }
+  }
+
+  /// Returns the host signalling channel for a given channel.
+  fn get_signalling_channel_sender(&self, room: &str) -> Result<SignalingChannel, matchbox_signaling::SignalingError> {
+    let state = self.state.lock().expect(LOCK_ERROR);
+    state
+      .rooms
+      .get(room)
+      .and_then(|room_state| room_state.host.as_ref())
+      .map(|(_host_id, sender)| sender.clone())
+      .ok_or(matchbox_signaling::SignalingError::UnknownPeer)
   }
 }
 
