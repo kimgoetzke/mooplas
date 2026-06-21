@@ -46,6 +46,7 @@ private key for SSH.
 Make sure you have valid credentials for AWS e.g. login with `aws login`.
 
 First run:
+
 ```bash
 cd mooplas_signalling_server/deploy/opentofu
 cp mooplas.auto.tfvars.example mooplas.auto.tfvars
@@ -54,6 +55,7 @@ tofu init
 ```
 
 Every run:
+
 ```bash
 curl -s https://checkip.amazonaws.com
 # Update your IP in mooplas.auto.tfvars
@@ -69,8 +71,8 @@ OpenTofu creates:
 - Amazon Linux EC2 instance with Docker and Compose bootstrapped
 - Elastic IP
 - CloudFront distribution for `wss://`
-  ?
-  OpenTofu does not build or publish the Docker image.
+
+OpenTofu does not build or publish the Docker image.
 
 ## 3 Export connection details
 
