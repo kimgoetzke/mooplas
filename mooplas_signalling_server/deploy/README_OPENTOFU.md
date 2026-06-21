@@ -43,11 +43,20 @@ private key for SSH.
 
 ## 2 Create the AWS infrastructure
 
+Make sure you have valid credentials for AWS e.g. login with `aws login`.
+
+First run:
 ```bash
 cd mooplas_signalling_server/deploy/opentofu
 cp mooplas.auto.tfvars.example mooplas.auto.tfvars
-# edit mooplas.auto.tfvars
+# Edit mooplas.auto.tfvars
 tofu init
+```
+
+Every run:
+```bash
+curl -s https://checkip.amazonaws.com
+# Update your IP in mooplas.auto.tfvars
 tofu plan
 tofu apply
 ```
