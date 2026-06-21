@@ -38,7 +38,8 @@ currently deployed.
   public STUN (`stun.l.google.com:19302`)
 - The standalone signalling server uses the WebSocket URL path as the room ID and supports multiple independent rooms
   on one process
-- The host generates an 6-character room ID and shares only that ID with clients
+- The host generates a 6-character room ID and shares only that ID with clients; internally the host connects to the
+  same room URL with `?role=host`, while clients enter the bare room ID or paste a full room URL in the join menu
 - `SIGNALLING_SERVER_URL` is baked in at build time (defaults to `ws://localhost:3536`); for native development the
   signalling server starts embedded in the host process and remains a single-room local-dev helper
 

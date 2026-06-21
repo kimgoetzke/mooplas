@@ -5,6 +5,10 @@
 This crate contains a standalone Mooplas signalling server for the Matchbox WASM backend. It supports:
 
 - Client-server topology with multiple concurrent rooms
+    - Hosts use the same room path plus `?role=host`, for example `wss://signal.example.com/{room-id}?role=host`
+    - The game is expected to add that query parameter internally
+    - Users still share only the room ID
+    - A duplicate host attempt for an active room is rejected
 - Plain `ws://` for local development
 - TLS-terminated `wss://` when you provide PEM certificate and key files
 - A simple `/health` endpoint for monitoring
