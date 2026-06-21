@@ -16,7 +16,7 @@ This configuration creates resources that can incur AWS charges:
 The dedicated VPC, subnet, route table, and internet gateway do not materially add cost by themselves. No NAT Gateway is
 created.
 
-## 1 Create a local SSH key pair
+## 1 Create a local SSH key pair (only once)
 
 Create the key pair locally, then give OpenTofu only the public key.
 
@@ -176,7 +176,7 @@ scp -i "$MOOPLAS_SIGNALLING_SSH_KEY" mooplas-signalling-server.tar.gz "ec2-user@
 ssh -i "$MOOPLAS_SIGNALLING_SSH_KEY" "ec2-user@$EC2_ELASTIC_IP" -v -o IdentitiesOnly=yes <<'EOF'
 cd /opt/mooplas-signalling
 docker load < mooplas-signalling-server.tar.gz
-docker compose up -d
+docker compose up -d --force-recreate
 EOF
 ```
 

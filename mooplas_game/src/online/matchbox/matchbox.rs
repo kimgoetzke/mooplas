@@ -55,7 +55,7 @@ fn handle_toggle_menu_message(
         #[cfg(not(target_arch = "wasm32"))]
         start_signaling_server(&mut commands);
         let room_id = generate_room_id();
-        let room_url = format!("{}/{}", signalling_server_url.as_str().trim_end_matches('/'), &room_id);
+        let room_url = host_room_url(signalling_server_url.as_str(), &room_id);
         let connection_info = ConnectionInfoMessage::new(room_id);
         match start_socket(&mut commands, &room_url) {
           Ok(()) => {
@@ -109,6 +109,14 @@ fn handle_connection_info_message(
   }
 }
 
+fn host_room_url(signalling_server_base_url: &str, room_id: &str) -> String {
+  format!(
+    "{}/{}?role=host",
+    signalling_server_base_url.trim_end_matches('/'),
+    room_id
+  )
+}
+
 // TODO: Implement an visual feedback for the user when host leaves
 #[allow(clippy::never_loop)]
 fn receive_network_error_event(
@@ -150,4 +158,17 @@ fn receive_network_error_event(
   }
   error!("Networking error occurred: [{}], panicking now...", error);
   panic!("{}", error);
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn host_room_url_adds_host_role_without_changing_room_id() {
+    assert_eq!(
+      host_room_url("wss://signal.example.com/", "room-456"),
+      "wss://signal.example.com/room-456?role=host"
+    );
+  }
 }
