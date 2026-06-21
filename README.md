@@ -32,14 +32,15 @@ currently deployed.
 - Both backends use a **client-server topology**: one instance acts as host, all others connect as clients
 - Wire data is serialised with [`postcard`](https://github.com/jamesmunns/postcard) and sent over three channels:
   `Unreliable`, `ReliableUnordered`, and `ReliableOrdered`
-- The matchbox backend brokers initial WebRTC connections through a WebSocket signalling server
+- Browser/WASM Matchbox builds broker initial WebRTC connections through the standalone WebSocket signalling server
   (`mooplas_signalling_server`,
   see [README](https://github.com/kimgoetzke/mooplas/blob/main/mooplas_signalling_server/README.md)); ICE uses Google's
   public STUN (`stun.l.google.com:19302`)
-- The WASM implementation supports room joining: the host generates an 8-character room ID and shares it with clients;
-  clients enter it in the join menu to connect
+- The standalone signalling server uses the WebSocket URL path as the room ID and supports multiple independent rooms
+  on one process
+- The host generates an 6-character room ID and shares only that ID with clients
 - `SIGNALLING_SERVER_URL` is baked in at build time (defaults to `ws://localhost:3536`); for native development the
-  signalling server starts embedded in the host process
+  signalling server starts embedded in the host process and remains a single-room local-dev helper
 
 ## Demo
 
