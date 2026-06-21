@@ -1,6 +1,6 @@
 # Deployment of a Mooplas signalling server
 
-AWS infrastructure is managed with OpenTofu in [`opentofu/`](./opentofu/). Use that workflow instead of creating EC2,
+AWS infrastructure is managed with OpenTofu in [`deploy/opentofu/`](./deploy/opentofu/). Use that workflow instead of creating EC2,
 security groups, Elastic IPs, or CloudFront distributions in the AWS console.
 
 TLS is terminated by CloudFront, so the container runs in plain `ws://` mode on the EC2 instance.
@@ -165,7 +165,7 @@ Example value:
 SIGNALLING_SERVER_URL=wss://d111111abcdef8.cloudfront.net
 ```
 
-See [README.md](./../../README.md#how-to-build-wasm-for-the-web) at the repository root for game build instructions.
+See [README.md](../README.md#how-to-build-wasm-for-the-web) at the repository root for game build instructions.
 
 ## 10 Updating the server
 

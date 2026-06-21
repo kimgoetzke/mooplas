@@ -1,8 +1,9 @@
 # Manual EC2 deployment of a Mooplas signalling server
 
 This guide is just a reference for deploying the signalling server to an EC2 instance manually (no CI/CD). It's the
-most basic, low-cost, but manual way of setting up a server I could think of. All the following is done in the AWS
-console.
+most basic, low-cost, but manual way of setting up a server I could think of while still AWS infrastructure.
+All the following is done in the AWS console. For a less manual alternative,
+see [README_WITH_OPEN_TOFU](DEPLOY_WITH_OPEN_TOFU.md).
 
 TLS is terminated by CloudFront, so the container runs in plain `ws://` mode.
 
@@ -241,7 +242,7 @@ Use this as the signalling server URL in the game build:
 SIGNALLING_SERVER_URL=wss://<SOMETHING>.cloudfront.net
 ```
 
-See [README.md](./../../README.md#how-to-build-wasm-for-the-web) at the root of the repository for instructions on how
+See [README.md](./../README.md#how-to-build-wasm-for-the-web) at the root of the repository for instructions on how
 to build the game with a signalling server URL configured.
 
 ## 13 Updating the server

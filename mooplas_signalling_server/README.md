@@ -40,6 +40,10 @@ To check that it works, do a health check with:
 curl http://127.0.0.1:3536/health -v
 ```
 
+## Deploying to the cloud
+
+See [DEPLOY_WITH_OPEN_TOFU](./DEPLOY_WITH_OPEN_TOFU.md) or [DEPLOY_MANUALLY](./DEPLOY_MANUALLY.md) for examples.
+
 ## Container image
 
 ### Build
