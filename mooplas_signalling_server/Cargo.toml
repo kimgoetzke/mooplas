@@ -7,7 +7,7 @@ edition = "2024"
 async-trait = "0.1.89"
 axum = { version = "0.8.8", features = ["http1", "ws"] }
 clap = { version = "4.6.0", features = ["derive"] }
-futures = "0.3.31"
+futures = { version = "0.3.31" }
 matchbox_protocol = { version = "0.14", features = ["json"] }
 matchbox_signaling = { version = "0.14" }
 rustls-pemfile = { version = "2.2.0" }
@@ -17,6 +17,8 @@ tracing = { version = "0.1.44", features = ["log"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 
 [dev-dependencies]
+matchbox_socket = { version = "0.14" }
 reqwest = { version = "0.13.2", default-features = false, features = ["http2", "rustls"] }
-serde_json = "1.0.145"
-tokio-tungstenite = "0.28.0"
+rustls = { version = "0.23.36", default-features = false, features = ["ring", "std"] }
+serde_json = { version = "1.0.145" }
+tokio-tungstenite = { version = "0.28.0" }
