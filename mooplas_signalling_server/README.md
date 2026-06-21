@@ -4,9 +4,10 @@
 
 This crate contains a standalone Mooplas signalling server for the Matchbox WASM backend. It supports:
 
-1. Plain `ws://` for local development
-2. TLS-terminated `wss://` when you provide PEM certificate and key files
-3. A simple `/health` endpoint for monitoring
+- Client-server topology with multiple concurrent rooms
+- Plain `ws://` for local development
+- TLS-terminated `wss://` when you provide PEM certificate and key files
+- A simple `/health` endpoint for monitoring
 
 ## Running locally
 
