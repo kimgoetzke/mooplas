@@ -23,6 +23,9 @@ pub fn generate_room_id() -> String {
 /// Give it the signalling server base URL and a connection string (either a full room URL or just a room ID) and it
 /// resolves it to a full room URL.
 ///
+/// The standalone signalling server honours the room ID in the URL path. The embedded native development signalling
+/// server remains a single-room local-dev helper.
+///
 /// Examples:
 /// - Base URL `wss://signal.example.com` and connection string `room-456` will resolve to:
 ///   `wss://signal.example.com/room-456`.
@@ -72,7 +75,6 @@ pub fn validate_websocket_url(url: &str) -> Result<(), String> {
   Ok(())
 }
 
-// TODO: Stop room ID from being entirely ignored by the server
 pub fn start_socket(commands: &mut Commands, room_url: &str) -> Result<(), String> {
   validate_websocket_url(room_url)?;
   let web_rtc_socket_builder = WebRtcSocket::builder(room_url)
