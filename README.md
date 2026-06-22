@@ -24,11 +24,8 @@ currently deployed.
 
 ## Networking overview
 
-- Two compile-time backends, selected via Cargo feature flags:
-    - `online_renet` — native only; UDP transport via [`bevy_renet`](https://github.com/lucaspoffo/renet) with a
-      `netcode` protocol
-    - `online_matchbox` — native and WASM; WebRTC data channels via
-      [`bevy_matchbox`](https://github.com/johanhelsing/matchbox), required for browser builds
+- Uses [`bevy_matchbox`](https://github.com/johanhelsing/matchbox) when the `online` Cargo feature flags is provided
+- Supports native and WASM/browser builds
 - Both backends use a **client-server topology**: one instance acts as host, all others connect as clients
 - Wire data is serialised with [`postcard`](https://github.com/jamesmunns/postcard) and sent over three channels:
   `Unreliable`, `ReliableUnordered`, and `ReliableOrdered`
@@ -109,7 +106,7 @@ Upgrade the flake by running `nix flake update --flake .` in the repository's ba
 ## How to build WASM for the web
 
 > [!NOTE]
-> Browser builds intended for online multiplayer should use the Matchbox backend (`--features online_matchbox`) and a
+> Browser builds intended for online multiplayer should use the Matchbox backend (`--features online`) and a
 > reachable signalling server URL.
 
 #### Prerequisites
@@ -145,7 +142,7 @@ Then you can build the WASM file:
 
 1. Build the WASM file:
     ```shell
-    SIGNALLING_SERVER_URL='ws://localhost:3536' RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online_matchbox
+    SIGNALLING_SERVER_URL='ws://localhost:3536' RUSTFLAGS='--cfg=web_sys_unstable_apis --cfg=getrandom_backend="wasm_js"' cargo build --target wasm32-unknown-unknown --release --manifest-path mooplas_game/Cargo.toml --package mooplas_game --bin mooplas_game --no-default-features --features online
     ```
    For local development builds you can omit `SIGNALLING_SERVER_URL` and the game will use `ws://localhost:3536`.
 2. Clean the `/www/public` directory and copy the game's assets over:

@@ -109,7 +109,7 @@ fn spawn_menu(
         .with_children(|parent| {
           // Instructions
           parent.spawn((
-            Text::new(host_connection_info_label()),
+            Text::new("Share this room ID with your friends:"),
             TextFont {
               font: heading_font.clone(),
               font_size: SMALL_FONT,
@@ -130,7 +130,7 @@ fn spawn_menu(
               justification: Justify::Center,
               ..Default::default()
             },
-            TextInputPrompt::new(host_connection_info_prompt()),
+            TextInputPrompt::new("Generating room ID..."),
             TextFont {
               font,
               font_size: NORMAL_FONT,
@@ -167,22 +167,6 @@ fn spawn_menu(
           spawn_button(parent, asset_server, BackButton, "Back", 300, NORMAL_FONT);
         });
     });
-}
-
-fn host_connection_info_label() -> &'static str {
-  if cfg!(feature = "online_matchbox") {
-    "Share this room ID with your friends:"
-  } else {
-    "Your friends can now join by connecting to:"
-  }
-}
-
-fn host_connection_info_prompt() -> &'static str {
-  if cfg!(feature = "online_matchbox") {
-    "Generating room ID..."
-  } else {
-    "Determining your address..."
-  }
 }
 
 /// System to handle updating the host address text when the connection info is updated.

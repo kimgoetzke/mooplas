@@ -34,28 +34,6 @@ impl From<ChannelType> for usize {
   }
 }
 
-#[cfg(feature = "renet")]
-impl From<bevy_renet::renet::DefaultChannel> for ChannelType {
-  fn from(value: bevy_renet::renet::DefaultChannel) -> Self {
-    match value {
-      bevy_renet::renet::DefaultChannel::Unreliable => ChannelType::Unreliable,
-      bevy_renet::renet::DefaultChannel::ReliableOrdered => ChannelType::ReliableOrdered,
-      bevy_renet::renet::DefaultChannel::ReliableUnordered => ChannelType::ReliableUnordered,
-    }
-  }
-}
-
-#[cfg(feature = "renet")]
-impl From<ChannelType> for bevy_renet::renet::DefaultChannel {
-  fn from(value: ChannelType) -> Self {
-    match value {
-      ChannelType::Unreliable => bevy_renet::renet::DefaultChannel::Unreliable,
-      ChannelType::ReliableOrdered => bevy_renet::renet::DefaultChannel::ReliableOrdered,
-      ChannelType::ReliableUnordered => bevy_renet::renet::DefaultChannel::ReliableUnordered,
-    }
-  }
-}
-
 /// A component identifying a player. Used to link player entities together.
 #[derive(Component, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct PlayerId(pub u8);

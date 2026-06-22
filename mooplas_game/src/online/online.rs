@@ -19,10 +19,7 @@ impl Plugin for OnlinePlugin {
     #[cfg(feature = "online")]
     app.init_resource::<LocalInputMapping>();
 
-    #[cfg(feature = "online_renet")]
-    app.add_plugins(crate::online::renet::RenetPlugin);
-
-    #[cfg(feature = "online_matchbox")]
+    #[cfg(feature = "online")]
     app.add_plugins(crate::online::matchbox::MatchboxPlugin);
   }
 }

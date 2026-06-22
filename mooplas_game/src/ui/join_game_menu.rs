@@ -137,7 +137,7 @@ fn spawn_menu(
               TextColor(Color::from(ACCENT_COLOUR)),
               BorderColor::all(Color::from(tailwind::SLATE_500)),
               BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
-              TextInputPrompt::new(join_connection_info_prompt()),
+              TextInputPrompt::new("Enter room ID or paste room URL here..."),
               Node {
                 width: percent(100),
                 height: px(45.),
@@ -197,14 +197,6 @@ fn spawn_menu(
       NotificationText,
     )],
   ));
-}
-
-fn join_connection_info_prompt() -> &'static str {
-  if cfg!(feature = "online_matchbox") {
-    "Enter room ID or paste room URL here..."
-  } else {
-    "Paste connection string here..."
-  }
 }
 
 /// A system to handle button interactions, excluding the connect button which is handled via an observer because it

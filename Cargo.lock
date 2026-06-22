@@ -553,7 +553,7 @@ dependencies = [
  "futures-io",
  "rustls 0.21.12",
  "rustls-pemfile 1.0.4",
- "webpki-roots 0.22.6",
+ "webpki-roots",
 ]
 
 [[package]]
@@ -1815,20 +1815,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 2.0.117",
-]
-
-[[package]]
-name = "bevy_renet"
-version = "4.0.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1adf4d4212a12a4fb789bc7870bbbb82a474a32ace8e5e39a25de67c23f8ee13"
-dependencies = [
- "bevy_app",
- "bevy_derive",
- "bevy_ecs",
- "bevy_time",
- "renet",
- "renet_netcode",
 ]
 
 [[package]]
@@ -5056,7 +5042,6 @@ dependencies = [
  "getrandom 0.4.1",
  "mooplas_networking",
  "mooplas_networking_matchbox",
- "mooplas_networking_renet",
  "rand 0.10.1",
  "serde",
 ]
@@ -5066,7 +5051,6 @@ name = "mooplas_networking"
 version = "0.1.0"
 dependencies = [
  "bevy",
- "bevy_renet",
  "postcard",
  "serde",
  "url",
@@ -5083,18 +5067,6 @@ dependencies = [
  "mooplas_networking",
  "rand 0.10.1",
  "url",
-]
-
-[[package]]
-name = "mooplas_networking_renet"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-inspector-egui",
- "bevy_renet",
- "mooplas_networking",
- "renet_visualizer",
- "ureq",
 ]
 
 [[package]]
@@ -5729,12 +5701,6 @@ dependencies = [
  "rdst",
  "static_assertions",
 ]
-
-[[package]]
-name = "octets"
-version = "0.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2ba5d98c13e549f6f26f7d70808688ab85c6b42eb350ba2524d96c24ebde27e9"
 
 [[package]]
 name = "offset-allocator"
@@ -6627,48 +6593,6 @@ name = "renderdoc-sys"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "19b30a45b0cd0bcca8037f3d0dc3421eaf95327a17cad11964fb8179b4fc4832"
-
-[[package]]
-name = "renet"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8535f2f4b5afe5e31fc37be4b8a1f167e61177f356b1c6ee8456b7045d6c74c0"
-dependencies = [
- "bytes",
- "log",
- "octets",
-]
-
-[[package]]
-name = "renet_netcode"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9479f1355a92d5aa04a0339ad341878fa572492cb9be09db7b34954bdb13a30"
-dependencies = [
- "log",
- "renet",
- "renetcode",
-]
-
-[[package]]
-name = "renet_visualizer"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "13f2d700dff60049d68e4f7af6666fd52a1292e45e27a418e29fe5e39e05245f"
-dependencies = [
- "egui",
- "renet",
-]
-
-[[package]]
-name = "renetcode"
-version = "2.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "76bed9d6d190d20804b5645511932fef803145520ef4eb76d5e4b5a841980eac"
-dependencies = [
- "chacha20poly1305",
- "log",
-]
 
 [[package]]
 name = "reqwest"
@@ -7915,16 +7839,16 @@ dependencies = [
  "indexmap",
  "toml_datetime",
  "toml_parser",
- "winnow",
+ "winnow 0.7.14",
 ]
 
 [[package]]
 name = "toml_parser"
-version = "1.0.6+spec-1.1.0"
+version = "1.1.2+spec-1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3198b4b0a8e11f09dd03e133c0280504d0801269e9afa46362ffde1cbeebf44"
+checksum = "a2abe9b86193656635d2411dc43050282ca48aa31c2451210f4202550afb7526"
 dependencies = [
- "winnow",
+ "winnow 1.0.3",
 ]
 
 [[package]]
@@ -8217,35 +8141,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ecb6da28b8a351d773b68d5825ac39017e680750f980f3a1a85cd8dd28a47c1"
 
 [[package]]
-name = "ureq"
-version = "3.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dea7109cdcd5864d4eeb1b58a1648dc9bf520360d7af16ec26d0a9354bafcfc0"
-dependencies = [
- "base64 0.22.1",
- "flate2",
- "log",
- "percent-encoding",
- "rustls 0.23.36",
- "rustls-pki-types",
- "ureq-proto",
- "utf8-zero",
- "webpki-roots 1.0.5",
-]
-
-[[package]]
-name = "ureq-proto"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e994ba84b0bd1b1b0cf92878b7ef898a5c1760108fe7b6010327e274917a808c"
-dependencies = [
- "base64 0.22.1",
- "http",
- "httparse",
- "log",
-]
-
-[[package]]
 name = "url"
 version = "2.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8262,12 +8157,6 @@ name = "utf-8"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "09cc8ee72d2a9becf2f2febe0205bbed8fc6615b7cb429ad062dc7b7ddd036a9"
-
-[[package]]
-name = "utf8-zero"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b8c0a043c9540bae7c578c88f91dda8bd82e59ae27c21baca69c8b191aaf5a6e"
 
 [[package]]
 name = "utf8_iter"
@@ -8636,15 +8525,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
 dependencies = [
  "webpki",
-]
-
-[[package]]
-name = "webpki-roots"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "12bed680863276c63889429bfd6cab3b99943659923822de1c8a39c49e4d722c"
-dependencies = [
- "rustls-pki-types",
 ]
 
 [[package]]
@@ -9596,6 +9476,12 @@ checksum = "5a5364e9d77fcdeeaa6062ced926ee3381faa2ee02d3eb83a5c27a8825540829"
 dependencies = [
  "memchr",
 ]
+
+[[package]]
+name = "winnow"
+version = "1.0.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0592e1c9d151f854e6fd382574c3a0855250e1d9b2f99d9281c6e6391af352f1"
 
 [[package]]
 name = "wit-bindgen"

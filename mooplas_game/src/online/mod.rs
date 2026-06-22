@@ -12,10 +12,7 @@ mod server;
 #[cfg(feature = "online")]
 mod client;
 
-#[cfg(feature = "online_renet")]
-mod renet;
-
-#[cfg(feature = "online_matchbox")]
+#[cfg(feature = "online")]
 mod matchbox;
 
 pub use online::OnlinePlugin;

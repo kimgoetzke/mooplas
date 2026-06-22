@@ -20,7 +20,7 @@
   {
     "label": "Run All Tests (online features)",
     "command": "cargo",
-    "args": ["test", "--features", "online,online_renet,online_matchbox"],
+    "args": ["test", "--features", "online"],
     "cwd": "$ZED_WORKTREE_ROOT",
     "env": {
       "RUST_BACKTRACE": "short"
@@ -61,30 +61,6 @@
     "cwd": "$ZED_WORKTREE_ROOT",
     "env": {
       "RUST_BACKTRACE": "short"
-    },
-    "allow_concurrent_runs": true,
-    "use_new_terminal": true
-  },
-  {
-    "label": "Run Online Game with Matchbox, Dev & Debug",
-    "command": "cargo",
-    "args": ["run", "--manifest-path", "mooplas_game/Cargo.toml", "--package", "mooplas_game", "--bin", "mooplas_game", "--no-default-features", "--features", "online_matchbox,dev"],
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "env": {
-      "RUST_BACKTRACE": "short",
-      "RUST_LOG": "mooplas_game=debug,mooplas_networking=debug"
-    },
-    "allow_concurrent_runs": true,
-    "use_new_terminal": true
-  },
-  {
-    "label": "Run Online Game with Renet, Dev & Debug",
-    "command": "cargo",
-    "args": ["run", "--manifest-path", "mooplas_game/Cargo.toml", "--package", "mooplas_game", "--bin", "mooplas_game", "--no-default-features", "--features", "online_renet,dev"],
-    "cwd": "$ZED_WORKTREE_ROOT",
-    "env": {
-      "RUST_BACKTRACE": "short",
-      "RUST_LOG": "mooplas_game=debug,mooplas_networking=debug"
     },
     "allow_concurrent_runs": true,
     "use_new_terminal": true

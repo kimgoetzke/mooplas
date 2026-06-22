@@ -16,7 +16,6 @@ use mooplas_networking_matchbox::prelude::{
 };
 
 /// Plugin that adds online multiplayer capabilities for WASM targets using websocket/`bevy_matchbox` to the game.
-/// Mutually exclusive with the [`crate::online::renet::RenetPlugin`].
 pub struct MatchboxPlugin;
 
 impl Plugin for MatchboxPlugin {
