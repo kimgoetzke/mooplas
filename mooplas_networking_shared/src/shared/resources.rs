@@ -44,12 +44,12 @@ impl NetworkRole {
   }
 }
 
-/// Marker resource inserted when a Renet server is active. The intention is to use this for running systems
+/// Marker resource inserted when a server is active. The intention is to use this for running systems
 /// conditionally e.g. `.run_if(resource_exists::<ServerNetworkingActive>)`.
 #[derive(Resource, Default)]
 pub struct ServerNetworkingActive;
 
-/// Marker resource inserted when a Renet client is active. The intention is to use this for running systems
+/// Marker resource inserted when a client is active. The intention is to use this for running systems
 /// conditionally e.g. `.run_if(resource_exists::<ClientNetworkingActive>)`.
 #[derive(Resource, Default)]
 pub struct ClientNetworkingActive;
@@ -400,6 +400,6 @@ mod tests {
   }
 
   fn test_client_id(value: u128) -> ClientId {
-    ClientId::from_renet_u64(value as u64)
+    ClientId::from_u64(value as u64)
   }
 }

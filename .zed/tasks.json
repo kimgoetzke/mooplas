@@ -46,15 +46,6 @@
     }
   },
   {
-    "label": "Run Matchbox Networking Tests",
-    "command": "cargo",
-    "args": ["test", "--no-default-features"],
-    "cwd": "$ZED_WORKTREE_ROOT/mooplas_networking_matchbox",
-    "env": {
-      "RUST_BACKTRACE": "short"
-    }
-  },
-  {
     "label": "Run Online Game",
     "command": "cargo",
     "args": ["run", "--manifest-path", "mooplas_game/Cargo.toml", "--package", "mooplas_game", "--bin", "mooplas_game", "--no-default-features", "--features", "online"],
@@ -64,15 +55,6 @@
     },
     "allow_concurrent_runs": true,
     "use_new_terminal": true
-  },
-  {
-    "label": "Run Renet Networking Tests",
-    "command": "cargo",
-    "args": ["test", "--no-default-features"],
-    "cwd": "$ZED_WORKTREE_ROOT/mooplas_networking_renet",
-    "env": {
-      "RUST_BACKTRACE": "short"
-    }
   },
   {
     "label": "Run Signalling Server",

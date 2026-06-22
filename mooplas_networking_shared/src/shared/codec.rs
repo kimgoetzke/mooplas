@@ -49,7 +49,7 @@ mod tests {
     fn client_initialised_round_trip_carries_seed_without_spawn_points() {
       let original = InboundServerMessage::ClientInitialised {
         seed: 42,
-        client_id: ClientId::from_renet_u64(7),
+        client_id: ClientId::from_u64(7),
         current_state: "Playing".to_string(),
         registered_players: vec![SerialisableRegisteredPlayer {
           client_id: ClientId::nil(),
@@ -73,7 +73,7 @@ mod tests {
         panic!("Expected ClientInitialised");
       };
       assert_eq!(seed, 42);
-      assert_eq!(client_id, ClientId::from_renet_u64(7));
+      assert_eq!(client_id, ClientId::from_u64(7));
       assert_eq!(current_state, "Playing");
       assert_eq!(registered_players.len(), 1);
       assert_eq!(winner_info, Some(0));

@@ -72,15 +72,15 @@ impl ClientId {
     self.0
   }
 
-  /// Creates a deterministic, stable UUID for a renet u64 client ID.
-  pub fn from_renet_u64(value: u64) -> Self {
+  /// Creates a deterministic, stable UUID for a u64 client ID.
+  pub fn from_u64(value: u64) -> Self {
     let mut bytes = [0_u8; 16];
     bytes[8..].copy_from_slice(&value.to_be_bytes());
     Self(Uuid::from_bytes(bytes))
   }
 
-  /// Extracts a renet u64 client ID from the backing UUID.
-  pub fn to_renet_u64(self) -> u64 {
+  /// Extracts a u64 client ID from the backing UUID.
+  pub fn to_u64(self) -> u64 {
     let bytes = self.0.as_bytes();
     u64::from_be_bytes(bytes[8..].try_into().expect("Expected 8 bytes"))
   }

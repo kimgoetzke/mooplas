@@ -546,8 +546,8 @@ mod tests {
     set_app_state(&mut app, AppState::Registering);
     app.add_systems(Update, handle_inbound_server_message);
 
-    let existing_client_id = ClientId::from_renet_u64(7);
-    let late_client_id = ClientId::from_renet_u64(8);
+    let existing_client_id = ClientId::from_u64(7);
+    let late_client_id = ClientId::from_u64(8);
     {
       let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
       registered_players
@@ -710,7 +710,7 @@ mod tests {
           control_scheme_id: 0,
           name: "Test".to_string(),
         },
-        ClientId::from_renet_u64(42),
+        ClientId::from_u64(42),
       ))
       .expect("Failed to queue InboundClientMessage");
     app.update();
@@ -740,7 +740,7 @@ mod tests {
             player_id: 1,
             control_scheme_id: 0,
             ..
-          } if client_id == ClientId::from_renet_u64(42)
+          } if client_id == ClientId::from_u64(42)
         ));
       }
       _ => panic!("Expected a broadcast message"),
@@ -774,7 +774,7 @@ mod tests {
           control_scheme_id: 0,
           name: "Test".to_string(),
         },
-        ClientId::from_renet_u64(42),
+        ClientId::from_u64(42),
       ))
       .expect("Failed to queue InboundClientMessage");
     app.update();
@@ -820,8 +820,8 @@ mod tests {
     add_control_schemes(&mut app, 2);
     app.add_systems(Update, handle_inbound_client_message);
 
-    let first_client_id = ClientId::from_renet_u64(42);
-    let second_client_id = ClientId::from_renet_u64(43);
+    let first_client_id = ClientId::from_u64(42);
+    let second_client_id = ClientId::from_u64(43);
 
     app
       .world_mut()

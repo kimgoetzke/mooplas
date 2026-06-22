@@ -562,7 +562,7 @@ mod tests {
       .world_mut()
       .write_message(InboundServerMessage::ClientInitialised {
         seed: 123,
-        client_id: ClientId::from_renet_u64(7),
+        client_id: ClientId::from_u64(7),
         current_state: "Registering".to_string(),
         registered_players: Vec::new(),
         winner_info: None,
@@ -588,7 +588,7 @@ mod tests {
     app.insert_resource(ClientNetworkingActive);
     set_app_state(&mut app, AppState::Preparing);
 
-    let client_id = ClientId::from_renet_u64(7);
+    let client_id = ClientId::from_u64(7);
     let host_client_id = ClientId::nil();
     app
       .world_mut()
@@ -633,7 +633,7 @@ mod tests {
     add_control_schemes(&mut app, 1);
     app.add_systems(Update, handle_inbound_server_message);
 
-    let client_id = ClientId::from_renet_u64(7);
+    let client_id = ClientId::from_u64(7);
     app
       .world_mut()
       .write_message(InboundServerMessage::ClientInitialised {
