@@ -4,7 +4,7 @@ use crate::online::utils;
 use crate::prelude::{
   AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalPlayerRegistrationRequestMessage,
   MenuName, PlayerId, PlayerName, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead, ToggleMenuMessage,
-  WinnerInfo,
+  UiNotification, WinnerInfo,
 };
 use bevy::app::Update;
 use bevy::log::{debug, error_once, info, warn};
@@ -25,6 +25,9 @@ pub struct ClientPlugin;
 
 #[derive(Resource, Default)]
 struct CurrentClientId(Option<ClientId>);
+
+const PLAYER_JOINED_NOTIFICATION: &str = "A player joined the game";
+const PLAYER_LEFT_NOTIFICATION: &str = "A player left the game";
 
 #[derive(Resource)]
 struct PendingClientBootstrap {
@@ -99,6 +102,20 @@ fn register_player_locally(
   }
 }
 
+fn write_remote_client_lifecycle_notification(
+  ui_notification: &mut MessageWriter<UiNotification>,
+  current_client_id: &CurrentClientId,
+  client_id: ClientId,
+  text: &str,
+) {
+  if current_client_id
+    .0
+    .is_some_and(|current_client_id| current_client_id != client_id)
+  {
+    ui_notification.write(UiNotification::info(text.to_string()));
+  }
+}
+
 fn set_state_safely(current_state: AppState, next_state: &mut ResMut<NextState<AppState>>, target_state: AppState) {
   if is_state_transition_permitted(&current_state, &target_state) {
     next_state.set(target_state);
@@ -136,11 +153,28 @@ fn handle_inbound_server_message(
   mut registration_message: MessageWriter<PlayerRegistrationMessage>,
   mut player_state_update_message: MessageWriter<PlayerStateUpdateMessage>,
   mut exit_lobby_message: MessageWriter<ExitLobbyMessage>,
+  mut ui_notification: MessageWriter<UiNotification>,
 ) {
   for message in messages.read() {
     match message {
-      InboundServerMessage::ClientConnected { client_id } => info!("[{:?}] connected", client_id),
-      InboundServerMessage::ClientDisconnected { client_id } => info!("[{:?}] disconnected", client_id),
+      InboundServerMessage::ClientConnected { client_id } => {
+        info!("[{:?}] connected", client_id);
+        write_remote_client_lifecycle_notification(
+          &mut ui_notification,
+          &current_client_id,
+          *client_id,
+          PLAYER_JOINED_NOTIFICATION,
+        );
+      }
+      InboundServerMessage::ClientDisconnected { client_id } => {
+        info!("[{:?}] disconnected", client_id);
+        write_remote_client_lifecycle_notification(
+          &mut ui_notification,
+          &current_client_id,
+          *client_id,
+          PLAYER_LEFT_NOTIFICATION,
+        );
+      }
       InboundServerMessage::ClientInitialised {
         seed: server_seed,
         client_id,
@@ -392,7 +426,7 @@ mod tests {
   use crate::app_state::AppStatePlugin;
   use crate::initialisation::InitialisationPlugin;
   use crate::prelude::constants::RESOLUTION_WIDTH;
-  use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin};
+  use crate::prelude::{SharedMessagesPlugin, SharedResourcesPlugin, UiNotification};
   use bevy::math::Vec3;
   use bevy::prelude::*;
   use bevy::state::app::StatesPlugin;
@@ -625,6 +659,85 @@ mod tests {
       .expect("Expected bootstrapped host player");
     assert!(player.is_remote());
     assert_eq!(player.name, "Host");
+  }
+
+  #[test]
+  fn handle_inbound_server_message_writes_join_notification_for_another_client() {
+    let mut app = setup();
+    app.add_systems(Update, handle_inbound_server_message);
+    app.world_mut().resource_mut::<CurrentClientId>().0 = Some(ClientId::from_u64(7));
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientConnected {
+        client_id: ClientId::from_u64(8),
+      })
+      .expect("Failed to write ClientConnected message");
+    app.update();
+
+    let notifications = app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing");
+    let notification_texts: Vec<_> = notifications
+      .iter_current_update_messages()
+      .map(|notification| notification.text.as_str())
+      .collect();
+    assert_eq!(notification_texts, vec!["A player joined the game"]);
+  }
+
+  #[test]
+  fn handle_inbound_server_message_does_not_write_join_notification_for_bootstrap_snapshot() {
+    let mut app = setup();
+    app.add_systems(Update, handle_inbound_server_message);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientInitialised {
+        seed: 123,
+        client_id: ClientId::from_u64(7),
+        current_state: "Registering".to_string(),
+        registered_players: vec![SerialisableRegisteredPlayer {
+          client_id: ClientId::nil(),
+          player_id: 0,
+          control_scheme_id: 0,
+          name: "Host".to_string(),
+        }],
+        winner_info: None,
+      })
+      .expect("Failed to write ClientInitialised message");
+    app.update();
+
+    let notifications = app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing");
+    assert_eq!(notifications.iter_current_update_messages().count(), 0);
+  }
+
+  #[test]
+  fn handle_inbound_server_message_writes_left_notification_for_another_client() {
+    let mut app = setup();
+    app.add_systems(Update, handle_inbound_server_message);
+    app.world_mut().resource_mut::<CurrentClientId>().0 = Some(ClientId::from_u64(7));
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientDisconnected {
+        client_id: ClientId::from_u64(8),
+      })
+      .expect("Failed to write ClientDisconnected message");
+    app.update();
+
+    let notifications = app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing");
+    let notification_texts: Vec<_> = notifications
+      .iter_current_update_messages()
+      .map(|notification| notification.text.as_str())
+      .collect();
+    assert_eq!(notification_texts, vec!["A player left the game"]);
   }
 
   #[test]

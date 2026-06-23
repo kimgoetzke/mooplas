@@ -1,7 +1,7 @@
 #![cfg(feature = "online")]
 
 use crate::app_state::AppState;
-use crate::prelude::constants::{ACCENT_COLOUR, DEFAULT_FONT, NORMAL_FONT};
+use crate::prelude::constants::{ACCENT_COLOUR, CLIENT_HAND_SHAKE_TIMEOUT_SECS, DEFAULT_FONT, NORMAL_FONT};
 use crate::prelude::{ConnectionInfoMessage, CustomInteraction, MenuName, UiNotification};
 use crate::shared::ToggleMenuMessage;
 use crate::shared::constants::BUTTON_ALPHA_DEFAULT;
@@ -12,14 +12,13 @@ use bevy::app::{App, Plugin};
 use bevy::asset::{AssetServer, Assets};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
-use bevy::ecs::children;
 use bevy::image::TextureAtlasLayout;
 use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Click, Commands, Component, DetectChangesMut,
   Entity, FlexDirection, IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, On,
-  OnExit, Pointer, PositionType, Query, Res, ResMut, Single, Text, TextColor, TextFont, UiRect, Update, With, Without,
-  default, in_state, percent, px,
+  OnExit, Pointer, Query, Res, ResMut, Single, TextColor, TextFont, UiRect, Update, With, Without, default, in_state,
+  percent, px,
 };
 use bevy_ui_text_input::actions::TextInputAction;
 use bevy_ui_text_input::{SubmitText, TextInputMode, TextInputNode, TextInputPrompt, TextInputQueue};
@@ -48,10 +47,6 @@ impl Plugin for JoinGameMenuPlugin {
 /// Marker component for the root of the menu. Used for despawning.
 #[derive(Component)]
 struct JoinGameMenuRoot;
-
-/// Marker component for displaying a notifications.
-#[derive(Component)]
-struct NotificationText;
 
 /// Marker component for the connect button.
 #[derive(Component)]
@@ -172,31 +167,6 @@ fn spawn_menu(
           spawn_button(parent, asset_server, BackButton, "Back", 300, NORMAL_FONT);
         });
     });
-
-  commands.spawn((
-    Name::new("Notification UI"),
-    JoinGameMenuRoot,
-    Node {
-      width: percent(100),
-      height: percent(25),
-      bottom: px(0.0),
-      position_type: PositionType::Absolute,
-      flex_direction: FlexDirection::Column,
-      justify_content: JustifyContent::Center,
-      align_items: AlignItems::Center,
-      ..default()
-    },
-    children![(
-      TextFont {
-        font,
-        font_size: NORMAL_FONT,
-        ..default()
-      },
-      TextColor(Color::from(tailwind::RED_500)),
-      Text::default(),
-      NotificationText,
-    )],
-  ));
 }
 
 /// A system to handle button interactions, excluding the connect button which is handled via an observer because it
@@ -231,7 +201,10 @@ fn handle_submit_text_messages(
     }
 
     // Let user know we're trying to connect
-    ui_message.write(UiNotification::info("Attempting to connect...".to_string()));
+    ui_message.write(UiNotification::info(format!(
+      "Attempting to connect... This can take up to {} seconds.",
+      CLIENT_HAND_SHAKE_TIMEOUT_SECS
+    )));
 
     // Ignore if connect button is disabled
     if **connect_button_interaction == CustomInteraction::Disabled {
@@ -256,15 +229,10 @@ fn handle_submit_text_messages(
 /// A system to handle UI error messages and display them in the menu. Also re-enables the connect and back buttons.
 fn handle_ui_notification_messages(
   mut messages: MessageReader<UiNotification>,
-  mut notification_text_query: Query<(&mut Text, &mut TextColor), With<NotificationText>>,
   mut connect_button_interaction: Single<&mut CustomInteraction, (With<ConnectButton>, Without<BackButton>)>,
   mut back_button_interaction: Single<&mut CustomInteraction, (With<BackButton>, Without<ConnectButton>)>,
 ) {
   for notification in messages.read() {
-    for (mut text, mut text_colour) in &mut notification_text_query {
-      text.0 = notification.text.clone();
-      text_colour.0 = *TextColor(notification.colour());
-    }
     if notification.should_reset_custom_interaction() {
       **connect_button_interaction = CustomInteraction::None;
       connect_button_interaction.set_changed();

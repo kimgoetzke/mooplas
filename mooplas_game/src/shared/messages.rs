@@ -139,7 +139,6 @@ impl ConnectionInfoMessage {
 }
 
 /// A [`Message`] for displaying an error message in the UI.
-#[cfg(feature = "online")]
 #[derive(Message, Clone)]
 pub struct UiNotification {
   pub text: String,
@@ -147,7 +146,6 @@ pub struct UiNotification {
   reset_custom_interaction: bool,
 }
 
-#[cfg(feature = "online")]
 impl UiNotification {
   pub fn error(text: String) -> Self {
     Self {

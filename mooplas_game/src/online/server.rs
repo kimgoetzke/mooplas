@@ -3,7 +3,7 @@ use crate::online::utils;
 use crate::prelude::{
   AvailableControlSchemes, ControlSchemeId, ExitLobbyMessage, InputMessage, LocalPlayerRegistrationRequestMessage,
   MAX_PLAYERS, MenuName, PlayerId, PlayerName, PlayerRegistrationMessage, RegisteredPlayers, Seed, SnakeHead,
-  ToggleMenuMessage, WinnerInfo,
+  ToggleMenuMessage, UiNotification, WinnerInfo,
 };
 use bevy::log::{debug, info, warn};
 use bevy::prelude::{
@@ -58,6 +58,8 @@ impl Plugin for ServerPlugin {
 }
 
 const CLIENT_MESSAGE_SERIALISATION: &str = "Failed to serialise client message";
+const PLAYER_JOINED_NOTIFICATION: &str = "A player joined the game";
+const PLAYER_LEFT_NOTIFICATION: &str = "A player left the game";
 
 // A resource to schedule the actual disconnect after broadcasting the shutdown message.
 #[derive(Resource)]
@@ -192,6 +194,36 @@ fn broadcast_player_unregistered(
   });
 }
 
+fn broadcast_client_connected(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  connected_client_id: ClientId,
+) {
+  let payload = encode_to_bytes(&InboundServerMessage::ClientConnected {
+    client_id: connected_client_id,
+  })
+  .expect(CLIENT_MESSAGE_SERIALISATION);
+  outbound_server_message.write(OutboundServerMessage::BroadcastExcept {
+    except_client_id: connected_client_id,
+    channel: ChannelType::ReliableOrdered,
+    payload,
+  });
+}
+
+fn broadcast_client_disconnected(
+  outbound_server_message: &mut MessageWriter<OutboundServerMessage>,
+  disconnected_client_id: ClientId,
+) {
+  let payload = encode_to_bytes(&InboundServerMessage::ClientDisconnected {
+    client_id: disconnected_client_id,
+  })
+  .expect(CLIENT_MESSAGE_SERIALISATION);
+  outbound_server_message.write(OutboundServerMessage::BroadcastExcept {
+    except_client_id: disconnected_client_id,
+    channel: ChannelType::ReliableOrdered,
+    payload,
+  });
+}
+
 /// Processes any incoming messages from clients by applying them locally and broadcasting them to all other clients,
 /// if necessary.
 fn handle_inbound_client_message(
@@ -256,6 +288,7 @@ fn handle_inbound_server_message(
   winner: Res<WinnerInfo>,
   mut registered_players: ResMut<RegisteredPlayers>,
   mut player_registration_message: MessageWriter<PlayerRegistrationMessage>,
+  mut ui_notification: MessageWriter<UiNotification>,
 ) {
   for message in messages.read() {
     match message {
@@ -280,6 +313,8 @@ fn handle_inbound_server_message(
           channel: ChannelType::ReliableOrdered,
           payload: seed_message,
         });
+        broadcast_client_connected(&mut outbound_server_message, *client_id);
+        ui_notification.write(UiNotification::info(PLAYER_JOINED_NOTIFICATION.to_string()));
 
         if *current_state == AppState::Preparing {
           // Advance to lobby once the first player connects
@@ -300,6 +335,8 @@ fn handle_inbound_server_message(
             false,
           );
         }
+        broadcast_client_disconnected(&mut outbound_server_message, *client_id);
+        ui_notification.write(UiNotification::info(PLAYER_LEFT_NOTIFICATION.to_string()));
       }
       _ => {}
     }
@@ -628,6 +665,145 @@ mod tests {
           && player.control_scheme_id == 1
           && player.name == "Remote"),
       "Expected remote registration replay"
+    );
+  }
+
+  #[test]
+  fn handle_inbound_server_message_broadcasts_client_connected_to_existing_clients() {
+    let mut app = setup();
+    set_app_state(&mut app, AppState::Registering);
+    app.add_systems(Update, handle_inbound_server_message);
+
+    let connected_client_id = ClientId::from_u64(8);
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientConnected {
+        client_id: connected_client_id,
+      })
+      .expect("Failed to queue ClientConnected message");
+    app.update();
+
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
+      .expect("Messages<OutboundServerMessage> missing");
+    let mut sent_bootstrap = false;
+    let mut broadcast_lifecycle = false;
+    for message in messages.iter_current_update_messages() {
+      match message {
+        OutboundServerMessage::Send { client_id, payload, .. } if *client_id == connected_client_id => {
+          sent_bootstrap = matches!(
+            decode_from_bytes::<InboundServerMessage>(payload),
+            Ok(InboundServerMessage::ClientInitialised { client_id, .. }) if client_id == connected_client_id
+          );
+        }
+        OutboundServerMessage::BroadcastExcept {
+          except_client_id,
+          payload,
+          ..
+        } if *except_client_id == connected_client_id => {
+          broadcast_lifecycle = matches!(
+            decode_from_bytes::<InboundServerMessage>(payload),
+            Ok(InboundServerMessage::ClientConnected { client_id }) if client_id == connected_client_id
+          );
+        }
+        _ => {}
+      }
+    }
+
+    assert!(sent_bootstrap, "Expected bootstrap message for connected client");
+    assert!(
+      broadcast_lifecycle,
+      "Expected client connection lifecycle broadcast excluding connected client"
+    );
+  }
+
+  #[test]
+  fn handle_inbound_server_message_writes_host_join_notification() {
+    let mut app = setup();
+    set_app_state(&mut app, AppState::Registering);
+    app.add_systems(Update, handle_inbound_server_message);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientConnected {
+        client_id: ClientId::from_u64(8),
+      })
+      .expect("Failed to queue ClientConnected message");
+    app.update();
+
+    let notifications = app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing");
+    let notification_texts: Vec<_> = notifications
+      .iter_current_update_messages()
+      .map(|notification| notification.text.as_str())
+      .collect();
+    assert_eq!(notification_texts, vec!["A player joined the game"]);
+  }
+
+  #[test]
+  fn handle_inbound_server_message_broadcasts_client_disconnected_after_cleanup() {
+    let mut app = setup();
+    add_control_schemes(&mut app, 1);
+    set_app_state(&mut app, AppState::Registering);
+    app.add_systems(Update, handle_inbound_server_message);
+
+    let disconnected_client_id = ClientId::from_u64(7);
+    {
+      let mut registered_players = app.world_mut().resource_mut::<RegisteredPlayers>();
+      registered_players
+        .register(crate::prelude::RegisteredPlayer::new_immutable(
+          PlayerId(0),
+          "Remote".to_string(),
+          ControlScheme::test(0),
+          Color::WHITE,
+        ))
+        .expect("Remote player should register");
+    }
+    app
+      .world_mut()
+      .resource_mut::<Lobby>()
+      .register_player(disconnected_client_id, PlayerId(0).into(), 0);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientDisconnected {
+        client_id: disconnected_client_id,
+      })
+      .expect("Failed to queue ClientDisconnected message");
+    app.update();
+
+    assert_eq!(app.world().resource::<RegisteredPlayers>().count(), 0);
+    assert!(
+      app
+        .world()
+        .resource::<Lobby>()
+        .get_registered_players_cloned(&disconnected_client_id)
+        .is_empty(),
+      "Expected disconnected client's registrations to be cleaned up"
+    );
+
+    let messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<OutboundServerMessage>>()
+      .expect("Messages<OutboundServerMessage> missing");
+    let broadcast_lifecycle = messages.iter_current_update_messages().any(|message| match message {
+      OutboundServerMessage::BroadcastExcept {
+        except_client_id,
+        payload,
+        ..
+      } if *except_client_id == disconnected_client_id => matches!(
+        decode_from_bytes::<InboundServerMessage>(payload),
+        Ok(InboundServerMessage::ClientDisconnected { client_id }) if client_id == disconnected_client_id
+      ),
+      _ => false,
+    });
+
+    assert!(
+      broadcast_lifecycle,
+      "Expected client disconnection lifecycle broadcast excluding disconnected client"
     );
   }
 

@@ -9,6 +9,7 @@ use crate::ui::in_game_ui::InGameUiPlugin;
 #[cfg(feature = "online")]
 use crate::ui::join_game_menu::JoinGameMenuPlugin;
 use crate::ui::main_menu::MainMenuPlugin;
+use crate::ui::notification::NotificationPlugin;
 use crate::ui::play_online_menu::PlayOnlineMenuPlugin;
 use crate::ui::shared;
 use crate::ui::shared::{BackgroundRoot, ButtonAnimation};
@@ -50,6 +51,7 @@ impl Plugin for UiPlugin {
       HostGameMenuPlugin,
       JoinGameMenuPlugin,
       TextInputPlugin,
+      NotificationPlugin,
     ));
   }
 }
