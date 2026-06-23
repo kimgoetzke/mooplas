@@ -2,7 +2,7 @@ use bevy::app::{App, Plugin, Update};
 use bevy::log::*;
 use bevy::prelude::{Commands, IntoScheduleConfigs, MessageReader, MessageWriter, ResMut, Resource, resource_exists};
 use bevy_matchbox::MatchboxSocket;
-use bevy_matchbox::matchbox_socket::{ChannelError, Packet, PeerId};
+use bevy_matchbox::matchbox_socket::{ChannelError, Packet, PeerId, PeerState};
 use mooplas_networking::prelude::{
   ChannelType, ClientNetworkingActive, InboundServerMessage, NetworkErrorEvent, OutboundClientMessage,
   decode_from_bytes,
@@ -30,6 +30,20 @@ pub struct HostConnectionInfo {
   pub host_id: PeerId,
 }
 
+fn network_error_from_peer_state(peer_state: PeerState) -> Option<NetworkErrorEvent> {
+  match peer_state {
+    PeerState::Connected => None,
+    PeerState::Disconnected => Some(NetworkErrorEvent::Disconnect("Host disconnected".to_string())),
+  }
+}
+
+fn network_error_from_channel_error(channel_error: ChannelError) -> NetworkErrorEvent {
+  match channel_error {
+    ChannelError::Closed => NetworkErrorEvent::Disconnect("Connection closed".to_string()),
+    _ => NetworkErrorEvent::OtherError(channel_error.to_string()),
+  }
+}
+
 fn receive_server_messages_system(
   mut socket: ResMut<MatchboxSocket>,
   mut commands: Commands,
@@ -39,15 +53,13 @@ fn receive_server_messages_system(
     Ok(result) => {
       for (peer_id, state) in result {
         info!("[{peer_id}]: {state:?}");
+        if let Some(error) = network_error_from_peer_state(state) {
+          commands.trigger(error);
+        }
       }
     }
     Err(channel_error) => {
-      let error = match channel_error {
-        ChannelError::Closed => NetworkErrorEvent::Disconnect("Connection closed".to_string()),
-        _ => NetworkErrorEvent::OtherError(channel_error.to_string()),
-      };
-
-      commands.trigger(error);
+      commands.trigger(network_error_from_channel_error(channel_error));
     }
   }
 
@@ -87,5 +99,26 @@ fn handle_outbound_client_message(
         socket.close();
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn network_error_from_peer_state_returns_disconnect_when_host_peer_disconnects() {
+    let error = network_error_from_peer_state(PeerState::Disconnected)
+      .expect("Expected host peer disconnection to become network error");
+
+    assert!(matches!(
+      error,
+      NetworkErrorEvent::Disconnect(message) if message == "Host disconnected"
+    ));
+  }
+
+  #[test]
+  fn network_error_from_peer_state_ignores_connected_host_peer() {
+    assert!(network_error_from_peer_state(PeerState::Connected).is_none());
   }
 }

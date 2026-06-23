@@ -116,7 +116,6 @@ fn host_room_url(signalling_server_base_url: &str, room_id: &str) -> String {
   )
 }
 
-// TODO: Implement an visual feedback for the user when host leaves
 #[allow(clippy::never_loop)]
 fn receive_network_error_event(
   error_event: On<NetworkErrorEvent>,
@@ -150,6 +149,10 @@ fn receive_network_error_event(
       return;
     }
 
+    if network_role.is_client() {
+      ui_message.write(UiNotification::error(format!("{}", error)));
+    }
+
     // In all other cases, we fall back to the main menu for now
     next_app_state.set(next_state);
     *network_role = NetworkRole::None;
@@ -162,12 +165,67 @@ fn receive_network_error_event(
 #[cfg(test)]
 mod tests {
   use super::*;
+  use bevy::prelude::*;
+  use bevy::state::app::StatesPlugin;
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, StatesPlugin));
+    app.init_state::<AppState>();
+    app.add_message::<UiNotification>();
+    app.insert_resource(NetworkRole::Client);
+    app.add_observer(receive_network_error_event);
+    app
+  }
+
+  fn set_app_state(app: &mut App, state: AppState) {
+    app.world_mut().resource_mut::<NextState<AppState>>().set(state);
+    app.update();
+  }
+
+  fn notification_texts(app: &mut App) -> Vec<String> {
+    app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing")
+      .iter_current_update_messages()
+      .map(|notification| notification.text.clone())
+      .collect()
+  }
 
   #[test]
   fn host_room_url_adds_host_role_without_changing_room_id() {
     assert_eq!(
       host_room_url("wss://signal.example.com/", "room-456"),
       "wss://signal.example.com/room-456?role=host"
+    );
+  }
+
+  #[test]
+  fn receive_network_error_event_writes_host_left_notification_for_client_disconnect_after_preparing() {
+    let mut app = setup();
+    set_app_state(&mut app, AppState::Playing);
+
+    app
+      .world_mut()
+      .trigger(NetworkErrorEvent::Disconnect("Host disconnected".to_string()));
+
+    assert_eq!(notification_texts(&mut app), vec!["Host disconnected".to_string()]);
+    assert_eq!(*app.world().resource::<NetworkRole>(), NetworkRole::None);
+  }
+
+  #[test]
+  fn receive_network_error_event_keeps_preparing_connection_failure_notification() {
+    let mut app = setup();
+    set_app_state(&mut app, AppState::Preparing);
+
+    app
+      .world_mut()
+      .trigger(NetworkErrorEvent::Disconnect("Connection closed".to_string()));
+
+    assert_eq!(
+      notification_texts(&mut app),
+      vec!["Unable to establish connection - is there a typo in the room ID or URL?"]
     );
   }
 }

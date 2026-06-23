@@ -27,6 +27,7 @@ pub struct ClientPlugin;
 struct CurrentClientId(Option<ClientId>);
 
 const CONNECTED_NOTIFICATION: &str = "Connected to game";
+const HOST_LEFT_NOTIFICATION: &str = "The host has left the game";
 const PLAYER_JOINED_NOTIFICATION: &str = "A player joined the game";
 const PLAYER_LEFT_NOTIFICATION: &str = "A player left the game";
 
@@ -237,6 +238,7 @@ fn handle_inbound_server_message(
       }
       InboundServerMessage::ShutdownServer => {
         exit_lobby_message.write(ExitLobbyMessage::forced_by_server());
+        ui_notification.write(UiNotification::error(HOST_LEFT_NOTIFICATION.to_string()));
       }
       InboundServerMessage::UpdatePlayerStates { states } => {
         for (player_id, x, y, rotation_z) in states {
@@ -587,6 +589,7 @@ mod tests {
     assert_eq!(app.world().resource::<Seed>().get(), 41);
   }
 
+  //noinspection DuplicatedCode
   #[test]
   fn handle_inbound_server_message_sets_seed_when_client_initialised_received() {
     let mut app = setup();
@@ -688,6 +691,7 @@ mod tests {
     assert_eq!(notification_texts, vec!["A player joined the game"]);
   }
 
+  //noinspection DuplicatedCode
   #[test]
   fn handle_inbound_server_message_writes_connected_notification_when_initialised() {
     let mut app = setup();

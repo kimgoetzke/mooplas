@@ -115,8 +115,14 @@ pub enum NetworkErrorEvent {
 impl Error for NetworkErrorEvent {}
 
 impl Display for NetworkErrorEvent {
-  fn fmt(&self, fmt: &mut Formatter) -> fmt::Result {
-    Debug::fmt(&self, fmt)
+  fn fmt(&self, fmt: &mut Formatter<'_>) -> fmt::Result {
+    let message = match self {
+      NetworkErrorEvent::Disconnect(message)
+      | NetworkErrorEvent::NetcodeTransportError(message)
+      | NetworkErrorEvent::IoError(message)
+      | NetworkErrorEvent::OtherError(message) => message,
+    };
+    write!(fmt, "{message}")
   }
 }
 
@@ -194,5 +200,30 @@ impl Debug for ClientMessage {
         write!(f, "ClientMessage::{:?}", action)
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn network_error_event_display_returns_only_inner_message() {
+    assert_eq!(
+      NetworkErrorEvent::Disconnect("Host disconnected".to_string()).to_string(),
+      "Host disconnected"
+    );
+    assert_eq!(
+      NetworkErrorEvent::NetcodeTransportError("Transport failed".to_string()).to_string(),
+      "Transport failed"
+    );
+    assert_eq!(
+      NetworkErrorEvent::IoError("IO error".to_string()).to_string(),
+      "IO error"
+    );
+    assert_eq!(
+      NetworkErrorEvent::OtherError("Other error".to_string()).to_string(),
+      "Other error"
+    );
   }
 }
