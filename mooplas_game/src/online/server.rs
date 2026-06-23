@@ -11,9 +11,8 @@ use bevy::prelude::{
   Resource, State, StateTransitionEvent, Time, Timer, TimerMode, Transform, Update, With, in_state, resource_exists,
 };
 use mooplas_networking::prelude::{
-  ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, OutboundServerMessage,
-  RegisteredClientPlayer, SerialisableRegisteredPlayer, SerialisableUnregistrationRequest, ServerNetworkingActive,
-  encode_to_bytes,
+  ChannelType, ClientId, InboundClientMessage, InboundServerMessage, Lobby, OutboundServerMessage, PlayerInLobby,
+  SerialisableRegisteredPlayer, SerialisableUnregistrationRequest, ServerNetworkingActive, encode_to_bytes,
 };
 use std::time::Duration;
 
@@ -308,7 +307,7 @@ fn handle_inbound_server_message(
 }
 
 fn lobby_snapshot(lobby: &Lobby, registered_players: &RegisteredPlayers) -> Vec<SerialisableRegisteredPlayer> {
-  let mut registrations: Vec<(ClientId, RegisteredClientPlayer)> = lobby
+  let mut registrations: Vec<(ClientId, PlayerInLobby)> = lobby
     .registered
     .iter()
     .flat_map(|(registered_client_id, players)| {

@@ -140,7 +140,6 @@ pub struct SerialisableUnregistrationRequest {
   pub player_id: PlayerId,
 }
 
-// TODO: Check if this struct is really required - probably not
 /// A player registration included in the authoritative client bootstrap.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct SerialisableRegisteredPlayer {
@@ -148,6 +147,13 @@ pub struct SerialisableRegisteredPlayer {
   pub player_id: u8,
   pub control_scheme_id: u8,
   pub name: String,
+}
+
+/// A player in an online game. Only used by the [`prelude::Lobby`] resource.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PlayerInLobby {
+  pub player_id: PlayerId,
+  pub control_scheme_id: u8,
 }
 
 /// The type sent by the networking code of the client. It's the same as [`InboundClientMessage`] but doesn't contain

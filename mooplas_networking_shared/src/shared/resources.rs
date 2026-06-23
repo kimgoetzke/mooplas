@@ -1,4 +1,4 @@
-use crate::prelude::{ClientId, PlayerId};
+use crate::prelude::{ClientId, PlayerId, PlayerInLobby};
 use bevy::app::{App, Plugin};
 use bevy::log::debug;
 use bevy::prelude::Resource;
@@ -113,32 +113,20 @@ fn validate_signalling_server_base_url(url: &str) -> Result<(), String> {
   Ok(())
 }
 
-// TODO: Consider removing this resource altogether / merge with SerialisableRegisteredPlayer
-/// A resource for the server to store information about connected clients and their registered players.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct RegisteredClientPlayer {
-  pub player_id: PlayerId,
-  pub control_scheme_id: u8,
-}
-
 /// A resource for the server to store information about connected clients and their registered players.
 #[derive(Debug, Default, Resource)]
 pub struct Lobby {
   pub connected: Vec<ClientId>,
-  pub registered: HashMap<ClientId, Vec<RegisteredClientPlayer>>,
+  pub registered: HashMap<ClientId, Vec<PlayerInLobby>>,
 }
 
 impl Lobby {
   /// Registers a player for the given client ID.
   pub fn register_player(&mut self, client_id: ClientId, player_id: PlayerId, control_scheme_id: u8) {
-    self
-      .registered
-      .entry(client_id)
-      .or_default()
-      .push(RegisteredClientPlayer {
-        player_id,
-        control_scheme_id,
-      });
+    self.registered.entry(client_id).or_default().push(PlayerInLobby {
+      player_id,
+      control_scheme_id,
+    });
   }
 
   /// Unregisters a player for the given client ID.
@@ -235,7 +223,7 @@ mod tests {
     lobby.register_player(client_id, player_id, 3);
     assert_eq!(
       lobby.registered.get(&client_id),
-      Some(&vec![RegisteredClientPlayer {
+      Some(&vec![PlayerInLobby {
         player_id,
         control_scheme_id: 3,
       }])
@@ -263,7 +251,7 @@ mod tests {
     lobby.unregister_player(client_id, player_id1);
     assert_eq!(
       lobby.registered.get(&client_id),
-      Some(&vec![RegisteredClientPlayer {
+      Some(&vec![PlayerInLobby {
         player_id: player_id2,
         control_scheme_id: 2,
       }])
