@@ -26,6 +26,7 @@ pub struct ClientPlugin;
 #[derive(Resource, Default)]
 struct CurrentClientId(Option<ClientId>);
 
+const CONNECTED_NOTIFICATION: &str = "Connected to game";
 const PLAYER_JOINED_NOTIFICATION: &str = "A player joined the game";
 const PLAYER_LEFT_NOTIFICATION: &str = "A player left the game";
 
@@ -184,6 +185,7 @@ fn handle_inbound_server_message(
       } => {
         seed.set(*server_seed);
         current_client_id.0 = Some(*client_id);
+        ui_notification.write(UiNotification::info(CONNECTED_NOTIFICATION.to_string()));
         registered_players.clear();
         local_input_mapping.clear();
         commands.insert_resource(PendingClientBootstrap {
@@ -687,6 +689,34 @@ mod tests {
   }
 
   #[test]
+  fn handle_inbound_server_message_writes_connected_notification_when_initialised() {
+    let mut app = setup();
+    app.add_systems(Update, handle_inbound_server_message);
+
+    app
+      .world_mut()
+      .write_message(InboundServerMessage::ClientInitialised {
+        seed: 123,
+        client_id: ClientId::from_u64(7),
+        current_state: "Registering".to_string(),
+        registered_players: Vec::new(),
+        winner_info: None,
+      })
+      .expect("Failed to write ClientInitialised message");
+    app.update();
+
+    let notifications = app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing");
+    let notification_texts: Vec<_> = notifications
+      .iter_current_update_messages()
+      .map(|notification| notification.text.as_str())
+      .collect();
+    assert_eq!(notification_texts, vec!["Connected to game"]);
+  }
+
+  #[test]
   fn handle_inbound_server_message_does_not_write_join_notification_for_bootstrap_snapshot() {
     let mut app = setup();
     app.add_systems(Update, handle_inbound_server_message);
@@ -712,7 +742,11 @@ mod tests {
       .world_mut()
       .get_resource_mut::<Messages<UiNotification>>()
       .expect("Messages<UiNotification> missing");
-    assert_eq!(notifications.iter_current_update_messages().count(), 0);
+    let notification_texts: Vec<_> = notifications
+      .iter_current_update_messages()
+      .map(|notification| notification.text.as_str())
+      .collect();
+    assert_eq!(notification_texts, vec!["Connected to game"]);
   }
 
   #[test]
