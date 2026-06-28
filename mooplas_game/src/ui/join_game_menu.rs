@@ -140,7 +140,7 @@ fn spawn_menu(
             BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
             Node {
               width: percent(100),
-              height: px(45.),
+              height: px(55.),
               padding: UiRect::all(px(10.)),
               align_items: AlignItems::Center,
               justify_content: JustifyContent::Center,
@@ -228,7 +228,6 @@ fn handle_submit_connection_keyboard_system(
   if !keyboard_input.just_pressed(KeyCode::Enter) {
     return;
   }
-
   let Some(focused_entity) = input_focus.get() else {
     return;
   };
@@ -238,7 +237,6 @@ fn handle_submit_connection_keyboard_system(
   if input.is_composing() {
     return;
   }
-
   let Ok(mut connect_button_interaction) = connect_button_query.single_mut() else {
     return;
   };

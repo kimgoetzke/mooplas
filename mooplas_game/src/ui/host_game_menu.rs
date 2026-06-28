@@ -146,7 +146,7 @@ fn spawn_menu(
             BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
             Node {
               width: percent(100),
-              height: px(45.),
+              height: px(55.),
               padding: UiRect::all(px(10.)),
               align_items: AlignItems::Center,
               justify_content: JustifyContent::Center,
