@@ -53,8 +53,8 @@ fn create_world_system(
               Name::new("Text"),
               Text2d::new(description),
               TextFont {
-                font_size: 16.,
-                font: asset_server.load(DEFAULT_FONT),
+                font_size: FontSize::Px(16.0),
+                font: asset_server.load(DEFAULT_FONT).into(),
                 font_smoothing: FontSmoothing::None,
                 ..default()
               },

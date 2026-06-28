@@ -1700,23 +1700,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bevy_ui_text_input"
-version = "0.7.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "390917ea8e68505bd94f29c4ce8ec337a011b5ccd48a3ac7378961ca6c59de45"
-dependencies = [
- "arboard",
- "bevy",
- "cosmic-text",
- "cosmic_undo_2",
- "once_cell",
- "sys-locale",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
-]
-
-[[package]]
 name = "bevy_utils"
 version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3603,7 +3586,6 @@ dependencies = [
  "avian2d",
  "bevy",
  "bevy-inspector-egui",
- "bevy_ui_text_input",
  "crossbeam-channel",
  "postcard",
  "rand",

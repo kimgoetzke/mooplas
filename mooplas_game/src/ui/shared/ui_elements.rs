@@ -14,9 +14,9 @@ use bevy::image::{Image, TextureAtlas, TextureAtlasLayout};
 use bevy::math::{UVec2, Vec2};
 use bevy::prelude::{
   AlignItems, BackgroundColor, BorderColor, BorderGradient, BorderRadius, Bundle, ChildOf, Component, Entity,
-  FlexDirection, Font, ImageNode, Justify, JustifyContent, LineBreak, LinearGradient, Name, Node, NodeImageMode,
-  PositionType, Query, SpriteImageMode, SpriteScalingMode, Text, TextColor, TextFont, TextLayout, TextShadow, Timer,
-  TimerMode, UiRect, With, children, default, percent, px,
+  FlexDirection, Font, FontSize, ImageNode, Justify, JustifyContent, LineBreak, LinearGradient, Name, Node,
+  NodeImageMode, PositionType, Query, SpriteImageMode, SpriteScalingMode, Text, TextColor, TextFont, TextLayout,
+  TextShadow, Timer, TimerMode, UiRect, With, children, default, percent, px,
 };
 use bevy::prelude::{Commands, Sprite, Transform};
 
@@ -167,8 +167,8 @@ fn button(
     children![(
       Text::new(button_text),
       TextFont {
-        font: asset_server.load(DEFAULT_FONT),
-        font_size,
+        font: asset_server.load(DEFAULT_FONT).into(),
+        font_size: FontSize::Px(font_size),
         ..default()
       },
       TEXT_COLOUR,
@@ -218,8 +218,8 @@ pub(crate) fn player_slot_label(
 /// Returns the [`TextFont`] for regular in-game text.
 pub(crate) fn default_font(font: &Handle<Font>) -> TextFont {
   TextFont {
-    font: font.clone(),
-    font_size: NORMAL_FONT,
+    font: font.clone().into(),
+    font_size: FontSize::Px(NORMAL_FONT),
     ..default()
   }
 }
@@ -227,8 +227,8 @@ pub(crate) fn default_font(font: &Handle<Font>) -> TextFont {
 /// Returns the [`TextFont`] for large in-game text, e.g. the "Player {id} wins!" text at the end of a game.
 pub(crate) fn large_font(font: &Handle<Font>) -> TextFont {
   TextFont {
-    font: font.clone(),
-    font_size: LARGE_FONT,
+    font: font.clone().into(),
+    font_size: FontSize::Px(LARGE_FONT),
     ..default()
   }
 }

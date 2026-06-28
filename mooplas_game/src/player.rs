@@ -328,7 +328,7 @@ fn update_active_segment_mesh_system(
       }
       if let Some(mesh_entity) = active_segment.mesh_entity() {
         if let Ok(mesh2d) = mesh_query.get_mut(mesh_entity) {
-          if let Some(m) = meshes.get_mut(&mesh2d.0) {
+          if let Some(mut m) = meshes.get_mut(&mesh2d.0) {
             *m = create_snake_tail_mesh(&active_segment.positions());
           }
         }

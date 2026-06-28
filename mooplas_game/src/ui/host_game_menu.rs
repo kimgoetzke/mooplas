@@ -11,15 +11,16 @@ use bevy::asset::{AssetServer, Assets};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::image::TextureAtlasLayout;
+use bevy::input_focus::AutoFocus;
+use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::log::*;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Commands, Component, Entity, FlexDirection,
-  IntoScheduleConfigs, Justify, JustifyContent, Local, MessageReader, MessageWriter, Name, Node, OnExit, Query, Res,
-  ResMut, Text, TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
+  FontSize, IntoScheduleConfigs, Justify, JustifyContent, Local, MessageReader, MessageWriter, Name, Node, OnExit,
+  Query, Res, ResMut, Text, TextColor, TextFont, TextLayout, TextShadow, UiRect, Update, With, default, in_state,
+  percent, px,
 };
-use bevy::text::LineHeight;
-use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
-use bevy_ui_text_input::{TextInputMode, TextInputNode, TextInputPrompt, TextInputQueue};
+use bevy::text::{EditableText, LineHeight, TextCursorStyle, TextEdit};
 
 /// A plugin to manage the game menu UI used to host an online multiplayer game. Only included with the "online"
 /// feature.
@@ -45,6 +46,10 @@ impl Plugin for HostGameMenuPlugin {
 /// Marker component for the root of the menu. Used for despawning.
 #[derive(Component)]
 struct HostGameMenuRoot;
+
+/// Marker component for the room ID input field.
+#[derive(Component)]
+struct HostRoomInputField;
 
 /// Marker component for the back button.
 #[derive(Component)]
@@ -82,6 +87,9 @@ fn spawn_menu(
   let heading_font = font.clone();
   let background_image = asset_server.load("images/background.png");
   let logo_image = asset_server.load("images/logo_animated.png");
+  let mut room_input = EditableText::new("Generating room ID...");
+  room_input.max_characters = Some(50);
+  room_input.visible_width = Some(25.);
 
   // Background & logo
   spawn_background_if_not_exists(
@@ -111,32 +119,29 @@ fn spawn_menu(
           parent.spawn((
             Text::new("Share this room ID with your friends:"),
             TextFont {
-              font: heading_font.clone(),
-              font_size: SMALL_FONT,
+              font: heading_font.clone().into(),
+              font_size: FontSize::Px(SMALL_FONT),
               ..default()
             },
             TEXT_COLOUR,
             TextShadow::default(),
           ));
 
-          // TODO: Replace bevy_ui_text_input because copy & paste doesn't work reliably enough across systems
           // Text input field to copy the host address from
           parent.spawn((
             Name::new("Input Field"),
-            TextInputNode {
-              mode: TextInputMode::SingleLine,
-              max_chars: Some(50),
-              clear_on_submit: true,
-              justification: Justify::Center,
-              ..Default::default()
-            },
-            TextInputPrompt::new("Generating room ID..."),
+            HostRoomInputField,
+            room_input,
+            AutoFocus,
+            TabIndex(0),
+            TextLayout::no_wrap().with_justify(Justify::Center),
             TextFont {
-              font,
-              font_size: NORMAL_FONT,
+              font: font.into(),
+              font_size: FontSize::Px(NORMAL_FONT),
               ..Default::default()
             },
             TextColor(Color::from(ACCENT_COLOUR)),
+            TextCursorStyle::default(),
             BorderColor::all(Color::from(tailwind::SLATE_500)),
             BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
             Node {
@@ -154,8 +159,8 @@ fn spawn_menu(
           parent.spawn((
             Text::new("Waiting for at least one player to join..."),
             TextFont {
-              font: heading_font.clone(),
-              font_size: SMALL_FONT,
+              font: heading_font.clone().into(),
+              font_size: FontSize::Px(SMALL_FONT),
               ..default()
             },
             LineHeight::RelativeToFont(2.),
@@ -172,7 +177,7 @@ fn spawn_menu(
 /// System to handle updating the host address text when the connection info is updated.
 fn handle_connection_info_updated_message(
   mut messages: MessageReader<ConnectionInfoMessage>,
-  mut text_input_queue: Query<&mut TextInputQueue>,
+  mut room_input_query: Query<&mut EditableText, With<HostRoomInputField>>,
   mut retryable_connection_info_message: Local<Option<(ConnectionInfoMessage, bool)>>,
 ) {
   for message in messages.read() {
@@ -182,10 +187,10 @@ fn handle_connection_info_updated_message(
 
   if let Some((message, is_processed)) = &mut *retryable_connection_info_message {
     if !*is_processed {
-      for mut queue in &mut text_input_queue {
-        queue.add_front(TextInputAction::Edit(TextInputEdit::Paste(
-          message.connection_string.clone(),
-        )));
+      for mut room_input in &mut room_input_query {
+        room_input.clear();
+        room_input.editor_mut().set_text(&message.connection_string);
+        room_input.queue_edit(TextEdit::TextEnd(false));
         trace!("Successfully updated text input field with connection info");
         *is_processed = true;
       }

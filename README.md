@@ -54,6 +54,25 @@ In-game:
 
 ![Screenshots 3](mooplas_game/assets/ignore/demo/screenshot-3.png)
 
+## How to run
+
+The default feature set includes online multiplayer and dev tooling:
+
+```shell
+cargo run -p mooplas_game
+```
+
+To run just the game with online multiplayer (drop `--features online` for local multiplayer only):
+```shell
+cargo run -p mooplas_game --no-default-features --features online
+```
+
+To run without online mode while keeping dev tooling enabled:
+
+```shell
+cargo run -p mooplas_game --no-default-features --features dev
+```
+
 ## How to develop
 
 ### Using Nix Flakes, JetBrains RustRover & Direnv

@@ -17,13 +17,13 @@ use crate::ui::touch_controls_ui::TouchControlsUiPlugin;
 use bevy::app::{App, Plugin, PostUpdate, Update};
 use bevy::color::palettes::tailwind;
 use bevy::color::{Alpha, Color};
+#[cfg(feature = "online")]
+use bevy::input_focus::tab_navigation::TabNavigationPlugin;
 use bevy::log::trace;
 use bevy::prelude::{
   BackgroundColor, BorderColor, BorderGradient, Cancel, Changed, Commands, DetectChangesMut, Entity, Gradient,
   IntoScheduleConfigs, LinearGradient, On, OnExit, Out, Over, Pointer, Press, Query, Release, Res, Time, With,
 };
-#[cfg(feature = "online")]
-use bevy_ui_text_input::TextInputPlugin;
 
 /// A plugin that manages the user interface elements of the game, including in-game UI and touch controls UI.
 pub struct UiPlugin;
@@ -50,7 +50,7 @@ impl Plugin for UiPlugin {
       EnterNameMenuPlugin,
       HostGameMenuPlugin,
       JoinGameMenuPlugin,
-      TextInputPlugin,
+      TabNavigationPlugin,
       NotificationPlugin,
     ));
   }

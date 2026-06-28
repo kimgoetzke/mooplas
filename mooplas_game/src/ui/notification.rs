@@ -6,9 +6,9 @@ use bevy::asset::AssetServer;
 use bevy::color::Color;
 use bevy::picking::Pickable;
 use bevy::prelude::{
-  AlignItems, Alpha, Commands, Component, Entity, Justify, JustifyContent, LineBreak, MessageReader, Name, Node,
-  PositionType, Query, Res, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, Time, Timer, TimerMode, With,
-  default, percent, px,
+  AlignItems, Alpha, Commands, Component, Entity, FontSize, Justify, JustifyContent, LineBreak, MessageReader, Name,
+  Node, PositionType, Query, Res, Text, TextBackgroundColor, TextColor, TextFont, TextLayout, Time, Timer, TimerMode,
+  With, default, percent, px,
 };
 use bevy::text::LineHeight;
 
@@ -68,8 +68,8 @@ fn handle_ui_notification_messages(
         Pickable::IGNORE,
         Text::new(format!(" {} ", notification.text.clone())),
         TextFont {
-          font: asset_server.load(DEFAULT_FONT),
-          font_size: SMALL_FONT,
+          font: asset_server.load(DEFAULT_FONT).into(),
+          font_size: FontSize::Px(SMALL_FONT),
           ..default()
         },
         LineHeight::RelativeToFont(1.5),

@@ -13,15 +13,15 @@ use bevy::asset::{AssetServer, Assets};
 use bevy::color::Color;
 use bevy::color::palettes::tailwind;
 use bevy::image::TextureAtlasLayout;
+use bevy::input_focus::AutoFocus;
+use bevy::input_focus::tab_navigation::TabIndex;
 use bevy::log::debug;
 use bevy::prelude::{
   AlignItems, Alpha, BackgroundColor, BorderColor, BorderRadius, Changed, Commands, Component, Entity, FlexDirection,
   IntoScheduleConfigs, Justify, JustifyContent, MessageReader, MessageWriter, Name, Node, OnExit, Query, Res, ResMut,
-  Text, TextColor, TextFont, TextShadow, UiRect, Update, With, default, in_state, percent, px,
+  Text, TextColor, TextFont, TextLayout, TextShadow, UiRect, Update, With, default, in_state, percent, px,
 };
-use bevy::text::LineHeight;
-use bevy_ui_text_input::actions::{TextInputAction, TextInputEdit};
-use bevy_ui_text_input::{TextInputBuffer, TextInputMode, TextInputNode, TextInputQueue};
+use bevy::text::{EditableText, FontSize, LineHeight, TextCursorStyle};
 
 /// A plugin to manage the name entry menu UI. Players choose their name before entering
 /// the play online menu.
@@ -103,6 +103,9 @@ fn spawn_menu(
   spawn_logo(commands, EnterNameMenuRoot, logo_image, texture_atlas_layouts);
 
   let initial_name = player_name.get().to_string();
+  let mut name_input = EditableText::new(initial_name);
+  name_input.max_characters = Some(8);
+  name_input.visible_width = Some(8.);
 
   // Enter name UI
   commands
@@ -120,10 +123,10 @@ fn spawn_menu(
         .with_children(|parent| {
           // Prompt text
           parent.spawn((
-            Text::new("Choose your name:"),
+            Text::new("Choose your name (max. 8 characters):"),
             TextFont {
-              font: heading_font.clone(),
-              font_size: SMALL_FONT,
+              font: heading_font.clone().into(),
+              font_size: FontSize::Px(SMALL_FONT),
               ..default()
             },
             TEXT_COLOUR,
@@ -131,48 +134,39 @@ fn spawn_menu(
           ));
 
           // Name text input field, pre-populated with random name
-          let input_entity = parent
-            .spawn((
-              Name::new("Name Input Field"),
-              NameInputField,
-              TextInputNode {
-                mode: TextInputMode::SingleLine,
-                max_chars: Some(8),
-                clear_on_submit: false,
-                justification: Justify::Center,
-                ..Default::default()
-              },
-              TextFont {
-                font,
-                font_size: NORMAL_FONT,
-                ..Default::default()
-              },
-              TextColor(Color::from(ACCENT_COLOUR)),
-              BorderColor::all(Color::from(tailwind::SLATE_500)),
-              BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
-              Node {
-                width: percent(100),
-                height: px(45.),
-                padding: UiRect::all(px(10.)),
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::Center,
-                border_radius: BorderRadius::all(px(10)),
-                ..default()
-              },
-            ))
-            .id();
-
-          // Pre-populate with the current name via paste action
-          let mut queue = TextInputQueue::default();
-          queue.add(TextInputAction::Edit(TextInputEdit::Paste(initial_name)));
-          parent.commands().entity(input_entity).insert(queue);
+          parent.spawn((
+            Name::new("Name Input Field"),
+            NameInputField,
+            name_input,
+            AutoFocus,
+            TabIndex(0),
+            TextLayout::no_wrap().with_justify(Justify::Center),
+            TextFont {
+              font: font.into(),
+              font_size: FontSize::Px(NORMAL_FONT),
+              ..Default::default()
+            },
+            TextColor(Color::from(ACCENT_COLOUR)),
+            TextCursorStyle::default(),
+            BorderColor::all(Color::from(tailwind::SLATE_500)),
+            BackgroundColor(Color::from(tailwind::SLATE_500.with_alpha(BUTTON_ALPHA_DEFAULT))),
+            Node {
+              width: percent(100),
+              height: px(45.),
+              padding: UiRect::all(px(10.)),
+              align_items: AlignItems::Center,
+              justify_content: JustifyContent::Center,
+              border_radius: BorderRadius::all(px(10)),
+              ..default()
+            },
+          ));
 
           // Info note
           parent.spawn((
             Text::new("To change your name later, you need to restart Mooplas."),
             TextFont {
-              font: heading_font,
-              font_size: SMALL_FONT,
+              font: heading_font.into(),
+              font_size: FontSize::Px(SMALL_FONT),
               ..default()
             },
             LineHeight::RelativeToFont(2.),
@@ -194,13 +188,13 @@ fn handle_button_interactions_system(
   mut continue_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<ContinueButton>)>,
   mut back_button_query: Query<&CustomInteraction, (Changed<CustomInteraction>, With<BackButton>)>,
   mut toggle_menu_message: MessageWriter<ToggleMenuMessage>,
-  name_input_query: Query<&TextInputBuffer, With<NameInputField>>,
+  name_input_query: Query<&EditableText, With<NameInputField>>,
   mut player_name: ResMut<PlayerName>,
 ) {
   for interaction in &mut continue_button_query {
     if *interaction == CustomInteraction::Released {
       if let Ok(input_buffer) = name_input_query.single() {
-        let name = input_buffer.get_text().trim().to_string();
+        let name = input_buffer.value().to_string().trim().to_string();
         if !name.is_empty() {
           debug!("[Menu] Player name set to \"{}\"", name);
           player_name.set(name);
