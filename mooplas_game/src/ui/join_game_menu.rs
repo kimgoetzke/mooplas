@@ -318,3 +318,139 @@ fn handle_ui_notification_messages(
 fn despawn_menu_system(mut commands: Commands, menu_root_query: Query<Entity, With<JoinGameMenuRoot>>) {
   despawn_menu(&mut commands, &menu_root_query);
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::prelude::{App, Messages, MinimalPlugins, Mut, Update};
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_message::<ConnectionInfoMessage>();
+    app.add_message::<UiNotification>();
+    app.add_message::<ToggleMenuMessage>();
+    app
+  }
+
+  #[test]
+  fn handle_submit_connection_button_system_sends_trimmed_connection_info_and_disables_buttons() {
+    let mut app = setup();
+    app.add_systems(Update, handle_submit_connection_button_system);
+    app
+      .world_mut()
+      .spawn((JoinRoomInputField, EditableText::new("  room-42  ")));
+    app.world_mut().spawn((ConnectButton, CustomInteraction::Released));
+    app.world_mut().spawn((BackButton, CustomInteraction::None));
+
+    app.update();
+
+    let connection_info_messages: Mut<Messages<ConnectionInfoMessage>> = app
+      .world_mut()
+      .get_resource_mut::<Messages<ConnectionInfoMessage>>()
+      .expect("Messages<ConnectionInfoMessage> missing");
+    let connection_info_messages: Vec<_> = connection_info_messages.iter_current_update_messages().collect();
+    assert_eq!(connection_info_messages.len(), 1);
+    assert_eq!(connection_info_messages[0].connection_string, "room-42");
+
+    let ui_messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<UiNotification>>()
+      .expect("Messages<UiNotification> missing");
+    assert_eq!(ui_messages.iter_current_update_messages().count(), 1);
+
+    let mut connect_query = app
+      .world_mut()
+      .query_filtered::<&CustomInteraction, With<ConnectButton>>();
+    assert_eq!(
+      *connect_query.single(app.world()).expect("Expected connect button"),
+      CustomInteraction::Disabled
+    );
+    let mut back_query = app.world_mut().query_filtered::<&CustomInteraction, With<BackButton>>();
+    assert_eq!(
+      *back_query.single(app.world()).expect("Expected back button"),
+      CustomInteraction::Disabled
+    );
+  }
+
+  #[test]
+  fn handle_submit_connection_button_system_ignores_empty_connection_string() {
+    let mut app = setup();
+    app.add_systems(Update, handle_submit_connection_button_system);
+    app.world_mut().spawn((JoinRoomInputField, EditableText::new("   ")));
+    app.world_mut().spawn((ConnectButton, CustomInteraction::Released));
+    app.world_mut().spawn((BackButton, CustomInteraction::None));
+
+    app.update();
+
+    let connection_info_messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<ConnectionInfoMessage>>()
+      .expect("Messages<ConnectionInfoMessage> missing");
+    assert_eq!(connection_info_messages.iter_current_update_messages().count(), 0);
+
+    let mut connect_query = app
+      .world_mut()
+      .query_filtered::<&CustomInteraction, With<ConnectButton>>();
+    assert_eq!(
+      *connect_query.single(app.world()).expect("Expected connect button"),
+      CustomInteraction::Released
+    );
+  }
+
+  #[test]
+  fn handle_submit_connection_keyboard_system_sends_connection_info_when_input_is_focused() {
+    let mut app = setup();
+    app.init_resource::<InputFocus>();
+    app.init_resource::<ButtonInput<KeyCode>>();
+    app.add_systems(Update, handle_submit_connection_keyboard_system);
+    let input_entity = app
+      .world_mut()
+      .spawn((JoinRoomInputField, EditableText::new("room-from-keyboard")))
+      .id();
+    app.world_mut().spawn((ConnectButton, CustomInteraction::None));
+    app.world_mut().spawn((BackButton, CustomInteraction::None));
+    app.world_mut().insert_resource(InputFocus::from_entity(input_entity));
+    app
+      .world_mut()
+      .resource_mut::<ButtonInput<KeyCode>>()
+      .press(KeyCode::Enter);
+
+    app.update();
+
+    let connection_info_messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<ConnectionInfoMessage>>()
+      .expect("Messages<ConnectionInfoMessage> missing");
+    let connection_info_messages: Vec<_> = connection_info_messages.iter_current_update_messages().collect();
+    assert_eq!(connection_info_messages.len(), 1);
+    assert_eq!(connection_info_messages[0].connection_string, "room-from-keyboard");
+  }
+
+  #[test]
+  fn handle_ui_notification_messages_resets_disabled_join_buttons_when_notification_requires_reset() {
+    let mut app = setup();
+    app.add_systems(Update, handle_ui_notification_messages);
+    app.world_mut().spawn((ConnectButton, CustomInteraction::Disabled));
+    app.world_mut().spawn((BackButton, CustomInteraction::Disabled));
+    app
+      .world_mut()
+      .write_message(UiNotification::error("Connection failed".to_string()))
+      .expect("Failed to write UiNotification");
+
+    app.update();
+
+    let mut connect_query = app
+      .world_mut()
+      .query_filtered::<&CustomInteraction, With<ConnectButton>>();
+    assert_eq!(
+      *connect_query.single(app.world()).expect("Expected connect button"),
+      CustomInteraction::None
+    );
+    let mut back_query = app.world_mut().query_filtered::<&CustomInteraction, With<BackButton>>();
+    assert_eq!(
+      *back_query.single(app.world()).expect("Expected back button"),
+      CustomInteraction::None
+    );
+  }
+}

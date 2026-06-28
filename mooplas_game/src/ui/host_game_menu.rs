@@ -219,3 +219,77 @@ fn handle_button_interactions_system(
 fn despawn_menu_system(mut commands: Commands, menu_root_query: Query<Entity, With<HostGameMenuRoot>>) {
   despawn_menu(&mut commands, &menu_root_query);
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::prelude::{App, Messages, MinimalPlugins, Mut, Update};
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_message::<ConnectionInfoMessage>();
+    app.add_message::<ToggleMenuMessage>();
+    app
+  }
+
+  #[test]
+  fn handle_connection_info_updated_message_updates_host_room_editable_text() {
+    let mut app = setup();
+    app.add_systems(Update, handle_connection_info_updated_message);
+    app
+      .world_mut()
+      .spawn((HostRoomInputField, EditableText::new("Generating room ID...")));
+    app
+      .world_mut()
+      .write_message(ConnectionInfoMessage::new("abc123".to_string()))
+      .expect("Failed to write ConnectionInfoMessage");
+
+    app.update();
+
+    let mut input_query = app
+      .world_mut()
+      .query_filtered::<&EditableText, With<HostRoomInputField>>();
+    let input = input_query.single(app.world()).expect("Expected host room input");
+    assert_eq!(input.value().to_string(), "abc123");
+  }
+
+  #[test]
+  fn handle_connection_info_updated_message_retries_until_host_room_input_exists() {
+    let mut app = setup();
+    app.add_systems(Update, handle_connection_info_updated_message);
+    app
+      .world_mut()
+      .write_message(ConnectionInfoMessage::new("late-room".to_string()))
+      .expect("Failed to write ConnectionInfoMessage");
+
+    app.update();
+    app
+      .world_mut()
+      .spawn((HostRoomInputField, EditableText::new("Generating room ID...")));
+    app.update();
+
+    let mut input_query = app
+      .world_mut()
+      .query_filtered::<&EditableText, With<HostRoomInputField>>();
+    let input = input_query.single(app.world()).expect("Expected host room input");
+    assert_eq!(input.value().to_string(), "late-room");
+  }
+
+  #[test]
+  fn handle_button_interactions_system_opens_play_online_menu_when_back_button_released() {
+    let mut app = setup();
+    app.add_systems(Update, handle_button_interactions_system);
+    app.world_mut().spawn((BackButton, CustomInteraction::Released));
+
+    app.update();
+
+    let toggle_menu_messages: Mut<Messages<ToggleMenuMessage>> = app
+      .world_mut()
+      .get_resource_mut::<Messages<ToggleMenuMessage>>()
+      .expect("Messages<ToggleMenuMessage> missing");
+    let toggle_menu_messages: Vec<_> = toggle_menu_messages.iter_current_update_messages().collect();
+    assert_eq!(toggle_menu_messages.len(), 1);
+    assert_eq!(toggle_menu_messages[0].active, MenuName::PlayOnlineMenu);
+  }
+}

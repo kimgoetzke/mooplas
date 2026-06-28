@@ -217,3 +217,76 @@ fn handle_button_interactions_system(
 fn despawn_menu_system(mut commands: Commands, menu_root_query: Query<Entity, With<EnterNameMenuRoot>>) {
   despawn_menu(&mut commands, &menu_root_query);
 }
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use bevy::prelude::{App, Messages, MinimalPlugins, Mut, Update};
+
+  fn setup() -> App {
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_message::<ToggleMenuMessage>();
+    let mut player_name = PlayerName::default();
+    player_name.set("OldName".to_string());
+    app.insert_resource(player_name);
+    app
+  }
+
+  #[test]
+  fn handle_button_interactions_system_saves_trimmed_editable_text_and_opens_play_online_menu() {
+    let mut app = setup();
+    app.add_systems(Update, handle_button_interactions_system);
+    app.world_mut().spawn((ContinueButton, CustomInteraction::Released));
+    app.world_mut().spawn((BackButton, CustomInteraction::None));
+    app.world_mut().spawn((NameInputField, EditableText::new("  Moop  ")));
+
+    app.update();
+
+    let player_name = app.world().resource::<PlayerName>();
+    assert_eq!(player_name.get(), "Moop");
+    assert!(player_name.is_confirmed());
+
+    let toggle_menu_messages: Mut<Messages<ToggleMenuMessage>> = app
+      .world_mut()
+      .get_resource_mut::<Messages<ToggleMenuMessage>>()
+      .expect("Messages<ToggleMenuMessage> missing");
+    let toggle_menu_messages: Vec<_> = toggle_menu_messages.iter_current_update_messages().collect();
+    assert_eq!(toggle_menu_messages.len(), 1);
+    assert_eq!(toggle_menu_messages[0].active, MenuName::PlayOnlineMenu);
+  }
+
+  #[test]
+  fn handle_button_interactions_system_keeps_existing_name_when_editable_text_is_empty() {
+    let mut app = setup();
+    app.add_systems(Update, handle_button_interactions_system);
+    app.world_mut().spawn((ContinueButton, CustomInteraction::Released));
+    app.world_mut().spawn((BackButton, CustomInteraction::None));
+    app.world_mut().spawn((NameInputField, EditableText::new("   ")));
+
+    app.update();
+
+    let player_name = app.world().resource::<PlayerName>();
+    assert_eq!(player_name.get(), "OldName");
+    assert!(player_name.is_confirmed());
+  }
+
+  #[test]
+  fn handle_button_interactions_system_opens_main_menu_when_back_button_released() {
+    let mut app = setup();
+    app.add_systems(Update, handle_button_interactions_system);
+    app.world_mut().spawn((ContinueButton, CustomInteraction::None));
+    app.world_mut().spawn((BackButton, CustomInteraction::Released));
+    app.world_mut().spawn((NameInputField, EditableText::new("Moop")));
+
+    app.update();
+
+    let toggle_menu_messages = app
+      .world_mut()
+      .get_resource_mut::<Messages<ToggleMenuMessage>>()
+      .expect("Messages<ToggleMenuMessage> missing");
+    let toggle_menu_messages: Vec<_> = toggle_menu_messages.iter_current_update_messages().collect();
+    assert_eq!(toggle_menu_messages.len(), 1);
+    assert_eq!(toggle_menu_messages[0].active, MenuName::MainMenu);
+  }
+}
