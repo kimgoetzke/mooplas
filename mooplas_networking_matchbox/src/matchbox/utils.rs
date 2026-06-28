@@ -1,7 +1,7 @@
 use bevy::prelude::Commands;
-use bevy_matchbox::MatchboxSocket;
 use bevy_matchbox::matchbox_socket::{PeerId, RtcIceServerConfig, WebRtcSocket};
 use bevy_matchbox::prelude::ChannelConfig;
+use bevy_matchbox::{MatchboxServer, MatchboxSocket};
 use mooplas_networking::prelude::{ClientId, ClientNetworkingActive, ServerNetworkingActive};
 use rand::RngExt;
 use rand::distr::Alphanumeric;
@@ -113,6 +113,9 @@ pub fn remove_all_matchbox_resources(commands: &mut Commands) {
   commands.remove_resource::<ClientNetworkingActive>();
   commands.remove_resource::<ServerNetworkingActive>();
   commands.remove_resource::<MatchboxSocket>();
+
+  #[cfg(not(target_arch = "wasm32"))]
+  commands.remove_resource::<MatchboxServer>();
 }
 
 #[cfg(test)]
