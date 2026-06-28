@@ -104,8 +104,8 @@ fn spawn_menu(
 
   let initial_name = player_name.get().to_string();
   let mut name_input = EditableText::new(initial_name);
-  name_input.max_characters = Some(8);
-  name_input.visible_width = Some(8.);
+  name_input.max_characters = Some(10);
+  name_input.visible_width = Some(10.);
 
   // Enter name UI
   commands
@@ -123,7 +123,7 @@ fn spawn_menu(
         .with_children(|parent| {
           // Prompt text
           parent.spawn((
-            Text::new("Choose your name (max. 8 characters):"),
+            Text::new("Choose your name (max. 10 characters):"),
             TextFont {
               font: heading_font.clone().into(),
               font_size: FontSize::Px(SMALL_FONT),
@@ -161,7 +161,7 @@ fn spawn_menu(
             },
           ));
 
-          // Info note
+          // Information text
           parent.spawn((
             Text::new("To change your name later, you need to restart Mooplas."),
             TextFont {

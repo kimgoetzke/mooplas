@@ -88,8 +88,8 @@ fn spawn_menu(
   let background_image = asset_server.load("images/background.png");
   let logo_image = asset_server.load("images/logo_animated.png");
   let mut room_input = EditableText::new("Generating room ID...");
-  room_input.max_characters = Some(50);
-  room_input.visible_width = Some(25.);
+  room_input.max_characters = Some(10);
+  room_input.visible_width = Some(10.);
 
   // Background & logo
   spawn_background_if_not_exists(
