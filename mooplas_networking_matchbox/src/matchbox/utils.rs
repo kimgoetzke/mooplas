@@ -10,13 +10,13 @@ use url::Url;
 const ROOM_NAME_LENGTH: usize = 6;
 const STUN_ICE_SERVER_URL: &str = "stun:stun.l.google.com:19302";
 
-/// Generates a WebSocket room ID such as 'psd7ah'.
+/// Generates a WebSocket room ID such as 'PSD7AH'.
 pub fn generate_room_id() -> String {
   rand::rng()
     .sample_iter(&Alphanumeric)
     .take(ROOM_NAME_LENGTH)
     .map(char::from)
-    .map(|c| c.to_ascii_lowercase())
+    .map(|c| c.to_ascii_uppercase())
     .collect()
 }
 
@@ -123,7 +123,7 @@ mod tests {
   fn generate_room_id_returns_lowercase_alphanumeric_room_id() {
     let room_id = generate_room_id();
     assert_eq!(room_id.len(), ROOM_NAME_LENGTH);
-    assert!(room_id.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit()));
+    assert!(room_id.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()));
   }
 
   #[test]
